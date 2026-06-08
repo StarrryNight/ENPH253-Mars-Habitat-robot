@@ -1,23 +1,20 @@
 #include "pid_controller.h"
 
-class PidController::PidController{
+PidController::PidController(double p, double i, double d, double max_i): k_p_(p), k_d_(d), k_i_(i), max_integral_(max_i) {}
 
-	public:
+double PidController::step(double error, double delta_t){
 
-	PidController(double p, double i, double d, double max_i): k_p(p), k_i(i), k_d(d), max_inte
+	current_integral_ = delta_t * k_i_ * error;
+	if (current_integral_ > max_integral_){
+		current_integral_ = max_integral_;
+    }
 
+	return error * k_p_ + error/k_d_ + current_integral_;
+}
 
+void PidController::reset(){
+	current_integral_ = 0;
+}
 
-	void step();
-
-	void reset();
-
-	private:
-
-	double k_p;
-	double k_d;
-	double k_i;
-	double current_integral;
 	
 
-};

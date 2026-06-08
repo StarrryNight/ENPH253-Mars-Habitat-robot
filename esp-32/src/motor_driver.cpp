@@ -1,5 +1,5 @@
 #include <cstdint>
-
+#include <Arduino.h>
 #include "constants.h"
 #include "motor_driver.h"
 
@@ -28,7 +28,7 @@ void rotateCounterClockwise(int8_t	speed) {
 
 }
 
-void changeDirectionBuffer() {
+void MotorDriver::changeDirectionBuffer() {
   ledcWrite(LEFT_PWM_CHANNEL_0, 0);
   ledcWrite(LEFT_PWM_CHANNEL_1, 0);
   ledcWrite(RIGHT_PWM_CHANNEL_0, 0);
