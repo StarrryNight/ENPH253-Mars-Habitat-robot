@@ -33,11 +33,16 @@ cv_test.py       # HSV color blob detection test (OpenCV)
 
 ### esp-32
 
--[ ] Write setup and skeleton of MrCrab -[ ] Test on esp -[ ] Write localizer (positionl tracker) -[ ] Write motion profile for robot -[x] Write generic PID controller
+- [ ] Write setup and skeleton of MrCrab
+- [ ] Test on esp
+- [ ] Write localizer (positionl tracker)
+- [ ] Write motion profile for robot
+- [x] Write generic PID controller
 
 ### raspberry-pi
 
--[ ] Write setup software -[ ] Write statemachine
+- [ ] Write setup software 
+- [ ] Write statemachine
 
 ### Integration
 
