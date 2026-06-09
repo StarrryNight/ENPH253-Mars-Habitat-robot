@@ -37,14 +37,24 @@ cv_test.py       # HSV color blob detection test (OpenCV)
 - [ ] Test on esp
 - [ ] Write localizer (positionl tracker)
 - [ ] Write motion profile for robot
+- [ ] Write motion profile for arm
 - [x] Write generic PID controller
 
 ### raspberry-pi
 
-- [ ] Write setup software 
+- [ ] Write Ms Crab (rasp superloop)
+- [ ] Set up camera
+- [ ] Write setup software
 - [ ] Write statemachine
+- [ ] Write arm poses
+- [ ] Write color blob detection
+- [ ] Write hardcose kinematics
 
 ### Integration
+
+- [ ] Write proto
+- [ ] Write translating software for both
+- [ ] Test communication
 
 ## Setup
 
