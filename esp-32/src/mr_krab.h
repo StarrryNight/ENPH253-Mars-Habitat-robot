@@ -1,13 +1,14 @@
 
-class MrCrab{
+class MrKrab{
 
-	private:
+	public:
 
 		void setup();
-		
+
 		void reset();
-		
-		void loop();
-	
+
+		void update();
+
 
 };
+

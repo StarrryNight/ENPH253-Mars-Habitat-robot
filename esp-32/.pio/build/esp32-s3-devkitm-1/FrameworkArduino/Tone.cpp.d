@@ -1,4 +1,5 @@
-.pio/build/esp32-s3-devkitm-1/src/main.cpp.o: src/main.cpp \
+.pio/build/esp32-s3-devkitm-1/FrameworkArduino/Tone.cpp.o: \
+ /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/Tone.cpp \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp_arduino_version.h \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/freertos/FreeRTOS.h \
@@ -178,8 +179,4 @@
  /home/samuel/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/spi_flash/include/esp_spi_flash_counters.h \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_hw_support/include/soc/esp32/spiram.h \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/io_pin_remap.h \
- /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h \
- /home/samuel/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/driver/include/driver/ledc.h \
- /home/samuel/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/hal/include/hal/ledc_types.h \
- /home/samuel/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/driver/include/driver/periph_ctrl.h \
- /home/samuel/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/soc/esp32s3/include/soc/periph_defs.h
+ /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h

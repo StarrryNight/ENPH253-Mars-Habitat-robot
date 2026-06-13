@@ -1,4 +1,7 @@
+#pragma once
+#include "motor_driver.h"
 #include "pid_controller.h"
+#include <optional>
 #include <chrono>
 
 struct WheelVelocities{
@@ -28,6 +31,11 @@ class MotorController{
 		PidController wheel_1_pid_;
 		PidController wheel_2_pid_;
 		PidController wheel_3_pid_;
+
+		MotorDriver wheel_1_motor_;
+		MotorDriver wheel_2_motor_;
+		MotorDriver wheel_3_motor_;
+
 		double current_position_;
 		WheelVelocities current_wheel_velocities_;
 		std::optional<std::chrono::time_point<std::chrono::steady_clock>> prev_step_time_;
