@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+message RobotMessage{
+    string robotState = 0;
+}
+
+message teletubbyFound{
+    double confidence =0;
+    int angle = 1;
+}
+
+message RobotReply{
+    int robotState=0;
+    int robotStateStatus=1;
+}
+
+message teleoperation{
+    double v_x =0;
+    double v_y =1;
+    double orientation =2;
+}
