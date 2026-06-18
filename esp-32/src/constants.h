@@ -4,7 +4,7 @@ static constexpr double CONTROL_LOOP_PERIOD = 1e-6;
 // Photoresistors
 static constexpr int LEFT_PHOTORESISTOR = 10;
 static constexpr int MID_LEFT_PHOTORESISTOR = 11;
-static constexpr int MID_LEFT_PHOTORESISTOR = 12;
+static constexpr int MID_RIGHT_PHOTORESISTOR = 12;
 static constexpr int RIGHT_PHOTORESISTOR = 13;
 
 static constexpr double LIGHT_THRESHOLD_V = 0.6;

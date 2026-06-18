@@ -38,7 +38,6 @@ class MotorController{
 
 		double current_position_;
 		WheelVelocities current_wheel_velocities_;
-		std::optional<std::chrono::time_point<std::chrono::steady_clock>> prev_step_time_;
 		
 		static constexpr double WHEEL_DISTANCE_FROM_CENTER_M = 0.3;
 

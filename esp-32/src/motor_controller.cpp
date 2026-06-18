@@ -5,7 +5,6 @@
 
 MotorController::MotorController(): current_position_(0),
 	current_wheel_velocities_({0,0,0}),
-	prev_step_time_(std::chrono::steady_clock::now()),
 	wheel_1_pid_(PidController(0,1,2,3)),
 	wheel_2_pid_(PidController(0,1,2,3)),
 	wheel_3_pid_(PidController(0,1,2,3)),
@@ -22,14 +21,9 @@ void MotorController::setVelocity(double target_velocity_x, double target_veloci
 
 	WheelVelocities target_wheel_velocities = euclideanToWheel(target_velocity_x, target_velocity_y, target_angular_velocity);
 
-// Corrected syntax using duration cast for fractional seconds
-	auto now = std::chrono::steady_clock::now();
-	auto delta_t = std::chrono::duration<double>(now - prev_step_time_.value()).count();
-	wheel_1_pid_.step(target_wheel_velocities.wheel_1 -current_wheel_velocities_.wheel_1, delta_t);
-	wheel_2_pid_.step(target_wheel_velocities.wheel_2 -current_wheel_velocities_.wheel_2, delta_t);
-	wheel_3_pid_.step(target_wheel_velocities.wheel_3 -current_wheel_velocities_.wheel_3, delta_t);
-
-	prev_step_time_ = std::chrono::steady_clock::now();	
+	wheel_1_pid_.step(target_wheel_velocities.wheel_1 -current_wheel_velocities_.wheel_1, CONTROL_LOOP_PERIOD);
+	wheel_2_pid_.step(target_wheel_velocities.wheel_2 -current_wheel_velocities_.wheel_2, CONTROL_LOOP_PERIOD);
+	wheel_3_pid_.step(target_wheel_velocities.wheel_3 -current_wheel_velocities_.wheel_3, CONTROL_LOOP_PERIOD);
 }
 
 /*

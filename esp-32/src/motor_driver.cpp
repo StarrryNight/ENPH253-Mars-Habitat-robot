@@ -29,13 +29,7 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 	ledcWrite(pwm_channel_1_, 0);
 
 	pinMode(encoder_pin_0_, INPUT_PULLUP);
-	attachInterruptArg(encoder_pin_0_, [](void* arg) IRAM_ATTR {
-	    MotorDriver* m = static_cast<MotorDriver*>(arg);
-	    uint64_t now = micros();
-	    if (now - m->last_encoder_time_ < 3000) return; // ignore if <1ms since last tick
-	    m->last_encoder_time_ = now;
-	    m->encoder_count_ += 1;
-	}, this, RISING);
+
 	attachInterruptArg(encoder_pin_0_, [](void* arg) IRAM_ATTR {
 	    static_cast<MotorDriver*>(arg)->encoder_count_ += 1;
 	}, this, RISING);
@@ -45,10 +39,10 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 	        static_cast<MotorDriver*>(arg)->tickVelocity();
 	    },
 	    .arg = this,
-	    .name = "velocity_counter_timer"
+	    .name = "velocity_count_timer"
 	};
 	esp_timer_create(&timer_args, &velocity_count_timer_);
-	esp_timer_start_periodic(velocity_count_timer_, 10000);
+	esp_timer_start_periodic(velocity_count_timer_, 20000);
 }
 
 void MotorDriver::rotateClockwise(int	speed) {
@@ -68,12 +62,11 @@ double MotorDriver::getCurrentVelocity(){
 
 
 void IRAM_ATTR MotorDriver::tickVelocity(){
-	
-	auto now = micros(); 
-	auto delta_t = (now-prev_encoder_time_)*1e-6; 
-	wheel_velocity_ = ((encoder_count_ - prev_measurement_encoder_count_)*ENCODER_RESOLUTION_DISTANCE_M )/delta_t;
-	prev_encoder_time_ = now;
-	prev_measurement_encoder_count_ = encoder_count_;
-	Serial.println(encoder_count_);
+
+	// auto now = micros();
+	// auto delta_t = (now-prev_encoder_time_)*1e-6;
+	// wheel_velocity_ = ((encoder_count_ - prev_measurement_encoder_count_)*ENCODER_RESOLUTION_DISTANCE_M )/delta_t;
+	// prev_encoder_time_ = now;
+	// prev_measurement_encoder_count_ = encoder_count_;
 }
 

@@ -1,4 +1,5 @@
-.pio/build/esp32-s3-devkitm-1/src/mr_krab.cpp.o: src/mr_krab.cpp \
+.pio/build/esp32-s3-devkitm-1/src/line_follower.cpp.o: \
+ src/line_follower.cpp src/line_follower.h src/pid_controller.h \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp_arduino_version.h \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/freertos/FreeRTOS.h \
@@ -179,7 +180,4 @@
  /home/samuel/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_hw_support/include/soc/esp32/spiram.h \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/io_pin_remap.h \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h \
- src/mr_krab.h src/line_follower.h src/pid_controller.h \
- src/motor_controller.h src/motor_driver.h \
- /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-gpio.h \
  src/constants.h
