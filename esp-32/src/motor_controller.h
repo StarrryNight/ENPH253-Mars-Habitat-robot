@@ -13,7 +13,7 @@ struct WheelVelocities{
 class MotorController{
 	public:
 		MotorController();
-		void setup();	
+		void begin();
 		void setVelocity(double target_velocity_x, double target_velocity_y, double target_angular_velocity);
 		
 

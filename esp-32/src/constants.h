@@ -24,11 +24,11 @@ static constexpr int WHEEL_2_PWM_CHANNEL_1 = 3;
 static constexpr int WHEEL_2_PWM_PIN_0 = 2;
 static constexpr int WHEEL_2_PWM_PIN_1 = 45;
 
-static constexpr int WHEEL_3_PWM_CHANNEL_0 = 0;
-static constexpr int WHEEL_3_PWM_CHANNEL_1 = 1;
+static constexpr int WHEEL_3_PWM_CHANNEL_0 = 4;
+static constexpr int WHEEL_3_PWM_CHANNEL_1 = 5;
 
-static constexpr int WHEEL_3_PWM_PIN_0 = 0;
-static constexpr int WHEEL_3_PWM_PIN_1 = 1;
+static constexpr int WHEEL_3_PWM_PIN_0 = 3;
+static constexpr int WHEEL_3_PWM_PIN_1 = 44;
 // Encoder
 static constexpr int WHEEL_1_ENCODER_0 = 3;
 static constexpr int WHEEL_1_ENCODER_1 = 4;

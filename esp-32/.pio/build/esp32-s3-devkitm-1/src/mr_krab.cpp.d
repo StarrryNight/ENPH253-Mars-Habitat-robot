@@ -180,6 +180,4 @@
  /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/io_pin_remap.h \
  /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h \
  src/mr_krab.h src/line_follower.h src/pid_controller.h \
- src/motor_controller.h src/motor_driver.h \
- /home/samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-gpio.h \
- src/constants.h
+ src/motor_controller.h src/motor_driver.h src/constants.h

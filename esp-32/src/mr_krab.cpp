@@ -1,29 +1,29 @@
 #include <Arduino.h>
 #include "mr_krab.h"
-#include "esp32-hal-gpio.h"
-#include "motor_driver.h"
 #include "constants.h"
+#include "motor_controller.h"
+
+MrKrab::MrKrab()
+	: motor_driver_1_(1, WHEEL_1_PWM_CHANNEL_0, WHEEL_1_PWM_CHANNEL_1, WHEEL_1_PWM_PIN_0, WHEEL_1_PWM_PIN_1, WHEEL_1_ENCODER_0, 0),
+	  motor_driver_2_(2, WHEEL_2_PWM_CHANNEL_0, WHEEL_2_PWM_CHANNEL_1, WHEEL_2_PWM_PIN_0, WHEEL_2_PWM_PIN_1, 0, 0),
+	  motor_controller_()
+{}
 
 void MrKrab::setup()
 {
 	Serial.begin(115200);
 	delay(100);
 	Serial.println("ESP32 is ready!");
-	pinMode(3, OUTPUT);
-	digitalWrite(3, HIGH);
-
-//	motor_driver_1_.emplace(1, WHEEL_1_PWM_CHANNEL_0, WHEEL_1_PWM_CHANNEL_1, WHEEL_1_PWM_PIN_0, WHEEL_1_PWM_PIN_1, WHEEL_1_ENCODER_0, 0);
-//	motor_driver_2_.emplace(2, WHEEL_2_PWM_CHANNEL_0, WHEEL_2_PWM_CHANNEL_1, WHEEL_2_PWM_PIN_0, WHEEL_2_PWM_PIN_1, 0, 0);
+	motor_controller_.begin();
+	motor_controller_.setVelocity(-1,-1,0);
+	delay(3000);
+	motor_controller_.setVelocity(1,1,0);
+//	motor_controller_.setVelocity(-1,-1,0);
+//	motor_driver_1_.begin();
 //
-//	motor_driver_1_->rotateClockwise(230);
-//	motor_driver_2_->rotateCounterClockwise(230);
-//	delay(2000);
-//	motor_driver_1_->rotateCounterClockwise(230);
-//	motor_driver_2_->rotateClockwise(230);
-//	delay(1000);
-//	motor_driver_1_->rotateClockwise(230);
-//	motor_driver_2_->rotateCounterClockwise(230);
-//	delay(2000);
+//	motor_driver_1_.rotateClockwise(230);
+//	delay(3000);
+//	motor_driver_1_.rotateCounterClockwise(230);
 }
 
 void MrKrab::reset()

@@ -16,26 +16,36 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 	pwm_pin_1_(pwm_pin_1),
 	encoder_pin_0_(encoder_pin_0),
 	encoder_pin_1_(encoder_pin_1),
-	prev_encoder_time_(micros()),
+	wheel_velocity_(0),
+	last_encoder_time_(0),
+	prev_encoder_time_(0),
 	encoder_count_(0),
-	prev_measurement_encoder_count_(0)  {
+	prev_measurement_encoder_count_(0),
+	velocity_count_timer_(nullptr) {}
 
-	ledcSetup(pwm_channel_0_, 1000, 8); // (pwmchannel to use,  frequency in Hz, number of bits)
+void MotorDriver::begin() {
+	prev_encoder_time_ = micros();
+
+	ledcSetup(pwm_channel_0_, 1000, 8);
 	ledcAttachPin(pwm_pin_0_, pwm_channel_0_);
+
+	ledcSetup(pwm_channel_1_, 1000, 8);
+	ledcAttachPin(pwm_pin_1_, pwm_channel_1_);
+
 	ledcWrite(pwm_channel_0_, 0);
-	
-	ledcSetup(pwm_channel_1_, 1000, 8); // (pwmchannel to use,  frequency in Hz, number of bits)
-	ledcAttachPin(pwm_pin_1_,pwm_channel_1_);
 	ledcWrite(pwm_channel_1_, 0);
 
 	pinMode(encoder_pin_0_, INPUT_PULLUP);
-
 	attachInterruptArg(encoder_pin_0_, [](void* arg) IRAM_ATTR {
-	    static_cast<MotorDriver*>(arg)->encoder_count_ += 1;
+	    MotorDriver* m = static_cast<MotorDriver*>(arg);
+	    uint64_t now = micros();
+	    if (now - m->last_encoder_time_ < 3000) return;
+	    m->last_encoder_time_ = now;
+	    m->encoder_count_ += 1;
 	}, this, RISING);
 
 	esp_timer_create_args_t timer_args = {
-	    .callback = [](void* arg){
+	    .callback = [](void* arg) {
 	        static_cast<MotorDriver*>(arg)->tickVelocity();
 	    },
 	    .arg = this,
@@ -46,13 +56,15 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 }
 
 void MotorDriver::rotateClockwise(int	speed) {
+  ledcWrite(pwm_channel_0_, 0);
   ledcWrite(pwm_channel_1_, 0);
-  delay(100); // this is a reasonable delay for switching direction
+  delay(200); // this is a reasonable delay for switching direction
   ledcWrite(pwm_channel_0_, speed);
 }
 void MotorDriver::rotateCounterClockwise(int	speed) {
   ledcWrite(pwm_channel_0_, 0);
-  delay(100); // this is a reasonable delay for switching direction
+  ledcWrite(pwm_channel_1_, 0);
+  delay(200); // this is a reasonable delay for switching direction
   ledcWrite(pwm_channel_1_, speed); 
 }
 

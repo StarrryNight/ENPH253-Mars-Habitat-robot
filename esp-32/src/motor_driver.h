@@ -9,6 +9,7 @@ class MotorDriver{
 
 public:
 	MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,int pwm_pin_0, int pwm_pin_1  ,int encoder_pin_0, int encoder_pin_1);
+	void begin();
 	void rotateClockwise(int	speed);
 	void rotateCounterClockwise(int	speed);
 
