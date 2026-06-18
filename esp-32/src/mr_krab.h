@@ -1,14 +1,15 @@
+#include "line_follower.h"
+class MrKrab
+{
 
-class MrKrab{
+public:
+	void setup();
 
-	public:
+	void reset();
 
-		void setup();
+	void update();
 
-		void reset();
-
-		void update();
-
-
+private:
+	void stepControl();
+	LineFollower line_follower_;
 };
-
