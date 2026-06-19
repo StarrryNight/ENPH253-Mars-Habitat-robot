@@ -53,8 +53,18 @@ void MotorDriver::begin() {
 	};
 	esp_timer_create(&timer_args, &velocity_count_timer_);
 	esp_timer_start_periodic(velocity_count_timer_, 20000);
-}
 
+
+	esp_timer_create_args_t timer_args = {
+	    .callback = [](void* arg) {
+	        static_cast<MotorDriver*>(arg)->tickVelocity();
+	    },
+	    .arg = this,
+	    .name = "velocity_count_timer"
+	};
+	esp_timer_create(&timer_args, &velocity_count_timer_);
+}
+//TODO: Make delay not blocking
 void MotorDriver::rotateClockwise(int	speed) {
   ledcWrite(pwm_channel_0_, 0);
   ledcWrite(pwm_channel_1_, 0);

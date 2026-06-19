@@ -27,11 +27,11 @@ void LineFollower::followLine()
     if (current_state[1] == 0 && current_state[2] == 0)
     {
         // steer left greatly if left photoresistor is on line and right isn't
-        if (prev_state_[0] == 1 && prev_state_[1] == 0)
+        if (prev_state_[1] == 1 && prev_state_[2] == 0)
         {
             line_followng_pid_.step(-BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
         }
-		else if (prev_state_[0] == 0 && prev_state_[1] == 1)
+		else if (prev_state_[1] == 0 && prev_state_[2] == 1)
         {
             line_followng_pid_.step(BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
         }
