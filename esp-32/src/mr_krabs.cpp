@@ -16,6 +16,8 @@ void MrKrabs::setup()
 	motor_controller_.emplace();
 	motor_controller_->setup();
 
+	delay(2000); // wait 2 s before driving so the robot can be placed safely
+
 	// Start fixed-rate control loop at CONTROL_LOOP_PERIOD_US (10 ms).
 	esp_timer_create_args_t timer_args = {
 		.callback = [](void *arg) { static_cast<MrKrabs *>(arg)->stepControl(); },
@@ -37,17 +39,8 @@ void MrKrabs::update()
 
 void MrKrabs::stepControl()
 {
-	if (is_line_following_)
-	{
-		RobotVelocity correction = line_follower_->calculateCorrection();
-		// Drive forward at FORWARD_SPEED; line follower supplies lateral (x) correction.
-		motor_controller_->setVelocity({correction.x, FORWARD_SPEED, 0});
-	}
-	else
-	{
-		double rot = orientation_controller_.calculateCorrection(motor_controller_->computeAngle());
-		motor_controller_->setVelocity({0, 0, rot});
-	}
+	// Open-loop forward drive test — no PID, no line following.
+	motor_controller_->driveOpenLoop({0, FORWARD_SPEED, 0});
 }
 
 void MrKrabs::startLineFollowing()

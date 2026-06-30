@@ -48,6 +48,10 @@ public:
 	// Does NOT modify the stored base target; the next setVelocity() resets it.
 	void addVelocity(RobotVelocity correction_velocity);
 
+	// Open-loop drive: converts v directly to wheel PWM via euclidean-to-wheel,
+	// no PID. Still calls tickVelocity() each call to keep encoder counts live.
+	void driveOpenLoop(RobotVelocity v);
+
 	// Returns accumulated heading (rad) estimated from wheel encoder deltas.
 	// Uses kiwi-drive kinematics: omega = (w1+w2+w3) / (3*R).
 	double computeAngle();

@@ -78,6 +78,22 @@ void MotorController::applyVelocity_(RobotVelocity target)
 	wheel_3_motor_->set_velocity(w3_pwm);
 }
 
+void MotorController::driveOpenLoop(RobotVelocity v)
+{
+	if (!wheel_1_motor_ || !wheel_2_motor_ || !wheel_3_motor_) return;
+
+	// Keep encoder velocity measurements live even in open-loop mode.
+	double v1 = wheel_1_motor_->tickVelocity();
+	double v2 = wheel_2_motor_->tickVelocity();
+	double v3 = wheel_3_motor_->tickVelocity();
+	Serial.printf("w1=%.3f w2=%.3f w3=%.3f m/s\n", v1, v2, v3);
+
+	WheelVelocities target = euclideanToWheel(v);
+	wheel_1_motor_->set_velocity(target.wheel_1 * VELOCITY_TO_PWM);
+	wheel_2_motor_->set_velocity(target.wheel_2 * VELOCITY_TO_PWM);
+	wheel_3_motor_->set_velocity(target.wheel_3 * VELOCITY_TO_PWM);
+}
+
 double MotorController::computeAngle()
 {
 	return accumulated_angle_;
