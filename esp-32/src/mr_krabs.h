@@ -1,6 +1,7 @@
 #include "line_follower.h"
 #include "orientation_controller.h"
-class MrKrab
+#include "motor_controller.h"
+class MrKrabs
 {
 
 public:

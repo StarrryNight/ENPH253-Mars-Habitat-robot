@@ -2,11 +2,11 @@
 #include "line_follower.h"
 #include "motor_controller.h"
 #include "motor_driver.h"
-class MrKrab
+class MrKrabs
 {
 
 public:
-	MrKrab();
+	MrKrabs();
 	void setup();
 	void reset();
 	void update();

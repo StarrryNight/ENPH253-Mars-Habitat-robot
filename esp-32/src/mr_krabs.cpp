@@ -1,25 +1,13 @@
 #include <Arduino.h>
-<<<<<<< HEAD:esp-32/src/mr_krabs.cpp
 #include "mr_krabs.h"
 #include "motor_driver.h"
-=======
-#include "mr_krab.h"
->>>>>>> 028a5a6c2b69952a0f99a2081b56e3d5a0a858a7:esp-32/src/mr_krab.cpp
 #include "constants.h"
-#include "motor_controller.h"
 
-MrKrab::MrKrab()
-	: motor_driver_1_(1, WHEEL_1_PWM_CHANNEL_0, WHEEL_1_PWM_CHANNEL_1, WHEEL_1_PWM_PIN_0, WHEEL_1_PWM_PIN_1, WHEEL_1_ENCODER_0, 0),
-	  motor_driver_2_(2, WHEEL_2_PWM_CHANNEL_0, WHEEL_2_PWM_CHANNEL_1, WHEEL_2_PWM_PIN_0, WHEEL_2_PWM_PIN_1, 0, 0),
-	  motor_controller_()
-{}
-
-void MrKrab::setup()
+void MrKrabs::setup()
 {
 	Serial.begin(115200);
 	delay(100);
 	Serial.println("ESP32 is ready!");
-<<<<<<< HEAD:esp-32/src/mr_krabs.cpp
 
 	// set up motor
 	MotorDriver motor_driver_1 = MotorDriver(1, WHEEL_1_PWM_CHANNEL_0, WHEEL_1_PWM_CHANNEL_1, WHEEL_1_PWM_PIN_0, WHEEL_1_PWM_PIN_1, WHEEL_1_ENCODER_0, 0);
@@ -37,29 +25,17 @@ void MrKrab::setup()
 	// setup line follower
 	line_follower_ = LineFollower();
 	motor_controller_ = MotorController();
-=======
-	motor_controller_.begin();
-	motor_controller_.setVelocity(-1,-1,0);
-	delay(3000);
-	motor_controller_.setVelocity(1,1,0);
-//	motor_controller_.setVelocity(-1,-1,0);
-//	motor_driver_1_.begin();
-//
-//	motor_driver_1_.rotateClockwise(230);
-//	delay(3000);
-//	motor_driver_1_.rotateCounterClockwise(230);
->>>>>>> 028a5a6c2b69952a0f99a2081b56e3d5a0a858a7:esp-32/src/mr_krab.cpp
 }
 
-void MrKrab::reset()
+void MrKrabs::reset()
 {
 }
 
-void MrKrab::update()
+void MrKrabs::update()
 {
 }
 
-void MrKrab::stepControl()
+void MrKrabs::stepControl()
 {
 	if (is_rotating_)
 	{
@@ -75,19 +51,19 @@ void MrKrab::stepControl()
 	}
 }
 
-void MrKrab::startRotation()
+void MrKrabs::startRotation()
 {
 	is_rotating_ = true;
 	orientation_controller_.reset();
 }
 
-MrKrab mr_krab_;
+MrKrabs mr_krabs_;
 
 void setup()
 {
-	mr_krab_.setup();
+	mr_krabs_.setup();
 }
 void loop()
 {
-	mr_krab_.update();
+	mr_krabs_.update();
 }
