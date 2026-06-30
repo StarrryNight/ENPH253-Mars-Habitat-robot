@@ -28,12 +28,11 @@ RobotVelocity LineFollower::calculateCorrection()
     if (current_state[1] == 0 && current_state[2] == 0)
     {
         // steer left greatly if left photoresistor is on line and right isn't
-        if (prev_state_[0] == 1 && prev_state_[1] == 0)
+        if (prev_state_[1] == 1 && prev_state_[2] == 0)
         {
             correction = line_followng_pid_.step(-BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
         }
-        // steer right greatly if right photoresistor is on line and left isn't
-        elif (prev_state_[0] == 0 && prev_state_[1] == 1)
+		else if (prev_state_[1] == 0 && prev_state_[2] == 1)
         {
             correction = line_followng_pid_.step(BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
         }
@@ -51,9 +50,9 @@ std::array<double, 4> LineFollower::readPhotoresistors()
     current_state[2] = analogRead(MID_RIGHT_PHOTORESISTOR);
     current_state[3] = analogRead(RIGHT_PHOTORESISTOR);
 
-    for (int i = 0 : i < 4; i++)
+    for (int i = 0 ;i < 4; i++)
     {
         current_state[i] = 1 ? current_state[i] > LIGHT_THRESHOLD_V : 0;
     }
-    return currentState;
+    return current_state;
 }
