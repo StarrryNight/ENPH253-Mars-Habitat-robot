@@ -10,18 +10,19 @@ LineFollower::LineFollower() : line_followng_pid_(PidController(1, 0, 2, 2))
     pinMode(RIGHT_PHOTORESISTOR, INPUT);
 }
 
-void LineFollower::followLine()
+RobotVelocity LineFollower::calculateCorrection()
 {
     std::array<double, 4> current_state = readPhotoresistors();
+    double correction = 0;
     // steer left slightly if left photoresistor is on line and right isn't
     if (current_state[1] == 1 && current_state[2] == 0)
     {
-        line_followng_pid_.step(-SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
+        correction = line_followng_pid_.step(-SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
     }
     // steer right slightly if right photoresistor is on line and left isn't
     if (current_state[1] == 0 && current_state[2] == 1)
     {
-        line_followng_pid_.step(SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
+        correction = line_followng_pid_.step(SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
     }
     // big changes
     if (current_state[1] == 0 && current_state[2] == 0)
@@ -29,17 +30,19 @@ void LineFollower::followLine()
         // steer left greatly if left photoresistor is on line and right isn't
         if (prev_state_[0] == 1 && prev_state_[1] == 0)
         {
-            line_followng_pid_.step(-BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
+            correction = line_followng_pid_.step(-BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
         }
         // steer right greatly if right photoresistor is on line and left isn't
         elif (prev_state_[0] == 0 && prev_state_[1] == 1)
         {
-            line_followng_pid_.step(BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
+            correction = line_followng_pid_.step(BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
         }
     }
     prev_state_ = current_state;
+    return correction;
 }
 
+// Issue: For metal detecting, we will need to spin the robot arm while following line to be efficient. But our robot cannot support both actions at once.
 std::array<double, 4> LineFollower::readPhotoresistors()
 {
     std::array<double, 4> current_state = {};

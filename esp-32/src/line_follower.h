@@ -1,11 +1,20 @@
-#include <pid_controller.h>
+#include "pid_controller.h"
+#include "motor_controller.h"
 #include <array>
 class LineFollower
 {
 
 public:
+    /*
+     * Constructor of the line follower class.
+     * Uses PID
+     */
     LineFollower();
-    void followLine();
+
+    /*
+     *
+     */
+    void calculateCorrection();
 
 private:
     // formatted as {left, midleft, midright, right}

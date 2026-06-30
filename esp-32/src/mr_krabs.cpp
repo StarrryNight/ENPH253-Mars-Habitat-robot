@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "mr_krab.h"
+#include "mr_krabs.h"
 #include "motor_driver.h"
 #include "constants.h"
 
@@ -24,6 +24,7 @@ void MrKrab::setup()
 
 	// setup line follower
 	line_follower_ = LineFollower();
+	motor_controller_ = MotorController();
 }
 
 void MrKrab::reset()
@@ -36,7 +37,24 @@ void MrKrab::update()
 
 void MrKrab::stepControl()
 {
-	line_follower_.followLine();
+	if (is_rotating_)
+	{
+		double horizontal_correction = line_follower_.calculateCorrection();
+		RobotVelocity target_velocity = RobotVelocity{0 + horizontal_correction, 2, 0};
+		motor_controller_.addVelocity(target_velocity);
+	}
+	else
+	{
+		double rotational_correction = orientation_controller_.calculateCorrection();
+		RobotVelocity target_velocity = RobotVelocity{0, 0, rotational_correction};
+		motor_controller_.addVelocity(target_velocity);
+	}
+}
+
+void MrKrab::startRotation()
+{
+	is_rotating_ = true;
+	orientation_controller_.reset();
 }
 
 MrKrab mr_krab_;
