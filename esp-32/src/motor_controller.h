@@ -2,7 +2,7 @@
 #include "motor_driver.h"
 #include "pid_controller.h"
 #include <optional>
-#include <chrono>
+#include <cstdint>
 
 // Per-wheel speed targets in m/s (positive = forward for that wheel's orientation).
 struct WheelVelocities
@@ -29,41 +29,52 @@ struct RobotVelocity
 // Closed-loop velocity controller for the kiwi (3-omni-wheel) drivetrain.
 // Accepts robot-frame velocities, converts to per-wheel targets via inverse
 // kinematics, then runs independent PID loops per wheel each call to setVelocity.
+//
+// Call setup() once in Arduino setup() — that is when MotorDriver objects are
+// constructed and encoder interrupts are attached.
 class MotorController
 {
 public:
 	MotorController();
+
+	// Constructs MotorDrivers and attaches encoder interrupts. Must be called
+	// from Arduino setup() after the hardware is initialised.
 	void setup();
 
 	// Replaces the current velocity target and runs one PID step.
 	void setVelocity(RobotVelocity target_velocity);
 
-	// Adds correction_velocity on top of the stored target and runs one PID step.
-	// Used by line follower and orientation controller to nudge the robot without
-	// overwriting the base motion command.
+	// Applies a one-shot correction on top of the last setVelocity target.
+	// Does NOT modify the stored base target; the next setVelocity() resets it.
 	void addVelocity(RobotVelocity correction_velocity);
 
+	// Returns accumulated heading (rad) estimated from wheel encoder deltas.
+	// Uses kiwi-drive kinematics: omega = (w1+w2+w3) / (3*R).
+	double computeAngle();
+
 private:
-	// Kiwi-drive inverse kinematics: maps robot-frame (x, y, omega) to wheel speeds.
-	// Wheel angles: wheel_1=150°, wheel_2=30°, wheel_3=270° from +Y (forward).
-	// Positive wheel velocity = counter-clockwise (viewed from outside the robot).
-	WheelVelocities euclideanToWheel(RobotVelocity target_velocity);
-	WheelVelocities getWheelVelocities();
+	// Kiwi-drive inverse kinematics: maps robot-frame (x, y, omega) to wheel speeds (m/s).
+	// Wheel angles from +Y (forward): wheel_1=150°, wheel_2=30°, wheel_3=270°.
+	WheelVelocities euclideanToWheel(RobotVelocity v);
+
+	// Runs one PID step for all three wheels and writes PWM output.
+	void applyVelocity_(RobotVelocity target);
 
 	PidController wheel_1_pid_;
 	PidController wheel_2_pid_;
 	PidController wheel_3_pid_;
 
-	MotorDriver wheel_1_motor_;
-	MotorDriver wheel_2_motor_;
-	MotorDriver wheel_3_motor_;
+	// Motors are held in optionals so the MotorController object can be
+	// constructed safely before Arduino init; setup() emplaces them.
+	std::optional<MotorDriver> wheel_1_motor_;
+	std::optional<MotorDriver> wheel_2_motor_;
+	std::optional<MotorDriver> wheel_3_motor_;
 
-	double current_position_;
-	RobotVelocity current_target_velocity;
+	RobotVelocity current_target_velocity_;
 	WheelVelocities current_wheel_velocities_;
-	std::optional<std::chrono::time_point<std::chrono::steady_clock>> prev_step_time_;
+	uint64_t prev_step_time_us_;  // µs from esp_timer_get_time(); avoids std::chrono unreliability
+	double accumulated_angle_;    // radians; updated each applyVelocity_ call
 
 	// Distance from robot center to each wheel contact point (m).
-	// Used to scale omega into a linear wheel speed contribution.
 	static constexpr double WHEEL_DISTANCE_FROM_CENTER_M = 0.3;
 };

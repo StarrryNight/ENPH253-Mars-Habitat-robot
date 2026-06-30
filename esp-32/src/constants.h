@@ -1,5 +1,6 @@
-// Control
-static constexpr double CONTROL_LOOP_PERIOD = 1e-6;
+// Control loop — 10 ms period
+static constexpr int CONTROL_LOOP_PERIOD_US = 10000;        // µs, for esp_timer_start_periodic
+static constexpr double CONTROL_LOOP_PERIOD = 0.01;         // seconds, for PID delta_t
 
 // Photoresistors
 static constexpr int LEFT_PHOTORESISTOR = 10;
@@ -7,39 +8,45 @@ static constexpr int MID_LEFT_PHOTORESISTOR = 11;
 static constexpr int MID_RIGHT_PHOTORESISTOR = 12;
 static constexpr int RIGHT_PHOTORESISTOR = 13;
 
-static constexpr double LIGHT_THRESHOLD_V = 0.6;
+// Raw 12-bit ADC threshold (0–4095). Calibrate on your surface.
+static constexpr double LIGHT_THRESHOLD_ADC = 2000;
 static constexpr double SMALL_ERROR_VALUE = 1;
 static constexpr double BIG_ERROR_VALUE = 5;
-// Motor
-// Pins
+
+// Motor PWM channels and pins
 static constexpr int WHEEL_1_PWM_CHANNEL_0 = 0;
 static constexpr int WHEEL_1_PWM_CHANNEL_1 = 1;
-
 static constexpr int WHEEL_1_PWM_PIN_0 = 1;
 static constexpr int WHEEL_1_PWM_PIN_1 = 46;
 
 static constexpr int WHEEL_2_PWM_CHANNEL_0 = 2;
 static constexpr int WHEEL_2_PWM_CHANNEL_1 = 3;
-
 static constexpr int WHEEL_2_PWM_PIN_0 = 2;
 static constexpr int WHEEL_2_PWM_PIN_1 = 45;
 
 static constexpr int WHEEL_3_PWM_CHANNEL_0 = 4;
 static constexpr int WHEEL_3_PWM_CHANNEL_1 = 5;
-
-static constexpr int WHEEL_3_PWM_PIN_0 = 3;
+static constexpr int WHEEL_3_PWM_PIN_0 = 3;    // TODO: conflicts with WHEEL_1_ENCODER_0 — fix wiring
 static constexpr int WHEEL_3_PWM_PIN_1 = 44;
-// Encoder
-static constexpr int WHEEL_1_ENCODER_0 = 3;
+
+// Encoder pins
+static constexpr int WHEEL_1_ENCODER_0 = 3;    // TODO: conflicts with WHEEL_3_PWM_PIN_0 — fix wiring
 static constexpr int WHEEL_1_ENCODER_1 = 4;
 
-static constexpr int WHEEL_2_ENCODER_0 = 0;
+static constexpr int WHEEL_2_ENCODER_0 = 0;    // TODO: conflicts with WHEEL_3_ENCODER_0 — fix wiring
 static constexpr int WHEEL_2_ENCODER_1 = 1;
 
-static constexpr int WHEEL_3_ENCODER_0 = 0;
+static constexpr int WHEEL_3_ENCODER_0 = 0;    // TODO: conflicts with WHEEL_2_ENCODER_0 — fix wiring
 static constexpr int WHEEL_3_ENCODER_1 = 1;
 
-static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.3;
+// Distance traveled per encoder tick (m). Set from wheel circumference / ticks-per-rev.
+static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.3; // TODO: verify this value
+
+// Forward speed during line following (m/s). Tune empirically.
+static constexpr double FORWARD_SPEED = 0.3;
+
+// Converts PID output (m/s) to PWM counts. Tune to match motor transfer function.
+static constexpr double VELOCITY_TO_PWM = 200.0;
 
 // Values
 static constexpr int speed8bit = 230; // speed scales linear from 0 to 256

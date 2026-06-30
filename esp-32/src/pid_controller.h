@@ -16,7 +16,7 @@ class PidController{
 	// Returns the control output to add to the actuator command.
 	double step(double error, double delta_t);
 
-	// Zeroes the accumulated integral. Call on mode/state transitions.
+	// Zeroes the accumulated integral and previous error. Call on mode/state transitions.
 	void reset();
 
 	private:
@@ -26,6 +26,7 @@ class PidController{
 	double k_i_;
 	double max_integral_; // integral is clamped to [-max_integral_, max_integral_]
 	double current_integral_;
-
+	double prev_error_;   // stored for derivative calculation
+	bool first_step_;     // suppresses derivative on first step after reset to avoid spike
 
 };

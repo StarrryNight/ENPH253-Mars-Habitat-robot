@@ -1,25 +1,22 @@
 #include "orientation_controller.h"
+#include "constants.h"
 
-OrientationController::OrientationController() : orientation_pid(PidController(1, 0, 0, 1)),
-                                                 wheel_1_init_encoder_count_(0),
-                                                 wheel_2_init_encoder_count_(0),
-                                                 wheel_3_init_encoder_count_(0) {};
+OrientationController::OrientationController()
+    : orientation_pid(PidController(1, 0, 0, 1)),
+      target_angle_(0) {}
 
-double OrientationController::calculateCorrection(double target_angle)
+double OrientationController::calculateCorrection(double current_angle)
 {
-    double current_angle = encoderToPosition();
-    return orientation_pid.step(target_angle - current_angle, 10);
+    return orientation_pid.step(target_angle_ - current_angle, CONTROL_LOOP_PERIOD);
 }
 
-double OrientationController::encoderToPosition()
+void OrientationController::startRotation(double target_angle)
 {
-    return 0;
+    target_angle_ = target_angle;
+    reset();
 }
 
 void OrientationController::reset()
 {
-    wheel_1_init_encoder_count_ = 0;
-    wheel_2_init_encoder_count_ = 0;
-    wheel_3_init_encoder_count_ = 0;
     orientation_pid.reset();
 }

@@ -2,83 +2,102 @@
 #include "motor_controller.h"
 #include "motor_driver.h"
 #include "constants.h"
+#include "esp_timer.h"
 
-MotorController::MotorController() : current_position_(0),
-									 current_wheel_velocities_({0, 0, 0}),
-									 prev_step_time_(std::chrono::steady_clock::now()),
-									 wheel_1_pid_(PidController(0, 1, 2, 3)),
-									 wheel_2_pid_(PidController(0, 1, 2, 3)),
-									 wheel_3_pid_(PidController(0, 1, 2, 3)),
-									 wheel_1_motor_(MotorDriver(1, WHEEL_1_PWM_CHANNEL_0, WHEEL_1_PWM_CHANNEL_1, WHEEL_1_PWM_PIN_0, WHEEL_1_PWM_PIN_1, 0, 0)),
-									 wheel_2_motor_(MotorDriver(2, WHEEL_2_PWM_CHANNEL_0, WHEEL_2_PWM_CHANNEL_1, WHEEL_2_PWM_PIN_0, WHEEL_2_PWM_PIN_1, 0, 0)),
-									 wheel_3_motor_(MotorDriver(3, WHEEL_3_PWM_CHANNEL_0, WHEEL_3_PWM_CHANNEL_1, WHEEL_3_PWM_PIN_0, WHEEL_3_PWM_PIN_1, 0, 0))
+MotorController::MotorController()
+	: current_target_velocity_({0, 0, 0}),
+	  current_wheel_velocities_({0, 0, 0}),
+	  prev_step_time_us_(0),
+	  accumulated_angle_(0),
+	  wheel_1_pid_(PidController(0, 1, 2, 3)),
+	  wheel_2_pid_(PidController(0, 1, 2, 3)),
+	  wheel_3_pid_(PidController(0, 1, 2, 3))
 {
+	// Motors are NOT constructed here — setup() does that after Arduino init.
 }
 
 void MotorController::setup()
 {
+	wheel_1_motor_.emplace(1, WHEEL_1_PWM_CHANNEL_0, WHEEL_1_PWM_CHANNEL_1,
+	                       WHEEL_1_PWM_PIN_0, WHEEL_1_PWM_PIN_1,
+	                       WHEEL_1_ENCODER_0, WHEEL_1_ENCODER_1);
+	wheel_2_motor_.emplace(2, WHEEL_2_PWM_CHANNEL_0, WHEEL_2_PWM_CHANNEL_1,
+	                       WHEEL_2_PWM_PIN_0, WHEEL_2_PWM_PIN_1,
+	                       WHEEL_2_ENCODER_0, WHEEL_2_ENCODER_1);
+	wheel_3_motor_.emplace(3, WHEEL_3_PWM_CHANNEL_0, WHEEL_3_PWM_CHANNEL_1,
+	                       WHEEL_3_PWM_PIN_0, WHEEL_3_PWM_PIN_1,
+	                       WHEEL_3_ENCODER_0, WHEEL_3_ENCODER_1);
+	prev_step_time_us_ = esp_timer_get_time();
 }
+
 void MotorController::setVelocity(RobotVelocity target_velocity)
 {
-	RobotVelocity current_target_velocity = target_velocity;
-	WheelVelocities target_wheel_velocities = euclideanToWheel(target_velocity);
-
-	// Corrected syntax using duration cast for fractional seconds
-	auto now = std::chrono::steady_clock::now();
-	auto delta_t = std::chrono::duration<double>(now - prev_step_time_.value()).count();
-	current_wheel_velocities_ = WheelVelocities{wheel_1_motor_.tickVelocity(), wheel_2_motor_.tickVelocity(), wheel_3_motor_.tickVelocity()};
-
-	// Use PID to calculate correction needed for each wheel
-	double wheel_1_correction = wheel_1_pid_.step(target_wheel_velocities.wheel_1 - current_wheel_velocities_.wheel_1, delta_t);
-	double wheel_2_correction = wheel_2_pid_.step(target_wheel_velocities.wheel_2 - current_wheel_velocities_.wheel_2, delta_t);
-	double wheel_3_correction = wheel_3_pid_.step(target_wheel_velocities.wheel_3 - current_wheel_velocities_.wheel_3, delta_t);
-
-	// Use correction to set velocity
-	wheel_1_motor_.set_velocity(wheel_1_motor_.get_current_motor_speed() + wheel_1_correction);
-	wheel_2_motor_.set_velocity(wheel_2_motor_.get_current_motor_speed() + wheel_2_correction);
-	wheel_3_motor_.set_velocity(wheel_3_motor_.get_current_motor_speed() + wheel_3_correction);
-
-	prev_step_time_ = std::chrono::steady_clock::now();
+	current_target_velocity_ = target_velocity;
+	applyVelocity_(target_velocity);
 }
 
 void MotorController::addVelocity(RobotVelocity correction_velocity)
 {
-	RobotVelocity target_velocity = current_target_velocity + correction_velocity;
-	current_target_velocity = target_velocity;
-	WheelVelocities target_wheel_velocities = euclideanToWheel(target_velocity);
-
-	// Corrected syntax using duration cast for fractional seconds
-	auto now = std::chrono::steady_clock::now();
-	auto delta_t = std::chrono::duration<double>(now - prev_step_time_.value()).count();
-	current_wheel_velocities_ = WheelVelocities{wheel_1_motor_.tickVelocity(), wheel_2_motor_.tickVelocity(), wheel_3_motor_.tickVelocity()};
-
-	// Use PID to calculate correction needed for each wheel
-	double wheel_1_correction = wheel_1_pid_.step(target_wheel_velocities.wheel_1 - current_wheel_velocities_.wheel_1, delta_t);
-	double wheel_2_correction = wheel_2_pid_.step(target_wheel_velocities.wheel_2 - current_wheel_velocities_.wheel_2, delta_t);
-	double wheel_3_correction = wheel_3_pid_.step(target_wheel_velocities.wheel_3 - current_wheel_velocities_.wheel_3, delta_t);
-
-	// Use correction to set velocity
-	wheel_1_motor_.set_velocity(wheel_1_motor_.get_current_motor_speed() + wheel_1_correction);
-	wheel_2_motor_.set_velocity(wheel_2_motor_.get_current_motor_speed() + wheel_2_correction);
-	wheel_3_motor_.set_velocity(wheel_3_motor_.get_current_motor_speed() + wheel_3_correction);
-
-	prev_step_time_ = std::chrono::steady_clock::now();
+	// Applies a one-shot correction without modifying the stored base target.
+	applyVelocity_(current_target_velocity_ + correction_velocity);
 }
+
+void MotorController::applyVelocity_(RobotVelocity target)
+{
+	if (!wheel_1_motor_ || !wheel_2_motor_ || !wheel_3_motor_) return;
+
+	uint64_t now = esp_timer_get_time();
+	double delta_t = static_cast<double>(now - prev_step_time_us_) * 1e-6;
+	if (delta_t <= 0.0) delta_t = CONTROL_LOOP_PERIOD;
+	prev_step_time_us_ = now;
+
+	current_wheel_velocities_ = {
+		wheel_1_motor_->tickVelocity(),
+		wheel_2_motor_->tickVelocity(),
+		wheel_3_motor_->tickVelocity()
+	};
+
+	// Accumulate heading from kiwi-drive kinematics: omega = (w1+w2+w3)/(3R)
+	accumulated_angle_ += (current_wheel_velocities_.wheel_1 +
+	                       current_wheel_velocities_.wheel_2 +
+	                       current_wheel_velocities_.wheel_3) /
+	                      (3.0 * WHEEL_DISTANCE_FROM_CENTER_M) * delta_t;
+
+	WheelVelocities target_wheel = euclideanToWheel(target);
+
+	// PID error is in m/s; multiply output by VELOCITY_TO_PWM to get PWM counts.
+	double w1_pwm = wheel_1_motor_->get_current_motor_speed() +
+	                wheel_1_pid_.step(target_wheel.wheel_1 - current_wheel_velocities_.wheel_1, delta_t) * VELOCITY_TO_PWM;
+	double w2_pwm = wheel_2_motor_->get_current_motor_speed() +
+	                wheel_2_pid_.step(target_wheel.wheel_2 - current_wheel_velocities_.wheel_2, delta_t) * VELOCITY_TO_PWM;
+	double w3_pwm = wheel_3_motor_->get_current_motor_speed() +
+	                wheel_3_pid_.step(target_wheel.wheel_3 - current_wheel_velocities_.wheel_3, delta_t) * VELOCITY_TO_PWM;
+
+	wheel_1_motor_->set_velocity(w1_pwm);
+	wheel_2_motor_->set_velocity(w2_pwm);
+	wheel_3_motor_->set_velocity(w3_pwm);
+}
+
+double MotorController::computeAngle()
+{
+	return accumulated_angle_;
+}
+
 /*
  *
 	   ▲ +Y (Forward)
-				 │
-				 │
+				│
+				│
   // WHEEL 1 //  │  \\ WHEEL 2 \\
   [Front-Left]   │   [Front-Right]
 	 (150°)      │      (30°)
-		\        │        /
-		 \       │       /
-		  \      │      /
+		  \      │        /
+		   \     │       /
+		    \    │      /
 -X ──────────────┼──────────────► +X (Right)
 (Left)          /│\             (Right)
-			   / │ \
-			  /  │  \
+               / │ \
+              /  │  \
 				 │
 		   == WHEEL 3 ==
 			[Back Wheel]
@@ -87,16 +106,13 @@ void MotorController::addVelocity(RobotVelocity correction_velocity)
 				 ▼ -Y
  *
  */
-WheelVelocities MotorController::euclideanToWheel(RobotVelocity target_velocity)
+WheelVelocities MotorController::euclideanToWheel(RobotVelocity v)
 {
-	double wheel_1 = -std::sin(30) * target_velocity.x + cos(30) * target_velocity.y + WHEEL_DISTANCE_FROM_CENTER_M * target_velocity.omega;
-	double wheel_2 = std::sin(30) * target_velocity.x + cos(30) * target_velocity.y + WHEEL_DISTANCE_FROM_CENTER_M * target_velocity.omega;
-	double wheel_3 = std::sin(90) * target_velocity.x + WHEEL_DISTANCE_FROM_CENTER_M * target_velocity.omega;
+	// v_i = -sin(θ_i)*vx + cos(θ_i)*vy + R*ω
+	// θ measured CCW from +Y: wheel1=150°, wheel2=30°, wheel3=270°
+	double wheel_1 = -std::sin(5.0*M_PI/6) * v.x + std::cos(5.0*M_PI/6) * v.y + WHEEL_DISTANCE_FROM_CENTER_M * v.omega;
+	double wheel_2 = -std::sin(M_PI/6)     * v.x + std::cos(M_PI/6)     * v.y + WHEEL_DISTANCE_FROM_CENTER_M * v.omega;
+	double wheel_3 = -std::sin(3.0*M_PI/2) * v.x + std::cos(3.0*M_PI/2) * v.y + WHEEL_DISTANCE_FROM_CENTER_M * v.omega;
 
 	return WheelVelocities{wheel_1, wheel_2, wheel_3};
-}
-
-WheelVelocities MotorController::getWheelVelocities()
-{
-	return {};
 }

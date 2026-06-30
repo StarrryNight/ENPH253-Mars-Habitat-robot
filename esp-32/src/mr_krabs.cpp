@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include "mr_krabs.h"
-#include "motor_driver.h"
 #include "constants.h"
+#include "esp_timer.h"
+
+MrKrabs::MrKrabs() : is_line_following_(false), control_loop_timer_(nullptr) {}
 
 void MrKrabs::setup()
 {
@@ -9,22 +11,19 @@ void MrKrabs::setup()
 	delay(100);
 	Serial.println("ESP32 is ready!");
 
-	// set up motor
-	MotorDriver motor_driver_1 = MotorDriver(1, WHEEL_1_PWM_CHANNEL_0, WHEEL_1_PWM_CHANNEL_1, WHEEL_1_PWM_PIN_0, WHEEL_1_PWM_PIN_1, WHEEL_1_ENCODER_0, 0);
-	MotorDriver motor_driver_2 = MotorDriver(2, WHEEL_2_PWM_CHANNEL_0, WHEEL_2_PWM_CHANNEL_1, WHEEL_2_PWM_PIN_0, WHEEL_2_PWM_PIN_1, 0, 0);
-	motor_driver_1.rotateClockwise(230);
-	motor_driver_2.rotateCounterClockwise(230);
-	delay(2000);
-	motor_driver_1.rotateCounterClockwise(230);
-	motor_driver_2.rotateClockwise(230);
-	delay(1000);
-	motor_driver_1.rotateClockwise(230);
-	motor_driver_2.rotateCounterClockwise(230);
-	delay(2000);
+	// Emplace hardware objects now that Arduino init has run.
+	line_follower_.emplace();
+	motor_controller_.emplace();
+	motor_controller_->setup();
 
-	// setup line follower
-	line_follower_ = LineFollower();
-	motor_controller_ = MotorController();
+	// Start fixed-rate control loop at CONTROL_LOOP_PERIOD_US (10 ms).
+	esp_timer_create_args_t timer_args = {
+		.callback = [](void *arg) { static_cast<MrKrabs *>(arg)->stepControl(); },
+		.arg = this,
+		.name = "control_loop_timer"
+	};
+	esp_timer_create(&timer_args, &control_loop_timer_);
+	esp_timer_start_periodic(control_loop_timer_, CONTROL_LOOP_PERIOD_US);
 }
 
 void MrKrabs::reset()
@@ -33,28 +32,33 @@ void MrKrabs::reset()
 
 void MrKrabs::update()
 {
+	// TODO: read RPi UART (Serial1) and dispatch state commands
 }
 
 void MrKrabs::stepControl()
 {
-	if (is_rotating_)
+	if (is_line_following_)
 	{
-		double horizontal_correction = line_follower_.calculateCorrection();
-		RobotVelocity target_velocity = RobotVelocity{0 + horizontal_correction, 2, 0};
-		motor_controller_.addVelocity(target_velocity);
+		RobotVelocity correction = line_follower_->calculateCorrection();
+		// Drive forward at FORWARD_SPEED; line follower supplies lateral (x) correction.
+		motor_controller_->setVelocity({correction.x, FORWARD_SPEED, 0});
 	}
 	else
 	{
-		double rotational_correction = orientation_controller_.calculateCorrection();
-		RobotVelocity target_velocity = RobotVelocity{0, 0, rotational_correction};
-		motor_controller_.addVelocity(target_velocity);
+		double rot = orientation_controller_.calculateCorrection(motor_controller_->computeAngle());
+		motor_controller_->setVelocity({0, 0, rot});
 	}
 }
 
-void MrKrabs::startRotation()
+void MrKrabs::startLineFollowing()
 {
-	is_rotating_ = true;
-	orientation_controller_.reset();
+	is_line_following_ = true;
+}
+
+void MrKrabs::startRotation(double target_angle)
+{
+	is_line_following_ = false;
+	orientation_controller_.startRotation(target_angle);
 }
 
 MrKrabs mr_krabs_;
