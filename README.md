@@ -1,64 +1,100 @@
 # ENPH253 Mars Habitat Robot
 
-Autonomous robot for the ENPH 253 course project. The robot navigates a simulated Mars habitat environment using computer vision and closed-loop motor control.
+Autonomous robot for the ENPH 253 competition. Navigates an 8×8ft surface to assemble habitat pieces, detect Teletubbies, and recover aluminum rocks. Target: 8 points.
 
-## Architecture
+## Hardware
 
-The system splits responsibilities across two microcontrollers:
+- **Chassis:** Octagonal, kiwi drive (3 omni wheels at 120°)
+- **Arm:** 4-DOF — pitch @ base, pitch @ elbow, yaw @ wrist, servo claw
+- **Drive:** H-bridge per motor
 
-- **ESP32-S3** — low-level motor control, PID velocity regulation, and odometry-based localization. Built with PlatformIO (Arduino framework).
-- **Raspberry Pi** — high-level state machine, computer vision (OpenCV), and communication with the ESP32 over a protobuf serial protocol.
+## Processors
+
+| Processor | Role |
+|-----------|------|
+| ESP32-S3 | All real-time control |
+| RPi 4 2GB | State machine + UART coordination |
+
+### ESP32 runs
+- Superloop (Mr Crab)
+- Timer ISR — motor PID ×3, arm PID ×3 at fixed rate
+- Motion profile — setpoint ramping
+- Kiwi drive mixing — (vx, vy, ω) → 3 motor commands
+- Line following — IR sensor array
+- Metal detector — interrupt driven
+- Hardcoded pose sequencer — arm joint targets
+
+### RPi runs
+- State machine — drives all high-level decisions
+- UART manager — sends commands, receives sensor state
+
+## UART Contract
+
+| Direction | Payload |
+|-----------|---------|
+| RPi → ESP32 | Current state, target pose, drive commands (vx, vy, ω) |
+| ESP32 → RPi | Wheel encoder positions, arm joint positions, metal detected event |
+
+## State Machine
+
+`Line-following → Holding → Arming → Metalling → Teletubbying`
+
+## Sensors
+
+| Sensor | Use |
+|--------|-----|
+| Wheel encoders | Velocity PID + dead reckoning |
+| Arm encoders | Position PID, reset on limit switch |
+| IR line array | Line following |
+| Inductive metal detector | Rock detection (interrupt driven) |
+| USB camera (RPi) | Teletubby color blob detection |
 
 ## Repository Layout
 
 ```
-esp-32/          # PlatformIO project for the ESP32-S3
+esp-32/          # PlatformIO project (Arduino/FreeRTOS)
   src/
     MrCrab            # Superloop
-    localizer         # Odometry / position tracking
-    translation       # Velocity commands → wheel speeds
-    pid_controller    # Generic PID implementation, used for arm and wheels
+    localizer         # Dead reckoning position tracker
+    translation       # (vx, vy, ω) → kiwi wheel speeds
+    pid_controller    # Generic PID — wheels and arm joints
     motor_driver      # PWM output to H-bridge
-    motion_profile    # Plans motion profile of robot
-raspberry-pi/    # C++ high-level controller
+    motion_profile    # Setpoint ramping
+raspberry-pi/    # High-level C++ controller
   src/
-    robot_fsm         # Finite state machine
-    robot_communication  # Serial comms with ESP32
+    robot_fsm         # State machine
+    robot_communication  # UART manager
 shared/
-  messages/robot_messages.proto  # Shared protobuf message definitions
-cv_test.py       # HSV color blob detection test (OpenCV)
+  messages/robot_messages.proto  # Protobuf message definitions
+cv_test.py       # HSV color blob detection (OpenCV)
 ```
 
-## To-do List (by important-first order)
+## To-do
 
 ### esp-32
-
 - [ ] Write setup and skeleton of MrCrab
-- [ ] Test on esp
-- [ ] Write localizer (positionl tracker)
+- [ ] Test on ESP
+- [ ] Write localizer (position tracker)
 - [ ] Write motion profile for robot
 - [ ] Write motion profile for arm
 - [x] Write generic PID controller
 
 ### raspberry-pi
-
-- [ ] Write Ms Crab (rasp superloop)
+- [ ] Write Ms Crab (RPi superloop)
 - [ ] Set up camera
-- [ ] Write setup software
-- [ ] Write statemachine
+- [ ] Write state machine
 - [ ] Write arm poses
 - [ ] Write color blob detection
-- [ ] Write hardcose kinematics
+- [ ] Write hardcoded kinematics
 
 ### Integration
-
-- [ ] Write proto
-- [ ] Write translating software for both
-- [ ] Test communication
+- [ ] Write proto messages
+- [ ] Write UART translation layer for both sides
+- [ ] Test end-to-end communication
 
 ## Setup
 
-### ESP32 firmware
+### ESP32
 
 Requires [PlatformIO](https://platformio.org/).
 
@@ -66,7 +102,7 @@ Requires [PlatformIO](https://platformio.org/).
 cd esp-32
 pio run            # build
 pio run -t upload  # flash
-pio device monitor # serial monitor (115200 baud)
+pio device monitor # 115200 baud
 ```
 
 ### Raspberry Pi

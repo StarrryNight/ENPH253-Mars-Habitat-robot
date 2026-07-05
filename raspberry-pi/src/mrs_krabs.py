@@ -1,4 +1,4 @@
-iimport serial
+import serial
 import proto.messages_pb2 as proto
 import time
 
@@ -27,7 +27,7 @@ while True:
     sensor_state = receive_state()
     command = decide_command(sensor_state)
     send_command(command.state, command.pose, command.drive)
-    time.sleep(0.05)  # 20Hzmport shared.messages.robot_messages.proto;
+    time.sleep(0.05)  # 20 Hz
 
 def setup():
     return 0
