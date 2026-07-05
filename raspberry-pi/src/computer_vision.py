@@ -4,11 +4,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-MODEL_PATH = "model_ncnn_model"  # directory containing .param and .bin files
-
-CONF = 0.25
-IOU = 0.7
-IMGSZ = 640
+from config import MODEL_PATH, CV_CONF, CV_IOU, CV_IMGSZ, HFOV_DEG
 
 
 @dataclass
@@ -80,7 +76,7 @@ class ComputerVision:
         if not ok:
             return None
 
-        results = self.model(frame, conf=CONF, iou=IOU, imgsz=IMGSZ, verbose=False)
+        results = self.model(frame, conf=CV_CONF, iou=CV_IOU, imgsz=CV_IMGSZ, verbose=False)
 
         boxes = results[0].boxes
         if boxes is None or len(boxes) == 0:
@@ -94,9 +90,7 @@ class ComputerVision:
         cx = (x1 + x2) // 2
         cy = (y1 + y2) // 2
 
-        # TODO: measure actual camera FOV and update hfov_deg
-        hfov_deg = 60.0
-        bearing_deg = ((cx - self.frame_width / 2) / self.frame_width) * hfov_deg
+        bearing_deg = ((cx - self.frame_width / 2) / self.frame_width) * HFOV_DEG
 
         # bbox as (x, y, w, h) for TeletubbySensor
         bbox = (x1, y1, x2 - x1, y2 - y1)

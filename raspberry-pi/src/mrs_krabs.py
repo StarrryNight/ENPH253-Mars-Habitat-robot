@@ -2,15 +2,13 @@ import time
 
 import serial
 from computer_vision import ComputerVision
+from config import UART_PORT, UART_BAUD, METAL_DETECT_TIMEOUT_S, HABITAT_TIMEOUT_S
 from proto import robot_messages_pb2 as proto
 from state_machine import RobotStateMachine
 
-uart = serial.Serial("/dev/ttyUSB0", 115200)
+uart = serial.Serial(UART_PORT, UART_BAUD)
 state_machine = RobotStateMachine()
 cv = ComputerVision()
-
-METAL_DETECT_TIMEOUT_S = 15.0
-HABITAT_TIMEOUT_S      = 45.0
 
 # Bearing of the most recently spotted teletubby not yet acted on.
 # Survives ticks so a sighting during metal_detecting isn't lost.
