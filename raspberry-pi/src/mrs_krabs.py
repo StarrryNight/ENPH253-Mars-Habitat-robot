@@ -1,38 +1,44 @@
-import serial
-import proto.messages_pb2 as proto
 import time
 
-# Setup
-uart = serial.Serial('/dev/ttyUSB0', 115200)
+import serial
+from proto import robot_messages_pb2 as proto
+from state_machine import RobotStateMachine
 
-def send_command(state, target_pose, drive_command):
+uart = serial.Serial("/dev/ttyUSB0", 115200)
+state_machine = RobotStateMachine()
+
+
+def send_command(state: str):
     msg = proto.Command()
     msg.state = state
-    msg.target_pose = target_pose
-    msg.drive_command.CopyFrom(drive_command)
-    uart.write(msg.SerializeToString())
+    data = msg.SerializeToString()
+    uart.write(len(data).to_bytes(4, "little") + data)
 
-def receive_state():
+
+def receive_state() -> proto.SensorState | None:
+    if uart.in_waiting == 0:
+        return None
     data = uart.read(uart.in_waiting)
     msg = proto.SensorState()
     msg.ParseFromString(data)
     return msg
 
-def decide_command(sensor_state):
-    # State machine logic here
-    pass
+
+def tick(sensor_state: proto.SensorState):
+    # Update condition flags from sensor data
+    state_machine._metal_detected = sensor_state.metal_detected
+    state_machine._metal_not_detected = not sensor_state.metal_detected
+
+    # When ESP32 finishes executing the current state, advance
+    if sensor_state.state_completed:
+        state_machine.send("cycle")
+
+    send_command(state_machine.current_state.id)
+
 
 # Main loop
 while True:
     sensor_state = receive_state()
-    command = decide_command(sensor_state)
-    send_command(command.state, command.pose, command.drive)
+    if sensor_state is not None:
+        tick(sensor_state)
     time.sleep(0.05)  # 20 Hz
-
-def setup():
-    return 0
-
-def super_loop():
-    while (True):
-        return 0
-
