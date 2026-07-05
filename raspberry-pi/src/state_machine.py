@@ -47,3 +47,15 @@ class RobotStateMachine(StateMachine):
 
     def enter_habitat(self) -> bool:
         return self._enter_habitat
+
+    def current_top_state_id(self) -> str:
+        """Returns the top-level state name the ESP32 understands.
+        Compound sub-states (scanning, retrieving, etc.) are mapped to their parent."""
+        _parent_map = {
+            "scanning":   "metal_detecting",
+            "retrieving": "metal_detecting",
+            "grabbing":   "habitating",
+            "holding":    "habitating",
+            "placing":    "habitating",
+        }
+        return _parent_map.get(self.current_state.id, self.current_state.id)

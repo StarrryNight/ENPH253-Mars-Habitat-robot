@@ -39,6 +39,8 @@ class TeletubbySensor:
         return float(np.median(hues))
 
     def is_new(self, hue: float, threshold: int = 15) -> bool:
+        # TODO: hue wraps at 180 in OpenCV — use circular distance:
+        #   min(abs(hue - recorded), 180 - abs(hue - recorded))
         return all(abs(hue - recorded) >= threshold for recorded in self.detected)
 
     def record(self, frame, bbox: tuple[int, int, int, int]) -> bool:

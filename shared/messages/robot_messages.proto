@@ -3,12 +3,12 @@ syntax = "proto3";
 
 // RPi → ESP32
 message Command {
-    string state                = 1;
+    string state                 = 1;
     float  teletubby_bearing_deg = 2;  // degrees from frame center; only valid in teletubbying state
 }
 
 // ESP32 → RPi
 message SensorState {
-    bool state_completed = 1; 
-    bool  metal_detected = 2;
+    bool state_completed = 1;
+    bool metal_detected  = 2;
 }
