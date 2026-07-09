@@ -39,6 +39,7 @@ void MrKrabs::update()
 
 void MrKrabs::stepControl()
 {
+	// TODO add time compare in each loop for different controls
 	if (is_line_following_)
 	{
 		RobotVelocity correction = line_follower_->calculateCorrection();
