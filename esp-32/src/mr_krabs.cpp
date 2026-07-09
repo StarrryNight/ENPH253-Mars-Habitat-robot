@@ -15,6 +15,7 @@ void MrKrabs::setup()
 	line_follower_.emplace();
 	motor_controller_.emplace();
 	motor_controller_->setup();
+	arm_.emplace();
 
 	// Start fixed-rate control loop at CONTROL_LOOP_PERIOD_US (10 ms).
 	esp_timer_create_args_t timer_args = {
@@ -33,6 +34,7 @@ void MrKrabs::reset()
 void MrKrabs::update()
 {
 	// TODO: read RPi UART (Serial1) and dispatch state commands
+	arm_->tickArm();
 }
 
 void MrKrabs::stepControl()
