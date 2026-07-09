@@ -3,7 +3,7 @@
 #include "constants.h"
 #include "esp_timer.h"
 
-MrKrabs::MrKrabs() : is_line_following_(false), control_loop_timer_(nullptr) {}
+MrKrabs::MrKrabs() : is_line_following_(false), control_loop_timer_(nullptr), drive_test_start_us_(0) {}
 
 void MrKrabs::setup()
 {
@@ -17,6 +17,7 @@ void MrKrabs::setup()
 	motor_controller_->setup();
 
 	delay(2000); // wait 2 s before driving so the robot can be placed safely
+	drive_test_start_us_ = esp_timer_get_time();
 
 	// Start fixed-rate control loop at CONTROL_LOOP_PERIOD_US (10 ms).
 	esp_timer_create_args_t timer_args = {
@@ -40,7 +41,9 @@ void MrKrabs::update()
 void MrKrabs::stepControl()
 {
 	// Open-loop forward drive test — no PID, no line following.
-	motor_controller_->driveOpenLoop({0, FORWARD_SPEED, 0});
+	// Stops after FORWARD_DRIVE_TEST_DURATION_US so the robot doesn't run away.
+	bool still_driving = (esp_timer_get_time() - drive_test_start_us_) < FORWARD_DRIVE_TEST_DURATION_US;
+	motor_controller_->driveOpenLoop({0, still_driving ? FORWARD_SPEED : 0.0, 0});
 }
 
 void MrKrabs::startLineFollowing()

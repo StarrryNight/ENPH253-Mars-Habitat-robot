@@ -39,4 +39,8 @@ private:
 	OrientationController orientation_controller_;
 
 	esp_timer_handle_t control_loop_timer_;
+
+	// esp_timer_get_time() timestamp (µs) when the open-loop forward drive
+	// test started; used by stepControl to stop after FORWARD_DRIVE_TEST_DURATION_US.
+	uint64_t drive_test_start_us_;
 };

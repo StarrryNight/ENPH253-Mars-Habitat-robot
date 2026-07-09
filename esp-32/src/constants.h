@@ -1,3 +1,5 @@
+#include <cstdint>
+
 // Control loop — 10 ms period
 static constexpr int CONTROL_LOOP_PERIOD_US = 10000;        // µs, for esp_timer_start_periodic
 static constexpr double CONTROL_LOOP_PERIOD = 0.01;         // seconds, for PID delta_t
@@ -44,6 +46,9 @@ static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.3; // TODO: verify thi
 
 // Forward speed during line following (m/s). Tune empirically.
 static constexpr double FORWARD_SPEED = 0.3;
+
+// Open-loop forward drive test duration (µs) — see MrKrabs::stepControl.
+static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 1000000; // 1 s
 
 // Converts PID output (m/s) to PWM counts. Tune to match motor transfer function.
 static constexpr double VELOCITY_TO_PWM = 200.0;
