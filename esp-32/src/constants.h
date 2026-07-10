@@ -18,18 +18,18 @@ static constexpr double BIG_ERROR_VALUE = 5;
 // Motor PWM channels and pins
 static constexpr int WHEEL_1_PWM_CHANNEL_0 = 0;
 static constexpr int WHEEL_1_PWM_CHANNEL_1 = 1;
-static constexpr int WHEEL_1_PWM_PIN_0 = 1;
-static constexpr int WHEEL_1_PWM_PIN_1 = 46;
+static constexpr int WHEEL_1_PWM_PIN_0 = 2;
+static constexpr int WHEEL_1_PWM_PIN_1 = 1;
 
 static constexpr int WHEEL_2_PWM_CHANNEL_0 = 2;
 static constexpr int WHEEL_2_PWM_CHANNEL_1 = 3;
-static constexpr int WHEEL_2_PWM_PIN_0 = 2;
-static constexpr int WHEEL_2_PWM_PIN_1 = 45;
+static constexpr int WHEEL_2_PWM_PIN_0 = 4;
+static constexpr int WHEEL_2_PWM_PIN_1 = 3;
 
 static constexpr int WHEEL_3_PWM_CHANNEL_0 = 4;
 static constexpr int WHEEL_3_PWM_CHANNEL_1 = 5;
-static constexpr int WHEEL_3_PWM_PIN_0 = 3;    // TODO: conflicts with WHEEL_1_ENCODER_0 — fix wiring
-static constexpr int WHEEL_3_PWM_PIN_1 = 44;
+static constexpr int WHEEL_3_PWM_PIN_0 = 6;    // TODO: conflicts with WHEEL_1_ENCODER_0 — fix wiring
+static constexpr int WHEEL_3_PWM_PIN_1 = 5;
 
 // Encoder pins
 static constexpr int WHEEL_1_ENCODER_0 = 3;    // TODO: conflicts with WHEEL_3_PWM_PIN_0 — fix wiring
@@ -57,3 +57,4 @@ static constexpr double VELOCITY_TO_PWM = 200.0;
 static constexpr int speed8bit = 230; // speed scales linear from 0 to 256
 
 // Arm
+
