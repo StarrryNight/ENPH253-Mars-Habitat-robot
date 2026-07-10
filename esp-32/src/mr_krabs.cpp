@@ -15,6 +15,7 @@ void MrKrabs::setup()
 	line_follower_.emplace();
 	motor_controller_.emplace();
 	motor_controller_->setup();
+	arm_.emplace();
 
 	delay(2000); // wait 2 s before driving so the robot can be placed safely
 	drive_test_start_us_ = esp_timer_get_time();
@@ -36,6 +37,7 @@ void MrKrabs::reset()
 void MrKrabs::update()
 {
 	// TODO: read RPi UART (Serial1) and dispatch state commands
+	arm_->tickArm();
 }
 
 void MrKrabs::stepControl()

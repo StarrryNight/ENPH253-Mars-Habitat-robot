@@ -42,7 +42,8 @@ static constexpr int WHEEL_3_ENCODER_0 = 0;    // TODO: conflicts with WHEEL_2_E
 static constexpr int WHEEL_3_ENCODER_1 = 1;
 
 // Distance traveled per encoder tick (m). Set from wheel circumference / ticks-per-rev.
-static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.3; // TODO: verify this value
+// Placeholder: ~0.3 m circumference / 20 ticks-per-rev. Measure and replace before tuning PID.
+static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.015; // TODO: measure actual value
 
 // Forward speed during line following (m/s). Tune empirically.
 static constexpr double FORWARD_SPEED = 0.3;
@@ -55,6 +56,12 @@ static constexpr double VELOCITY_TO_PWM = 200.0;
 
 // Values
 static constexpr int speed8bit = 230; // speed scales linear from 0 to 256
+
+// Arm servo pins
+static constexpr int pitch_base = 0;
+static constexpr int pitch_elbow = 0;
+static constexpr int yaw_wrist = 0;
+static constexpr int open_claw = 0;
 
 // Arm
 

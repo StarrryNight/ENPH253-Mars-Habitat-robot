@@ -38,7 +38,10 @@ public:
 	double tickVelocity();
 
 private:
+	int speedToDutyCycle(int speed);
+
 	const int wheel_number_;
+
 
 	volatile double wheel_velocity_;
 	int current_motor_speed_;

@@ -1,45 +1,72 @@
-# ENPH 253 – Mars Habitat Robot Competition
+## UART Message Contract
 
-## Competition
+**RPi → ESP32**
 
-Autonomous robot competition on an 8x8ft wooden surface with ramp and 6" elevated platform.
-Two robots compete head-to-head in 2-minute heats. Robots can be restarted; highest score counts.
+- Current state (string)
+- Flash light command (bool, for Teletubby)
 
-## Scoring
+**ESP32 → RPi**
 
-| Task                   | Points      | Status  |
-| ---------------------- | ----------- | ------- |
-| Habitat assembly       | 4 (1/piece) | ✅      |
-| Teletubby discovery    | 2 (1/each)  | ✅      |
-| Aluminum rock recovery | 2           | ✅      |
-| Solar panel uncovering | 2           | ❌ Skip |
-| Tower assembly         | 3 (1/piece) | ❌ Skip |
+- state_completed (bool)
+- metal_detected (bool)
 
-**Target: 8 points**
+## State Machine (RPi)
 
-## Hardware
+```python
+class StateMachine(StateChart):
+    line_following = State(initial=True)
+    teletubbying = State()
 
-- Octagonal chassis, tank drive (2 wheels + 2 casters)
-- 4-DOF arm: pitch @ base, pitch @ elbow, yaw @ wrist, open @ claw
-- Hole in chassis for rock deposit
+    class metal_detecting(State.Compound):
+        scanning = State(initial=True)
+        retrieving = State()
+        _cycle = scanning.to(retrieving, cond="metal_detected")
 
-## Electronics
+    class habitating(State.Compound):
+        grabbing = State(initial=True)
+        holding = State()
+        placing = State()
+        _cycle = grabbing.to(holding) | holding.to(placing)
 
-- ESP32-S3: all real-time control
-- RPi 4 2GB: CV + high-level state commands
-- UART + protobuf for inter-processor communication
+    cycle = (
+        line_following.to(metal_detecting, cond="enter_metal_detection")
+        | line_following.to(teletubbying, cond="enter_teletubby")
+        | line_following.to(habitating, cond="enter_habitat")
+        | metal_detecting.scanning.to(line_following, cond="metal_not_detected")
+        | metal_detecting.retrieving.to(line_following)
+        | teletubbying.to(line_following)
+        | habitating.to(line_following)
+    )
+```
 
-## Software
+## Arm Architecture
 
-**ESP32:** superloop (Mr Crab), timer ISR PID, motor PID, arm PID, line following, metal detector, motion profiles, state machine
-**RPi:** OpenCV HSV color blob detection (Teletubby), state commands to ESP32
+- **Type:** Fixed-sequence servo manipulator
+- **Joints:** All servos — no PID needed, internal position control
+- **Poses:** home, sweep, rock pickup, rock deposit, habitat grab, habitat place
+- **Control:** ESP32 writes servo PWM angles directly per state
+- **No arm PID required** — servos hold position internally
 
-**States:** Line-following → Holding → Arming → Metalling → Teletubbying
+## Kiwi Drive
 
-**Arm:** Fixed-sequence position-controlled manipulator. Hardcoded joint-angle poses, independent PID per joint.
-**Poses:** home, sweep, rock pickup, rock deposit, habitat grab, habitat place
+- 3 omni wheels at 120° separation
+- Inverse mixing: (vx, vy, ω) → 3 motor commands
+- Forward mixing: 3 encoder readings → (vx, vy, ω) for dead reckoning
+- Motor PID: velocity control at 100Hz via timer ISR
+- Direction reversal: coast one control cycle, dead time per MOSFET t_d(off) + t_f
 
-**Localization:** Encoder dead reckoning + line following as drift correction. Reset on limit switch or state transition.
+## Localization
+
+- Primary: IR line following (ground truth)
+- Secondary: Encoder dead reckoning between tape landmarks
+- Reset: Limit switch or state transition
+
+## CV Pipeline (RPi)
+
+- Rock detection: HSV color mask (grey-brown) + contour filtering
+- Teletubby detection: regional proposals around rock bounding boxes + yellow HSV filter
+- Deduplication: dominant hue recorded per confirmed detection, compared on subsequent detections
+- Confirmation: N consecutive frames required before state transition triggered
 
 ## Constraints
 
@@ -48,32 +75,3 @@ Two robots compete head-to-head in 2-minute heats. Robots can be restarted; high
 - Battery powered only
 - No discrete H-bridge driver chips
 - $200 team budget cap
-
-# Strategy, Stack & Architecture
-
-## Strategy
-
-Score 8 points reliably over 13 possible. Prioritize deterministic tasks over complex ones.
-Robust line following + dead reckoning over sophisticated localization.
-Hardcoded poses over runtime IK. Simple CV over ML.
-
-## Task Priority
-
-1. Habitat assembly — 4pts, arm + line following
-2. Teletubby detection — 2pts, CV + flash light
-3. Aluminum rock collection — 2pts, metal detector + arm
-
-## Hardware Stack
-
-- **Chassis:** Octagonal, kiwi drive (3 omni wheels at 120°)
-- **Arm:** 4-DOF (pitch @ base, pitch @ elbow, yaw @ wrist, open @ claw), DC motors + encoders, servo claw
-- **Drivetrain:** 3x DC motors + wheel encoders, H-bridge driven
-- **Sensors:** IR line following array, wheel encoders, arm encoders, metal detector (inductive loop), USB camera
-
-## Software Stack
-
-- **ESP32-S3:** C++, FreeRTOS, superloop (Mr Crab)
-- **RPi 4 2GB:** Python, OpenCV, pyserial
-- **Protocol:** UART + Google Protobuf
-
-## Architecture

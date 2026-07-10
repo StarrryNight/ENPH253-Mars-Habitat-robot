@@ -1,21 +1,14 @@
 syntax = "proto3";
 
-message RobotMessage{
-    string robotState = 0;
+
+// RPi → ESP32
+message Command {
+    string state                 = 1;
+    float  teletubby_bearing_deg = 2;  // degrees from frame center; only valid in teletubbying state
 }
 
-message teletubbyFound{
-    double confidence =0;
-    int angle = 1;
-}
-
-message RobotReply{
-    int robotState=0;
-    int robotStateStatus=1;
-}
-
-message teleoperation{
-    double v_x =0;
-    double v_y =1;
-    double orientation =2;
+// ESP32 → RPi
+message SensorState {
+    bool state_completed = 1;
+    bool metal_detected  = 2;
 }
