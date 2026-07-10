@@ -67,7 +67,7 @@ void MotorDriver::set_velocity(double speed)
 		// Direction reversal — coast to stop briefly, then apply new direction.
 		ledcWrite(pwm_channel_0_, 0);
 		ledcWrite(pwm_channel_1_, 0);
-		// TODO: remove delay
+		// TODO: remove delay and use micros or esp timer
 		delay(10);
 		if (duty_cycle > 0) rotateClockwise(static_cast<int>(duty_cycle));
 		else           rotateCounterClockwise(static_cast<int>(-duty_cycle));
