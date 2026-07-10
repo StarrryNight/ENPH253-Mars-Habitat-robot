@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <ratio>
 #include <Arduino.h>
 #include "HardwareSerial.h"
 #include "driver/ledc.h"
@@ -21,7 +22,9 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 	  encoder_count_(0),
 	  prev_measurement_encoder_count_(0),
 	  current_motor_speed_(0),
-	  last_direction_(0)
+	  last_direction_(0),
+	  prev_pwm_reset_time_(0),
+	  pending_direction_change_(false)
 {
 	ledcSetup(pwm_channel_0_, 1000, 8);
 	ledcAttachPin(pwm_pin_0_, pwm_channel_0_);
@@ -62,19 +65,29 @@ void MotorDriver::set_velocity(double speed)
 		if (new_direction > 0) ledcWrite(pwm_channel_0_, pwm);
 		else                   ledcWrite(pwm_channel_1_, pwm);
 	}
-	else
+	else if (new_direction != last_direction_ && pending_direction_change_==false)
 	{
 		// Direction reversal — coast to stop briefly, then apply new direction.
 		ledcWrite(pwm_channel_0_, 0);
 		ledcWrite(pwm_channel_1_, 0);
-		// TODO: remove delay and use micros or esp timer
-		delay(10);
-		if (duty_cycle > 0) rotateClockwise(static_cast<int>(duty_cycle));
-		else           rotateCounterClockwise(static_cast<int>(-duty_cycle));
+		prev_pwm_reset_time_ = micros();
+		pending_direction_change_ = true;
 	}
 
-	last_direction_ = new_direction;
-	current_motor_speed_ = static_cast<int>(duty_cycle);
+	if (pending_direction_change_){
+		if (micros() - prev_pwm_reset_time_ > SHOOTTHROUGH_GUARD_THRESHOLD_US){
+			if (duty_cycle > 0) rotateClockwise(static_cast<int>(duty_cycle));
+			else           rotateCounterClockwise(static_cast<int>(-duty_cycle));
+			pending_direction_change_ = false;
+			last_direction_ = new_direction;
+			current_motor_speed_ = static_cast<int>(duty_cycle);
+		}
+	}
+	else{
+		last_direction_ = new_direction;
+		current_motor_speed_ = static_cast<int>(duty_cycle);
+
+	}
 }
 
 void MotorDriver::rotateClockwise(int duty_cycle)
