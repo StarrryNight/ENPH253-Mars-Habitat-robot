@@ -7,9 +7,9 @@
 // Per-wheel speed targets in m/s (positive = forward for that wheel's orientation).
 struct WheelVelocities
 {
-	double wheel_1; // front-left (150°)
-	double wheel_2; // front-right (30°)
-	double wheel_3; // back (270°)
+	double wheel_left; // front-left (150°)
+	double wheel_right; // front-right (30°)
+	double wheel_back; // back (270°)
 };
 
 // Robot-frame velocity in SI units.
@@ -53,7 +53,7 @@ public:
 	void driveOpenLoop(RobotVelocity v);
 
 	// Returns accumulated heading (rad) estimated from wheel encoder deltas.
-	// Uses kiwi-drive kinematics: omega = (w1+w2+w3) / (3*R).
+	// Uses kiwi-drive kinematics: omega = (w_left+w_right+w_back) / (3*R).
 	double computeAngle();
 
 	void tickMotorSpeeds();
@@ -70,22 +70,22 @@ public:
 private:
 
 	// Kiwi-drive inverse kinematics: maps robot-frame (x, y, omega) to wheel speeds (m/s).
-	// Wheel angles from +Y (forward): wheel_1=150°, wheel_2=30°, wheel_3=270°.
+	// Wheel angles from +Y (forward): wheel_left=150°, wheel_right=30°, wheel_back=270°.
 	WheelVelocities euclideanToWheel(RobotVelocity v);
 	RobotVelocity wheelToEuclidean(WheelVelocities v);
 
 	// Runs one PID step for all three wheels and writes PWM output.
 	void applyVelocity_(RobotVelocity target);
 
-	PidController wheel_1_pid_;
-	PidController wheel_2_pid_;
-	PidController wheel_3_pid_;
+	PidController wheel_left_pid_;
+	PidController wheel_right_pid_;
+	PidController wheel_back_pid_;
 
 	// Motors are held in optionals so the MotorController object can be
 	// constructed safely before Arduino init; setup() emplaces them.
-	std::optional<MotorDriver> wheel_1_motor_;
-	std::optional<MotorDriver> wheel_2_motor_;
-	std::optional<MotorDriver> wheel_3_motor_;
+	std::optional<MotorDriver> wheel_left_motor_;
+	std::optional<MotorDriver> wheel_right_motor_;
+	std::optional<MotorDriver> wheel_back_motor_;
 
 	RobotVelocity current_target_velocity_;
 	WheelVelocities current_wheel_velocities_;

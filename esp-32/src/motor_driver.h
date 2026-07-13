@@ -56,7 +56,7 @@ private:
 
 	volatile double wheel_speed_;
 	int current_motor_speed_;
-	int last_direction_;                  // -1, 0, or 1 — tracks last direction for H-bridge protection
+	int last_direction_;                  // -1, 0, or 1 — tracks last direction for H-bridge protection and speed tracking
 
 	const int pwm_channel_0_;
 	const int pwm_channel_1_;
@@ -79,4 +79,5 @@ private:
 	int buffer_index_;
 	int buffer_filled_count_; // number of valid samples so far, caps at VELOCITY_BUFFER_SIZE
 	static constexpr uint64_t SHOOTTHROUGH_GUARD_THRESHOLD_US = 10000;
+
 };
