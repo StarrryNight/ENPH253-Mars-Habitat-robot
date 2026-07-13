@@ -26,8 +26,8 @@ static constexpr int WHEEL_1_PWM_PIN_1 = 45;
 
 static constexpr int WHEEL_2_PWM_CHANNEL_0 = 2;
 static constexpr int WHEEL_2_PWM_CHANNEL_1 = 3;
-static constexpr int WHEEL_2_PWM_PIN_0 = 42;
-static constexpr int WHEEL_2_PWM_PIN_1 = 41;
+static constexpr int WHEEL_2_PWM_PIN_0 = 41;
+static constexpr int WHEEL_2_PWM_PIN_1 = 42;
 // "RIGHT" on altium
 
 static constexpr int WHEEL_3_PWM_CHANNEL_0 = 4;

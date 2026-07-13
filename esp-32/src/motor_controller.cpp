@@ -153,6 +153,10 @@ void MotorController::tickMotorSpeeds(){
 	wheel_2_motor_->tickSpeed();
 	wheel_3_motor_->tickSpeed();
 	RobotVelocity v = wheelToEuclidean({wheel_1_motor_->getSpeed(), wheel_2_motor_->getSpeed(), wheel_3_motor_->getSpeed()});
+	Serial.printf("wheel_1_velocity: %.5f\n",wheel_1_motor_->getSpeed());
+	Serial.printf("wheel_2_velocity: %.5f\n",wheel_2_motor_->getSpeed());
+	Serial.printf("wheel_3_velocity: %.5f\n",wheel_3_motor_->getSpeed());
+
 	Serial.printf("v_x: %.5f\n", v.x);
 	Serial.printf("v_y: %.5f\n", v.y);
 	Serial.printf("omega: %.5f\n", v.omega);
