@@ -1,8 +1,9 @@
 #include "line_follower.h"
 #include <Arduino.h>
 #include "constants.h"
+#include "pid_config.h"
 
-LineFollower::LineFollower() : line_followng_pid_(PidController(1, 0, 2, 2)), prev_state_({0, 0, 0, 0})
+LineFollower::LineFollower() : line_followng_pid_(PidController(LINE_PID_P, LINE_PID_I, LINE_PID_D, LINE_PID_MAX_I)), prev_state_({0, 0, 0, 0})
 {
     pinMode(LEFT_PHOTORESISTOR, INPUT);
     pinMode(MID_LEFT_PHOTORESISTOR, INPUT);

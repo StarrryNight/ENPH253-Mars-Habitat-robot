@@ -3,6 +3,7 @@
 #include "HWCDC.h"
 #include "motor_driver.h"
 #include "constants.h"
+#include "pid_config.h"
 #include "esp_timer.h"
 
 MotorController::MotorController()
@@ -11,9 +12,9 @@ MotorController::MotorController()
 	  prev_step_time_us_(0),
 	  accumulated_angle_(0),
 	  accumulated_rotation_distance_m_(0),
-	  wheel_1_pid_(PidController(0, 1, 2, 3)),
-	  wheel_2_pid_(PidController(0, 1, 2, 3)),
-	  wheel_3_pid_(PidController(0, 1, 2, 3))
+	  wheel_1_pid_(PidController(WHEEL_PID_P, WHEEL_PID_I, WHEEL_PID_D, WHEEL_PID_MAX_I)),
+	  wheel_2_pid_(PidController(WHEEL_PID_P, WHEEL_PID_I, WHEEL_PID_D, WHEEL_PID_MAX_I)),
+	  wheel_3_pid_(PidController(WHEEL_PID_P, WHEEL_PID_I, WHEEL_PID_D, WHEEL_PID_MAX_I))
 {
 	// Motors are NOT constructed here — setup() does that after Arduino init.
 }
