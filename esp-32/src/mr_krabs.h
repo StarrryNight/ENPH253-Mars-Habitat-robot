@@ -4,6 +4,7 @@
 #include "line_follower.h"
 #include "orientation_controller.h"
 #include "motor_controller.h"
+#include "arm.h"
 
 class MrKrabs
 {
@@ -34,9 +35,14 @@ private:
 	// Arduino init. setup() emplaces them once hardware is ready.
 	std::optional<LineFollower> line_follower_;
 	std::optional<MotorController> motor_controller_;
+	std::optional<Arm> arm_;
 
 	// OrientationController has no hardware deps in its constructor — safe as direct member.
 	OrientationController orientation_controller_;
 
 	esp_timer_handle_t control_loop_timer_;
+
+	// esp_timer_get_time() timestamp (µs) when the open-loop forward drive
+	// test started; used by stepControl to stop after FORWARD_DRIVE_TEST_DURATION_US.
+	uint64_t drive_test_start_us_;
 };

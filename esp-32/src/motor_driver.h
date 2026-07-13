@@ -38,7 +38,10 @@ public:
 	double tickVelocity();
 
 private:
+	int speedToDutyCycle(int speed);
+
 	const int wheel_number_;
+
 
 	volatile double wheel_velocity_;
 	int current_motor_speed_;
@@ -57,4 +60,9 @@ private:
 	volatile int encoder_count_;
 	int prev_measurement_encoder_count_; // snapshot taken each tickVelocity call
 	uint64_t prev_encoder_time_;         // µs timestamp of last tickVelocity call
+										 //
+	uint64_t prev_pwm_reset_time_;
+	bool pending_direction_change_;
+
+	static constexpr uint64_t SHOOTTHROUGH_GUARD_THRESHOLD_US = 10000;
 };
