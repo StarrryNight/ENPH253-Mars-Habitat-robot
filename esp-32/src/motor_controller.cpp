@@ -10,6 +10,7 @@ MotorController::MotorController()
 	  current_wheel_velocities_({0, 0, 0}),
 	  prev_step_time_us_(0),
 	  accumulated_angle_(0),
+	  accumulated_rotation_distance_m_(0),
 	  wheel_1_pid_(PidController(0, 1, 2, 3)),
 	  wheel_2_pid_(PidController(0, 1, 2, 3)),
 	  wheel_3_pid_(PidController(0, 1, 2, 3))
@@ -126,12 +127,59 @@ WheelVelocities MotorController::euclideanToWheel(RobotVelocity v)
 	return WheelVelocities{wheel_1, wheel_2, wheel_3};
 }
 
+
+RobotVelocity MotorController::wheelToEuclidean(WheelVelocities v)
+{
+    double vx = (2.0/3.0) * (
+        -std::sin(5.0*M_PI/6) * v.wheel_1 +
+        -std::sin(M_PI/6)     * v.wheel_2 +
+        -std::sin(3.0*M_PI/2) * v.wheel_3
+    );
+    double vy = (2.0/3.0) * (
+         std::cos(5.0*M_PI/6) * v.wheel_1 +
+         std::cos(M_PI/6)     * v.wheel_2 +
+         std::cos(3.0*M_PI/2) * v.wheel_3
+    );
+    double omega = (1.0/3.0) * (
+        v.wheel_1 + v.wheel_2 + v.wheel_3
+    ) / WHEEL_DISTANCE_FROM_CENTER_M;
+
+    return RobotVelocity{vx, vy, omega};
+}
+
 void MotorController::tickMotorSpeeds(){
 	wheel_1_motor_->tickSpeed();
 	wheel_2_motor_->tickSpeed();
 	wheel_3_motor_->tickSpeed();
-	Serial.printf("wheel 1: %.3f\n", wheel_1_motor_->getSpeed());
-	Serial.printf("wheel 2: %.3f\n", wheel_2_motor_->getSpeed());
-	Serial.printf("wheel 3: %.3f\n", wheel_3_motor_->getSpeed());
+	RobotVelocity v = wheelToEuclidean({wheel_1_motor_->getSpeed(), wheel_2_motor_->getSpeed(), wheel_3_motor_->getSpeed()});
+	Serial.printf("v_x: %.5f\n", v.x);
+	Serial.printf("v_y: %.5f\n", v.y);
+	Serial.printf("omega: %.5f\n", v.omega);
 
 }
+
+void MotorController::startRotation(){
+	accumulated_rotation_distance_m_ = 0.0;
+}
+
+double MotorController::calculateRotationDegrees(){
+	// Reuses the delta each MotorDriver already computed this tick in tickSpeed()
+	// (called via tickMotorSpeeds() earlier in the same control loop step) instead
+	// of independently re-diffing getEncoderCount().
+	WheelVelocities delta_wheel{
+		wheel_1_motor_->getCurrentDeltaCount() * ENCODER_RESOLUTION_DISTANCE_M,
+		wheel_2_motor_->getCurrentDeltaCount() * ENCODER_RESOLUTION_DISTANCE_M,
+		wheel_3_motor_->getCurrentDeltaCount() * ENCODER_RESOLUTION_DISTANCE_M
+	};
+
+	// wheelToEuclidean's omega term is (w1+w2+w3)/(3R) — the same kiwi-drive
+	// kinematics used for accumulated_angle_ in applyVelocity_. Feeding it per-tick
+	// wheel distance deltas (instead of velocities) yields the per-tick angle delta
+	// directly, correctly combining all three wheels instead of taking their max.
+	double omega_delta = wheelToEuclidean(delta_wheel).omega;
+	accumulated_rotation_distance_m_ += omega_delta * WHEEL_DISTANCE_FROM_CENTER_M;
+
+	return accumulated_rotation_distance_m_/WHEEL_DISTANCE_FROM_CENTER_M;
+}
+
+

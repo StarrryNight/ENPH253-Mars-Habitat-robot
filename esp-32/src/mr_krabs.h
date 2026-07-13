@@ -30,6 +30,7 @@ private:
 	void stepControl();
 
 	bool is_line_following_;
+	bool is_rotating_;
 
 	// Held in optionals so the global MrKrabs object is safe to construct before
 	// Arduino init. setup() emplaces them once hardware is ready.
@@ -45,4 +46,5 @@ private:
 	// esp_timer_get_time() timestamp (µs) when the open-loop forward drive
 	// test started; used by stepControl to stop after FORWARD_DRIVE_TEST_DURATION_US.
 	uint64_t drive_test_start_us_;
+
 };

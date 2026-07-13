@@ -57,10 +57,22 @@ public:
 	double computeAngle();
 
 	void tickMotorSpeeds();
+
+	// Initialize rotation control, activated once when we start rotating in place.
+	// Resets the accumulated rotation distance; per-tick deltas come from each
+	// MotorDriver's tickSpeed() (must run before this is called each tick — see
+	// MrKrabs::stepControl).
+	void startRotation();
+	// Returns total rotation (degrees) accumulated since startRotation(), computed by
+	// adding each wheel's most recent tickSpeed() delta every time this is called,
+	// then converting distance to angle via wheel-to-euclidean.
+	double calculateRotationDegrees();
 private:
+
 	// Kiwi-drive inverse kinematics: maps robot-frame (x, y, omega) to wheel speeds (m/s).
 	// Wheel angles from +Y (forward): wheel_1=150°, wheel_2=30°, wheel_3=270°.
 	WheelVelocities euclideanToWheel(RobotVelocity v);
+	RobotVelocity wheelToEuclidean(WheelVelocities v);
 
 	// Runs one PID step for all three wheels and writes PWM output.
 	void applyVelocity_(RobotVelocity target);
@@ -80,6 +92,9 @@ private:
 	uint64_t prev_step_time_us_;  // µs from esp_timer_get_time(); avoids std::chrono unreliability
 	double accumulated_angle_;    // radians; updated each applyVelocity_ call
 
+	// Running total (m) of signed rotation distance accumulated one control-loop
+	// delta at a time since startRotation().
+	double accumulated_rotation_distance_m_;
 	// Distance from robot center to each wheel contact point (m).
 	static constexpr double WHEEL_DISTANCE_FROM_CENTER_M = 0.3;
 };

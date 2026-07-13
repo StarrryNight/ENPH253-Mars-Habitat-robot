@@ -21,7 +21,11 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 	  current_motor_speed_(0),
 	  last_direction_(0),
 	  prev_pwm_reset_time_(0),
-	  pending_direction_change_(false)
+	  pending_direction_change_(false),
+	  velocity_count_buffer_{},
+	  buffer_index_(0),
+	  buffer_filled_count_(0),
+	  last_delta_count_(0)
 {
 	ledcSetup(pwm_channel_0_, 1000, 8);
 	ledcAttachPin(pwm_pin_0_, pwm_channel_0_);
@@ -43,8 +47,8 @@ void MotorDriver::set_velocity(double speed)
 {
 	int duty_cycle = speedToDutyCycle(speed);
 	int new_direction;
-	if (duty_cycle > 0)      new_direction =  1;
-	else if (duty_cycle < 0) new_direction = -1;
+	if (speed > 0)      new_direction =  1;
+	else if (speed < 0) new_direction = -1;
 	else                new_direction =  0;
 
 	if (new_direction == 0)
@@ -96,12 +100,12 @@ void MotorDriver::rotateCounterClockwise(int duty_cycle)
 	ledcWrite(pwm_channel_1_, duty_cycle);
 }
 
-int MotorDriver::speedToDutyCycle(int speed){
+int MotorDriver::speedToDutyCycle(double speed){
 	if (speed==0){
 		return 0;
 	}
-	int abs_speed = std::abs(speed);
-	int dir = speed/abs_speed;
+	int abs_speed = static_cast<int>(std::abs(speed));
+	int dir = speed > 0 ? 1 : -1;
 	return std::clamp(((abs_speed)+40)*dir,-255, 255);
 }
 int MotorDriver::get_current_motor_speed()
@@ -109,19 +113,34 @@ int MotorDriver::get_current_motor_speed()
 	return current_motor_speed_;
 }
 
-int MotorDriver::getEncoderCount()
+uint32_t MotorDriver::getEncoderCount()
 {
 	return encoder_count_;
 }
 
 void MotorDriver::tickSpeed()
 {
-	wheel_speed_ = ((encoder_count_ - prev_measurement_encoder_count_) * ENCODER_RESOLUTION_DISTANCE_M) / CONTROL_LOOP_PERIOD;
+	// Unsigned subtraction wraps correctly at 2^32, so this stays valid even
+	// once encoder_count_ has rolled over.
+	uint32_t delta_count = encoder_count_ - prev_measurement_encoder_count_;
+	last_delta_count_ = delta_count;
+	velocity_count_buffer_[buffer_index_] = (delta_count * ENCODER_RESOLUTION_DISTANCE_M) / CONTROL_LOOP_PERIOD;
+	buffer_index_ = (buffer_index_+1)%VELOCITY_BUFFER_SIZE;
+	if (buffer_filled_count_ < VELOCITY_BUFFER_SIZE) buffer_filled_count_++;
+
+	double sum = 0;
+	for (int i = 0; i < VELOCITY_BUFFER_SIZE; i++) sum += velocity_count_buffer_[i];
 	prev_measurement_encoder_count_ = encoder_count_;
+	wheel_speed_ = sum / buffer_filled_count_;
 }
 
 double MotorDriver::getSpeed(){
 
 	return wheel_speed_;
 
+}
+
+uint32_t MotorDriver::getCurrentDeltaCount()
+{
+	return last_delta_count_;
 }

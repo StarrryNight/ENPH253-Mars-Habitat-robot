@@ -1,6 +1,8 @@
 #pragma once
 #include <Arduino.h>
 #include <cstdint>
+#include <vector>
+#include "constants.h"
 
 // Controls a single DC motor with quadrature encoder feedback.
 // PWM is driven via ESP32 LEDC channels. Velocity is measured by tickVelocity(),
@@ -30,8 +32,9 @@ public:
 	// Returns the last PWM value written by set_velocity.
 	int get_current_motor_speed();
 
-	// Returns the raw cumulative encoder count since construction (monotonic, unsigned).
-	int getEncoderCount();
+	// Returns the raw cumulative encoder count since construction (monotonic, unsigned,
+	// wraps at 2^32 — callers must diff with unsigned arithmetic to handle wraparound).
+	uint32_t getEncoderCount();
 
 	// Computes wheel surface speed (m/s) from encoder count delta since last call.
 	// Must be called once per control loop tick (10 ms) by MotorController.
@@ -39,8 +42,14 @@ public:
 
 	double getSpeed();
 
+	// Encoder count delta computed by the most recent tickSpeed() call, i.e.
+	// ticks accumulated over the last control loop period (10 ms). Callers that
+	// tick on the same 10 ms cadence (e.g. rotation tracking) can reuse this
+	// instead of independently diffing getEncoderCount().
+	uint32_t getCurrentDeltaCount();
+
 private:
-	int speedToDutyCycle(int speed);
+	int speedToDutyCycle(double speed);
 
 	const int wheel_number_;
 
@@ -57,11 +66,17 @@ private:
 
 	const int encoder_pin_0_;
 
-	volatile int encoder_count_;
-	int prev_measurement_encoder_count_; // snapshot taken each tickVelocity call
-										 //
+	// uint32_t: wraps instead of overflowing at ~2 billion counts. Wraparound is
+	// handled correctly as long as deltas are computed with unsigned subtraction.
+	volatile uint32_t encoder_count_;
+	uint32_t prev_measurement_encoder_count_; // snapshot taken each tickVelocity call
+	uint32_t last_delta_count_;               // delta computed by the most recent tickSpeed() call
 	uint64_t prev_pwm_reset_time_;
 	bool pending_direction_change_;
 
+
+	double velocity_count_buffer_[VELOCITY_BUFFER_SIZE];
+	int buffer_index_;
+	int buffer_filled_count_; // number of valid samples so far, caps at VELOCITY_BUFFER_SIZE
 	static constexpr uint64_t SHOOTTHROUGH_GUARD_THRESHOLD_US = 10000;
 };
