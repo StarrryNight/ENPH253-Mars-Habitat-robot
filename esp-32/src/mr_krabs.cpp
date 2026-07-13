@@ -2,6 +2,7 @@
 #include "mr_krabs.h"
 #include "constants.h"
 #include "esp_timer.h"
+#include "motor_controller.h"
 
 MrKrabs::MrKrabs() : is_line_following_(false), control_loop_timer_(nullptr), drive_test_start_us_(0), is_rotating_(false) {}
 
@@ -39,7 +40,6 @@ void MrKrabs::update()
 	// TODO: read RPi UART (Serial1) and dispatch state commands
 	arm_->tickArm();
 }
-
 void MrKrabs::stepControl()
 {
 	// Open-loop forward drive test — no PID, no line following.
@@ -47,9 +47,20 @@ void MrKrabs::stepControl()
 	motor_controller_->tickMotorSpeeds();
 	bool still_driving = (esp_timer_get_time() - drive_test_start_us_) < FORWARD_DRIVE_TEST_DURATION_US;
 	motor_controller_->driveOpenLoop({0, still_driving ? FORWARD_SPEED : 0.0, 0});
-	 
-	if (is_rotating_){
-		double curr_position = motor_controller_->calculateRotationDegrees();
+	if (is_line_following_){
+		double correction = line_follower_->calculateCorrection();
+		motor_controller_->driveOpenLoop({correction, FORWARD_SPEED, 0});	
+	} 
+	else if (is_rotating_){
+		double curr_position = motor_controller_->calculateCurrentOrientation();
+		if (orientation_controller_.reachedTarget(curr_position)){
+			is_rotating_ = false;
+			motor_controller_->driveOpenLoop({0,0,0});
+		}
+		else{
+			double correction = orientation_controller_.calculateCorrection(curr_position);
+			motor_controller_->driveOpenLoop({0,0, correction});
+		}
 	}
 
 
@@ -62,6 +73,7 @@ void MrKrabs::startLineFollowing()
 
 void MrKrabs::startRotation(double target_angle)
 {
+	motor_controller_->driveOpenLoop({0,0,0});
 	is_line_following_ = false;
 	is_rotating_ = true;
 	motor_controller_->startRotation();

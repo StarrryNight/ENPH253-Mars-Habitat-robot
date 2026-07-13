@@ -12,9 +12,6 @@ MotorController::MotorController()
 	  prev_step_time_us_(0),
 	  accumulated_angle_(0),
 	  accumulated_rotation_distance_m_(0),
-	  wheel_left_pid_(PidController(WHEEL_PID_P, WHEEL_PID_I, WHEEL_PID_D, WHEEL_PID_MAX_I)),
-	  wheel_right_pid_(PidController(WHEEL_PID_P, WHEEL_PID_I, WHEEL_PID_D, WHEEL_PID_MAX_I)),
-	  wheel_back_pid_(PidController(WHEEL_PID_P, WHEEL_PID_I, WHEEL_PID_D, WHEEL_PID_MAX_I))
 {
 	// Motors are NOT constructed here — setup() does that after Arduino init.
 }
@@ -34,48 +31,7 @@ void MotorController::setup()
 	prev_step_time_us_ = esp_timer_get_time();
 }
 
-void MotorController::setVelocity(RobotVelocity target_velocity)
-{
-	current_target_velocity_ = target_velocity;
-	applyVelocity_(target_velocity);
-}
 
-void MotorController::addVelocity(RobotVelocity correction_velocity)
-{
-	// Applies a one-shot correction without modifying the stored base target.
-	applyVelocity_(current_target_velocity_ + correction_velocity);
-}
-
-void MotorController::applyVelocity_(RobotVelocity target)
-{
-	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return;
-
-	uint64_t now = esp_timer_get_time();
-	double delta_t = static_cast<double>(now - prev_step_time_us_) * 1e-6;
-	if (delta_t <= 0.0) delta_t = CONTROL_LOOP_PERIOD;
-	prev_step_time_us_ = now;
-
-
-	// Accumulate heading from kiwi-drive kinematics: omega = (w_left+w_right+w_back)/(3R)
-	accumulated_angle_ += (current_wheel_velocities_.wheel_left +
-	                       current_wheel_velocities_.wheel_right +
-	                       current_wheel_velocities_.wheel_back) /
-	                      (3.0 * WHEEL_DISTANCE_FROM_CENTER_M) * delta_t;
-
-	WheelVelocities target_wheel = euclideanToWheel(target);
-
-	// PID error is in m/s; multiply output by VELOCITY_TO_PWM to get PWM counts.
-	double wheel_left_pwm = wheel_left_motor_->get_current_motor_speed() +
-	                wheel_left_pid_.step(target_wheel.wheel_left - current_wheel_velocities_.wheel_left, delta_t) * VELOCITY_TO_PWM;
-	double wheel_right_pwm = wheel_right_motor_->get_current_motor_speed() +
-	                wheel_right_pid_.step(target_wheel.wheel_right - current_wheel_velocities_.wheel_right, delta_t) * VELOCITY_TO_PWM;
-	double wheel_back_pwm = wheel_back_motor_->get_current_motor_speed() +
-	                wheel_back_pid_.step(target_wheel.wheel_back - current_wheel_velocities_.wheel_back, delta_t) * VELOCITY_TO_PWM;
-
-	wheel_left_motor_->set_velocity(wheel_left_pwm);
-	wheel_right_motor_->set_velocity(wheel_right_pwm);
-	wheel_back_motor_->set_velocity(wheel_back_pwm);
-}
 
 
 void MotorController::driveOpenLoop(RobotVelocity v)
@@ -153,10 +109,12 @@ void MotorController::tickMotorSpeeds(){
 	wheel_right_motor_->tickSpeed();
 	wheel_back_motor_->tickSpeed();
 	RobotVelocity v = wheelToEuclidean({wheel_left_motor_->getSpeed(), wheel_right_motor_->getSpeed(), wheel_back_motor_->getSpeed()});
+	current_robot_velocity_ = v;
+
+	//print
 	Serial.printf("wheel_left_velocity: %.5f\n",wheel_left_motor_->getSpeed());
 	Serial.printf("wheel_right_velocity: %.5f\n",wheel_right_motor_->getSpeed());
 	Serial.printf("wheel_back_velocity: %.5f\n",wheel_back_motor_->getSpeed());
-
 	Serial.printf("v_x: %.5f\n", v.x);
 	Serial.printf("v_y: %.5f\n", v.y);
 	Serial.printf("omega: %.5f\n", v.omega);
@@ -166,8 +124,7 @@ void MotorController::tickMotorSpeeds(){
 void MotorController::startRotation(){
 	accumulated_rotation_distance_m_ = 0.0;
 }
-
-double MotorController::calculateRotationDegrees(){
+double MotorController::calculateCurrentOrientation(){
 	// Reuses the delta each MotorDriver already computed this tick in tickSpeed()
 	// (called via tickMotorSpeeds() earlier in the same control loop step) instead
 	// of independently re-diffing getEncoderCount().
@@ -187,4 +144,7 @@ double MotorController::calculateRotationDegrees(){
 	return accumulated_rotation_distance_m_/WHEEL_DISTANCE_FROM_CENTER_M;
 }
 
+RobotVelocity MotorController::getCurrentRobotVelocity(){
+	return current_robot_velocity_;
+}
 

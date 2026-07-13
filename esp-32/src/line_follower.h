@@ -17,7 +17,7 @@ public:
 
 	// Reads photoresistors and returns a lateral (x-axis) velocity correction.
 	// Positive x = steer right, negative x = steer left.
-	RobotVelocity calculateCorrection();
+	double calculateCorrection();
 
 private:
 	// Returns binarised sensor readings (1 = on line, 0 = off line)

@@ -11,7 +11,7 @@ LineFollower::LineFollower() : line_followng_pid_(PidController(LINE_PID_P, LINE
     pinMode(RIGHT_PHOTORESISTOR, INPUT);
 }
 
-RobotVelocity LineFollower::calculateCorrection()
+double LineFollower::calculateCorrection()
 {
     std::array<double, 4> current_state = readPhotoresistors();
     double correction = 0;
@@ -38,7 +38,7 @@ RobotVelocity LineFollower::calculateCorrection()
         }
     }
     prev_state_ = current_state;
-    return RobotVelocity{correction, 0, 0};
+    return correction;
 }
 
 // Issue: For metal detecting, we will need to spin the robot arm while following line to be efficient. But our robot cannot support both actions at once.

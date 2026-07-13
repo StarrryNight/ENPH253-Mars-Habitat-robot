@@ -66,7 +66,9 @@ public:
 	// Returns total rotation (degrees) accumulated since startRotation(), computed by
 	// adding each wheel's most recent tickSpeed() delta every time this is called,
 	// then converting distance to angle via wheel-to-euclidean.
-	double calculateRotationDegrees();
+	double calculateCurrentOrientation();
+
+	RobotVelocity getCurrentRobotVelocity();
 private:
 
 	// Kiwi-drive inverse kinematics: maps robot-frame (x, y, omega) to wheel speeds (m/s).
@@ -74,12 +76,7 @@ private:
 	WheelVelocities euclideanToWheel(RobotVelocity v);
 	RobotVelocity wheelToEuclidean(WheelVelocities v);
 
-	// Runs one PID step for all three wheels and writes PWM output.
-	void applyVelocity_(RobotVelocity target);
 
-	PidController wheel_left_pid_;
-	PidController wheel_right_pid_;
-	PidController wheel_back_pid_;
 
 	// Motors are held in optionals so the MotorController object can be
 	// constructed safely before Arduino init; setup() emplaces them.
@@ -97,4 +94,6 @@ private:
 	double accumulated_rotation_distance_m_;
 	// Distance from robot center to each wheel contact point (m).
 	static constexpr double WHEEL_DISTANCE_FROM_CENTER_M = 0.3;
+
+	RobotVelocity current_robot_velocity_;
 };

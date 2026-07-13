@@ -55,6 +55,10 @@ static constexpr double FORWARD_SPEED = 1;
 // Open-loop forward drive test duration (µs) — see MrKrabs::stepControl.
 static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 10000000000; // 1 s
 
+// Rotation is considered complete once within this angular distance (rad) of
+// the target angle. See OrientationController::reachedTarget.
+static constexpr double ROTATION_TOLERANCE_RAD = 0.05;
+
 // Converts PID output (m/s) to PWM counts. Tune to match motor transfer function.
 static constexpr double VELOCITY_TO_PWM = 200.0;
 
