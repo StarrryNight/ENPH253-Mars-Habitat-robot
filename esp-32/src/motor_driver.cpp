@@ -8,17 +8,14 @@
 #include "esp32-hal-gpio.h"
 #include "motor_driver.h"
 
-MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1, int pwm_pin_0, int pwm_pin_1, int encoder_pin_0, int encoder_pin_1)
+MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1, int pwm_pin_0, int pwm_pin_1, int encoder_pin_0)
 	: wheel_number_(wheel_number),
 	  pwm_channel_0_(pwm_channel_0),
 	  pwm_channel_1_(pwm_channel_1),
 	  pwm_pin_0_(pwm_pin_0),
 	  pwm_pin_1_(pwm_pin_1),
 	  encoder_pin_0_(encoder_pin_0),
-	  encoder_pin_1_(encoder_pin_1),
-	  wheel_velocity_(0),
-	  last_encoder_time_(0),
-	  prev_encoder_time_(micros()),
+	  wheel_speed_(0),
 	  encoder_count_(0),
 	  prev_measurement_encoder_count_(0),
 	  current_motor_speed_(0),
@@ -39,9 +36,6 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 	attachInterruptArg(encoder_pin_0_, [](void *arg) IRAM_ATTR
 					   {
 	    MotorDriver* m = static_cast<MotorDriver*>(arg);
-	    uint64_t now = micros();
-	    if (now - m->last_encoder_time_ < 3000) return;
-	    m->last_encoder_time_ = now;
 	    m->encoder_count_ += 1; }, this, RISING);
 }
 
@@ -120,12 +114,14 @@ int MotorDriver::getEncoderCount()
 	return encoder_count_;
 }
 
-double MotorDriver::tickVelocity()
+void MotorDriver::tickSpeed()
 {
-	auto now = micros();
-	auto delta_t = (now - prev_encoder_time_) * 1e-6;
-	wheel_velocity_ = ((encoder_count_ - prev_measurement_encoder_count_) * ENCODER_RESOLUTION_DISTANCE_M) / delta_t;
-	prev_encoder_time_ = now;
+	wheel_speed_ = ((encoder_count_ - prev_measurement_encoder_count_) * ENCODER_RESOLUTION_DISTANCE_M) / CONTROL_LOOP_PERIOD;
 	prev_measurement_encoder_count_ = encoder_count_;
-	return wheel_velocity_;
+}
+
+double MotorDriver::getSpeed(){
+
+	return wheel_speed_;
+
 }

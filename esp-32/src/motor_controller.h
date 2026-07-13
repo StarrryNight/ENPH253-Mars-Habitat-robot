@@ -56,6 +56,7 @@ public:
 	// Uses kiwi-drive kinematics: omega = (w1+w2+w3) / (3*R).
 	double computeAngle();
 
+	void tickMotorSpeeds();
 private:
 	// Kiwi-drive inverse kinematics: maps robot-frame (x, y, omega) to wheel speeds (m/s).
 	// Wheel angles from +Y (forward): wheel_1=150°, wheel_2=30°, wheel_3=270°.

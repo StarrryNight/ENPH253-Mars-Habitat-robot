@@ -1,5 +1,6 @@
 #include <cmath>
 #include "motor_controller.h"
+#include "HWCDC.h"
 #include "motor_driver.h"
 #include "constants.h"
 #include "esp_timer.h"
@@ -16,17 +17,18 @@ MotorController::MotorController()
 	// Motors are NOT constructed here — setup() does that after Arduino init.
 }
 
+
 void MotorController::setup()
 {
 	wheel_1_motor_.emplace(1, WHEEL_1_PWM_CHANNEL_0, WHEEL_1_PWM_CHANNEL_1,
 	                       WHEEL_1_PWM_PIN_0, WHEEL_1_PWM_PIN_1,
-	                       WHEEL_1_ENCODER_0, WHEEL_1_ENCODER_1);
+	                       WHEEL_1_ENCODER_0);
 	wheel_2_motor_.emplace(2, WHEEL_2_PWM_CHANNEL_0, WHEEL_2_PWM_CHANNEL_1,
 	                       WHEEL_2_PWM_PIN_0, WHEEL_2_PWM_PIN_1,
-	                       WHEEL_2_ENCODER_0, WHEEL_2_ENCODER_1);
+	                       WHEEL_2_ENCODER_0);
 	wheel_3_motor_.emplace(3, WHEEL_3_PWM_CHANNEL_0, WHEEL_3_PWM_CHANNEL_1,
 	                       WHEEL_3_PWM_PIN_0, WHEEL_3_PWM_PIN_1,
-	                       WHEEL_3_ENCODER_0, WHEEL_3_ENCODER_1);
+	                       WHEEL_3_ENCODER_0);
 	prev_step_time_us_ = esp_timer_get_time();
 }
 
@@ -51,11 +53,6 @@ void MotorController::applyVelocity_(RobotVelocity target)
 	if (delta_t <= 0.0) delta_t = CONTROL_LOOP_PERIOD;
 	prev_step_time_us_ = now;
 
-	current_wheel_velocities_ = {
-		wheel_1_motor_->tickVelocity(),
-		wheel_2_motor_->tickVelocity(),
-		wheel_3_motor_->tickVelocity()
-	};
 
 	// Accumulate heading from kiwi-drive kinematics: omega = (w1+w2+w3)/(3R)
 	accumulated_angle_ += (current_wheel_velocities_.wheel_1 +
@@ -78,20 +75,16 @@ void MotorController::applyVelocity_(RobotVelocity target)
 	wheel_3_motor_->set_velocity(w3_pwm);
 }
 
+
 void MotorController::driveOpenLoop(RobotVelocity v)
 {
 	if (!wheel_1_motor_ || !wheel_2_motor_ || !wheel_3_motor_) return;
-
-	// Keep encoder velocity measurements live even in open-loop mode.
-	double v1 = wheel_1_motor_->tickVelocity();
-	double v2 = wheel_2_motor_->tickVelocity();
-	double v3 = wheel_3_motor_->tickVelocity();
-	Serial.printf("w1=%.3f w2=%.3f w3=%.3f m/s\n", v1, v2, v3);
 
 	WheelVelocities target = euclideanToWheel(v);
 	wheel_1_motor_->set_velocity(target.wheel_1 * VELOCITY_TO_PWM);
 	wheel_2_motor_->set_velocity(target.wheel_2 * VELOCITY_TO_PWM);
 	wheel_3_motor_->set_velocity(target.wheel_3 * VELOCITY_TO_PWM);
+
 }
 
 double MotorController::computeAngle()
@@ -131,4 +124,14 @@ WheelVelocities MotorController::euclideanToWheel(RobotVelocity v)
 	double wheel_3 = -std::sin(3.0*M_PI/2) * v.x + std::cos(3.0*M_PI/2) * v.y + WHEEL_DISTANCE_FROM_CENTER_M * v.omega;
 
 	return WheelVelocities{wheel_1, wheel_2, wheel_3};
+}
+
+void MotorController::tickMotorSpeeds(){
+	wheel_1_motor_->tickSpeed();
+	wheel_2_motor_->tickSpeed();
+	wheel_3_motor_->tickSpeed();
+	Serial.printf("wheel 1: %.3f\n", wheel_1_motor_->getSpeed());
+	Serial.printf("wheel 2: %.3f\n", wheel_2_motor_->getSpeed());
+	Serial.printf("wheel 3: %.3f\n", wheel_3_motor_->getSpeed());
+
 }

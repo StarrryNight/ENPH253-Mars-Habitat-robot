@@ -32,18 +32,15 @@ static constexpr int WHEEL_3_PWM_PIN_0 = 6;    // TODO: conflicts with WHEEL_1_E
 static constexpr int WHEEL_3_PWM_PIN_1 = 5;
 
 // Encoder pins
-static constexpr int WHEEL_1_ENCODER_0 = 3;    // TODO: conflicts with WHEEL_3_PWM_PIN_0 — fix wiring
-static constexpr int WHEEL_1_ENCODER_1 = 4;
+static constexpr int WHEEL_1_ENCODER_0 = 11;    // TODO: conflicts with WHEEL_3_PWM_PIN_0 — fix wiring
 
-static constexpr int WHEEL_2_ENCODER_0 = 0;    // TODO: conflicts with WHEEL_3_ENCODER_0 — fix wiring
-static constexpr int WHEEL_2_ENCODER_1 = 1;
+static constexpr int WHEEL_2_ENCODER_0 = 12;    // TODO: conflicts with WHEEL_3_ENCODER_0 — fix wiring
 
-static constexpr int WHEEL_3_ENCODER_0 = 0;    // TODO: conflicts with WHEEL_2_ENCODER_0 — fix wiring
-static constexpr int WHEEL_3_ENCODER_1 = 1;
+static constexpr int WHEEL_3_ENCODER_0 = 13;    // TODO: conflicts with WHEEL_2_ENCODER_0 — fix wiring
 
 // Distance traveled per encoder tick (m). Set from wheel circumference / ticks-per-rev.
 // Placeholder: ~0.3 m circumference / 20 ticks-per-rev. Measure and replace before tuning PID.
-static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.015; // TODO: measure actual value
+static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.008639; // TODO: measure actual value
 
 // Forward speed during line following (m/s). Tune empirically.
 static constexpr double FORWARD_SPEED = 0.3;

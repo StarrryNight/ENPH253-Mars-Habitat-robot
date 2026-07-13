@@ -14,7 +14,7 @@ public:
 	// pwm_channel_0/1: LEDC channels (must be unique per motor).
 	// pwm_pin_0 drives forward, pwm_pin_1 drives reverse.
 	// encoder_pin_0: single-phase encoder input (RISING edge counted).
-	MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1, int pwm_pin_0, int pwm_pin_1, int encoder_pin_0, int encoder_pin_1);
+	MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1, int pwm_pin_0, int pwm_pin_1, int encoder_pin_0);
 
 	// Direct PWM control. Zeroes the opposite channel before applying speed.
 	// These do NOT include a direction-change delay; use set_velocity for the
@@ -33,9 +33,11 @@ public:
 	// Returns the raw cumulative encoder count since construction (monotonic, unsigned).
 	int getEncoderCount();
 
-	// Computes wheel surface velocity (m/s) from encoder count delta since last call.
+	// Computes wheel surface speed (m/s) from encoder count delta since last call.
 	// Must be called once per control loop tick (10 ms) by MotorController.
-	double tickVelocity();
+	void tickSpeed();
+
+	double getSpeed();
 
 private:
 	int speedToDutyCycle(int speed);
@@ -43,10 +45,9 @@ private:
 	const int wheel_number_;
 
 
-	volatile double wheel_velocity_;
+	volatile double wheel_speed_;
 	int current_motor_speed_;
 	int last_direction_;                  // -1, 0, or 1 — tracks last direction for H-bridge protection
-	volatile uint64_t last_encoder_time_; // µs; used to debounce encoder ISR
 
 	const int pwm_channel_0_;
 	const int pwm_channel_1_;
@@ -55,11 +56,9 @@ private:
 	const int pwm_pin_1_;
 
 	const int encoder_pin_0_;
-	const int encoder_pin_1_;
 
 	volatile int encoder_count_;
 	int prev_measurement_encoder_count_; // snapshot taken each tickVelocity call
-	uint64_t prev_encoder_time_;         // µs timestamp of last tickVelocity call
 										 //
 	uint64_t prev_pwm_reset_time_;
 	bool pending_direction_change_;

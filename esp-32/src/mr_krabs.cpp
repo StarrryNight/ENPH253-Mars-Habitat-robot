@@ -44,6 +44,7 @@ void MrKrabs::stepControl()
 {
 	// Open-loop forward drive test — no PID, no line following.
 	// Stops after FORWARD_DRIVE_TEST_DURATION_US so the robot doesn't run away.
+	motor_controller_->tickMotorSpeeds();
 	bool still_driving = (esp_timer_get_time() - drive_test_start_us_) < FORWARD_DRIVE_TEST_DURATION_US;
 	motor_controller_->driveOpenLoop({0, still_driving ? FORWARD_SPEED : 0.0, 0});
 }
