@@ -82,9 +82,9 @@ void MotorController::driveOpenLoop(RobotVelocity v)
 	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return;
 
 	WheelVelocities target = euclideanToWheel(v);
-	wheel_left_motor_->set_velocity(target.wheel_left * VELOCITY_TO_PWM);
-	wheel_right_motor_->set_velocity(target.wheel_right * VELOCITY_TO_PWM);
-	wheel_back_motor_->set_velocity(target.wheel_back * VELOCITY_TO_PWM);
+	wheel_left_motor_->set_velocity(target.wheel_left  );
+	wheel_right_motor_->set_velocity(target.wheel_right) ;
+	wheel_back_motor_->set_velocity(target.wheel_back  );
 
 }
 

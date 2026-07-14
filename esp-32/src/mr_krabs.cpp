@@ -12,14 +12,27 @@ void MrKrabs::setup()
 	delay(100);
 	Serial.println("ESP32 is ready!");
 
+
 	// Emplace hardware objects now that Arduino init has run.
 	line_follower_.emplace();
 	motor_controller_.emplace();
 	motor_controller_->setup();
 	arm_.emplace();
 
-	delay(2000); // wait 2 s before driving so the robot can be placed safely
-	drive_test_start_us_ = esp_timer_get_time();
+	// SCServo bus servo: single data wire on GPIO 6, so RX and TX share the
+	// same pin (half-duplex). ST-series default bus baud rate is 1,000,000.
+	Serial2.begin(1000000, SERIAL_8N1, /*rxPin=*/BASE_ELBOW_PITCH_SERIAL_PIN, /*txPin=*/BASE_ELBOW_PITCH_SERIAL_PIN);
+	test_servo_.pSerial = &Serial2;
+	
+
+
+
+
+	//delay(2000); // wait 2 s before driving so the robot can be placed safel
+	//test_servo_.WritePosEx(/*ID=*/1, /*Position=*/1000, /*Speed=*/2400, /*ACC=*/50); // ~150 deg
+	//delay(2000); // wait 2 s before driving so the robot can be placed safely
+	//test_servo_.WritePosEx(/*ID=*/2, /*Position=*/4000, /*Speed=*/34900, /*ACC=*/50); // ~150 deg
+	//drive_test_start_us_ = esp_timer_get_time();
 
 	// Start fixed-rate control loop at CONTROL_LOOP_PERIOD_US.
 	esp_timer_create_args_t timer_args = {
@@ -54,27 +67,6 @@ void MrKrabs::update()
 }
 void MrKrabs::stepControl()
 {
-	// Open-loop forward drive test — no PID, no line following.
-	// Stops after FORWARD_DRIVE_TEST_DURATION_US so the robot doesn't run away.
-	bool still_driving = (esp_timer_get_time() - drive_test_start_us_) < FORWARD_DRIVE_TEST_DURATION_US;
-	motor_controller_->setVelocity({0, still_driving ? FORWARD_SPEED : 0.0, 0});
-	if (is_line_following_){
-		double correction = line_follower_->calculateCorrection();
-		motor_controller_->driveOpenLoop({correction, FORWARD_SPEED, 0});	
-	} 
-	else if (is_rotating_){
-		double curr_position = motor_controller_->calculateCurrentOrientation();
-		if (orientation_controller_.reachedTarget(curr_position)){
-			is_rotating_ = false;
-			motor_controller_->setVelocity({0,0,0});
-		}
-		else{
-			double correction = orientation_controller_.calculateCorrection(curr_position);
-			motor_controller_->setVelocity({0,0, correction});
-		}
-	}
-
-
 }
 
 void MrKrabs::motorStepControl(){

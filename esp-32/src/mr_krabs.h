@@ -5,6 +5,7 @@
 #include "orientation_controller.h"
 #include "motor_controller.h"
 #include "arm.h"
+#include <SCServo.h>
 
 class MrKrabs
 {
@@ -48,6 +49,10 @@ private:
 	// esp_timer_get_time() timestamp (µs) when the open-loop forward drive
 	// test started; used by stepControl to stop after FORWARD_DRIVE_TEST_DURATION_US.
 	uint64_t drive_test_start_us_;
-	
+
+	// SMS_STS/SCSerial's constructor only sets defaults (pSerial = nullptr) and
+	// touches no hardware, so it's safe as a direct member; pSerial is bound to
+	// Serial2 in setup() once Arduino init (and Serial2.begin()) has run.
+	SMS_STS test_servo_;
 
 };
