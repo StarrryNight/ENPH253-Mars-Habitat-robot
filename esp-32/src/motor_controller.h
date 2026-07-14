@@ -76,7 +76,12 @@ private:
 	WheelVelocities euclideanToWheel(RobotVelocity v);
 	RobotVelocity wheelToEuclidean(WheelVelocities v);
 
+	// Runs one PID step for all three wheels and writes PWM output.
+	void applyVelocity_(RobotVelocity target);
 
+	PidController wheel_left_pid_;
+	PidController wheel_right_pid_;
+	PidController wheel_back_pid_;
 
 	// Motors are held in optionals so the MotorController object can be
 	// constructed safely before Arduino init; setup() emplaces them.
