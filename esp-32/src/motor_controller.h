@@ -46,7 +46,7 @@ public:
 
 
 	// Runs one PID step for all three wheels and writes PWM output.
-	void applyVelocity(RobotVelocity target);
+	void applyVelocity();
 
 	// Open-loop drive: converts v directly to wheel PWM via euclidean-to-wheel,
 	// no PID. Still calls tickVelocity() each call to keep encoder counts live.
@@ -57,6 +57,11 @@ public:
 	double computeAngle();
 
 	void tickMotorSpeeds();
+
+	// Resyncs all three wheels' speed baselines to their current encoder counts.
+	// Call once, right before the motor control loop timer starts — see
+	// MotorDriver::resetSpeedBaseline.
+	void resetSpeedBaselines();
 
 	// Initialize rotation control, activated once when we start rotating in place.
 	// Resets the accumulated rotation distance; per-tick deltas come from each

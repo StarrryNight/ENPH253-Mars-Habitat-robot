@@ -8,10 +8,10 @@
 // Per-wheel velocity PIDs (MotorController). Error is in m/s; output is
 // multiplied by VELOCITY_TO_PWM to get PWM counts. All three wheels share
 // gains for now — placeholders, tune on hardware.
-static constexpr double WHEEL_PID_P = 0;
-static constexpr double WHEEL_PID_I = 1;
-static constexpr double WHEEL_PID_D = 2;
-static constexpr double WHEEL_PID_MAX_I = 3;
+static constexpr double WHEEL_PID_P = 3;
+static constexpr double WHEEL_PID_I = 0.1;
+static constexpr double WHEEL_PID_D = 0;
+static constexpr double WHEEL_PID_MAX_I = 2;
 
 // Orientation (rotate-to-angle) PID (OrientationController). Error in radians.
 static constexpr double ORIENTATION_PID_P = 1;

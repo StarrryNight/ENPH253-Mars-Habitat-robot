@@ -37,18 +37,15 @@ void MotorController::setup()
 void MotorController::setVelocity(RobotVelocity target_velocity)
 {
 	current_target_velocity_ = target_velocity;
-	applyVelocity(target_velocity);
+	applyVelocity();
 }
 
 
-void MotorController::applyVelocity(RobotVelocity target)
+void MotorController::applyVelocity()
 {
 	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return;
 
-	uint64_t now = esp_timer_get_time();
-	double delta_t = static_cast<double>(now - prev_step_time_us_) * 1e-6;
-	if (delta_t <= 0.0) delta_t = CONTROL_LOOP_PERIOD;
-	prev_step_time_us_ = now;
+	double delta_t = MOTOR_CONTROL_LOOP_PERIOD;
 
 
 	// Accumulate heading from kiwi-drive kinematics: omega = (w_left+w_right+w_back)/(3R)
@@ -57,15 +54,23 @@ void MotorController::applyVelocity(RobotVelocity target)
 	                       current_wheel_velocities_.wheel_back) /
 	                      (3.0 * WHEEL_DISTANCE_FROM_CENTER_M) * delta_t;
 
-	WheelVelocities target_wheel = euclideanToWheel(target);
+	WheelVelocities target_wheel_velocity = euclideanToWheel(current_target_velocity_);
 
 	// PID error is in m/s; multiply output by VELOCITY_TO_PWM to get PWM counts.
-	double wheel_left_pwm = wheel_left_motor_->get_current_motor_speed() +
-	                wheel_left_pid_.step(target_wheel.wheel_left - current_wheel_velocities_.wheel_left, delta_t) * VELOCITY_TO_PWM;
-	double wheel_right_pwm = wheel_right_motor_->get_current_motor_speed() +
-	                wheel_right_pid_.step(target_wheel.wheel_right - current_wheel_velocities_.wheel_right, delta_t) * VELOCITY_TO_PWM;
-	double wheel_back_pwm = wheel_back_motor_->get_current_motor_speed() +
-	                wheel_back_pid_.step(target_wheel.wheel_back - current_wheel_velocities_.wheel_back, delta_t) * VELOCITY_TO_PWM;
+int wheel_left_pwm = static_cast<int>(
+    wheel_left_motor_->getCurrentTargetSpeed() +
+    wheel_left_pid_.step(target_wheel_velocity.wheel_left - current_wheel_velocities_.wheel_left, delta_t) 
+);
+
+int wheel_right_pwm = static_cast<int>(
+    wheel_right_motor_->getCurrentTargetSpeed() +
+    wheel_right_pid_.step(target_wheel_velocity.wheel_right - current_wheel_velocities_.wheel_right, delta_t) 
+);
+
+int wheel_back_pwm = static_cast<int>(
+    wheel_back_motor_->getCurrentTargetSpeed() +
+    wheel_back_pid_.step(target_wheel_velocity.wheel_back - current_wheel_velocities_.wheel_back, delta_t) 
+);
 
 	wheel_left_motor_->set_velocity(wheel_left_pwm);
 	wheel_right_motor_->set_velocity(wheel_right_pwm);
@@ -142,20 +147,29 @@ RobotVelocity MotorController::wheelToEuclidean(WheelVelocities v)
     return RobotVelocity{vx, vy, omega};
 }
 
+void MotorController::resetSpeedBaselines(){
+	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return;
+	wheel_left_motor_->resetSpeedBaseline();
+	wheel_right_motor_->resetSpeedBaseline();
+	wheel_back_motor_->resetSpeedBaseline();
+}
+
 void MotorController::tickMotorSpeeds(){
 	wheel_left_motor_->tickSpeed();
 	wheel_right_motor_->tickSpeed();
 	wheel_back_motor_->tickSpeed();
-	RobotVelocity v = wheelToEuclidean({wheel_left_motor_->getSpeed(), wheel_right_motor_->getSpeed(), wheel_back_motor_->getSpeed()});
+
+	current_wheel_velocities_ = {wheel_left_motor_->getSpeed(),wheel_right_motor_->getSpeed(),wheel_back_motor_->getSpeed()};
+	RobotVelocity v = wheelToEuclidean(current_wheel_velocities_) ;
 	current_robot_velocity_ = v;
 
 	//print
 	Serial.printf("wheel_left_velocity: %.5f\n",wheel_left_motor_->getSpeed());
-	Serial.printf("wheel_right_velocity: %.5f\n",wheel_right_motor_->getSpeed());
-	Serial.printf("wheel_back_velocity: %.5f\n",wheel_back_motor_->getSpeed());
-	Serial.printf("v_x: %.5f\n", v.x);
-	Serial.printf("v_y: %.5f\n", v.y);
-	Serial.printf("omega: %.5f\n", v.omega);
+///	Serial.printf("wheel_right_velocity: %.5f\n",wheel_right_motor_->getSpeed());
+///	Serial.printf("wheel_back_velocity: %.5f\n",wheel_back_motor_->getSpeed());
+///	Serial.printf("v_x: %.5f\n", v.x);
+///	Serial.printf("v_y: %.5f\n", v.y);
+///	Serial.printf("omega: %.5f\n", v.omega);
 
 }
 

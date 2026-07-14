@@ -21,7 +21,7 @@ void MrKrabs::setup()
 	delay(2000); // wait 2 s before driving so the robot can be placed safely
 	drive_test_start_us_ = esp_timer_get_time();
 
-	// Start fixed-rate control loop at CONTROL_LOOP_PERIOD_US (10 ms).
+	// Start fixed-rate control loop at CONTROL_LOOP_PERIOD_US.
 	esp_timer_create_args_t timer_args = {
 		.callback = [](void *arg) { static_cast<MrKrabs *>(arg)->stepControl(); },
 		.arg = this,
@@ -30,14 +30,17 @@ void MrKrabs::setup()
 	esp_timer_create(&timer_args, &control_loop_timer_);
 	esp_timer_start_periodic(control_loop_timer_, CONTROL_LOOP_PERIOD_US);
 
-	//If use motor control loop
-//	esp_timer_create_args_t motor_timer_args = {
-//		.callback = [](void *arg) { static_cast<MrKrabs *>(arg)->motorStepControl(); },
-//		.arg = this,
-//		.name = "motor_control_loop_timer"
-//	};
-//	esp_timer_create(&motor_timer_args, &motor_control_loop_timer_);
-//	esp_timer_start_periodic(motor_control_loop_timer_, MOTOR_CONTROL_LOOP_PERIOD_US);
+	esp_timer_create_args_t motor_timer_args = {
+		.callback = [](void *arg) { static_cast<MrKrabs *>(arg)->motorStepControl(); },
+		.arg = this,
+		.name = "motor_control_loop_timer"
+	};
+	esp_timer_create(&motor_timer_args, &motor_control_loop_timer_);
+	// Resync encoder baselines right before the timer starts so pulses picked up
+	// during construction/the placement delay above don't read as a velocity spike
+	// on the very first tick.
+	motor_controller_->resetSpeedBaselines();
+	esp_timer_start_periodic(motor_control_loop_timer_, MOTOR_CONTROL_LOOP_PERIOD_US);
 }
 
 void MrKrabs::reset()
@@ -54,7 +57,7 @@ void MrKrabs::stepControl()
 	// Open-loop forward drive test — no PID, no line following.
 	// Stops after FORWARD_DRIVE_TEST_DURATION_US so the robot doesn't run away.
 	bool still_driving = (esp_timer_get_time() - drive_test_start_us_) < FORWARD_DRIVE_TEST_DURATION_US;
-	motor_controller_->driveOpenLoop({0, still_driving ? FORWARD_SPEED : 0.0, 0});
+	motor_controller_->setVelocity({0, still_driving ? FORWARD_SPEED : 0.0, 0});
 	if (is_line_following_){
 		double correction = line_follower_->calculateCorrection();
 		motor_controller_->driveOpenLoop({correction, FORWARD_SPEED, 0});	
@@ -63,11 +66,11 @@ void MrKrabs::stepControl()
 		double curr_position = motor_controller_->calculateCurrentOrientation();
 		if (orientation_controller_.reachedTarget(curr_position)){
 			is_rotating_ = false;
-			motor_controller_->driveOpenLoop({0,0,0});
+			motor_controller_->setVelocity({0,0,0});
 		}
 		else{
 			double correction = orientation_controller_.calculateCorrection(curr_position);
-			motor_controller_->driveOpenLoop({0,0, correction});
+			motor_controller_->setVelocity({0,0, correction});
 		}
 	}
 
@@ -76,7 +79,7 @@ void MrKrabs::stepControl()
 
 void MrKrabs::motorStepControl(){
 	motor_controller_->tickMotorSpeeds();
-	motor_controller_->applyVelocity();
+  motor_controller_->applyVelocity();
 	
 }
 

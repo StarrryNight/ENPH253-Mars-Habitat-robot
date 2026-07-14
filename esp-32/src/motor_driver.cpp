@@ -19,7 +19,7 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 	  wheel_speed_(0),
 	  encoder_count_(0),
 	  prev_measurement_encoder_count_(0),
-	  current_motor_speed_(0),
+	  motor_target_speed_(0),
 	  last_direction_(0),
 	  prev_pwm_reset_time_(0),
 	  pending_direction_change_(false),
@@ -46,47 +46,66 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 
 void MotorDriver::set_velocity(double speed)
 {
+    int duty_cycle = speedToDutyCycle(speed);
+    int new_direction;
+    if (duty_cycle == 0)   new_direction =  0;
+    else if (speed > 0)    new_direction =  1;
+    else                   new_direction = -1;
 
-	int duty_cycle = speedToDutyCycle(speed);
-	int new_direction;
-	if (duty_cycle == 0)   new_direction =  0;
-	else if (speed > 0)    new_direction =  1;
-	else                   new_direction = -1;
+	Serial.printf("duty_cycle: %d\n",duty_cycle*new_direction);
+    // CAPTURE INTENT IMMEDIATELY: Tell the encoder math exactly what the PID wants right now
+    intended_direction_ = new_direction;
 
-	if (new_direction == 0)
-	{
-		ledcWrite(pwm_channel_0_, 0);
-		ledcWrite(pwm_channel_1_, 0);
-	}
-	else if (new_direction == last_direction_)
-	{
-		// Same direction — update PWM with no delay.
-		if (new_direction > 0) ledcWrite(pwm_channel_0_, duty_cycle);
-		else                   ledcWrite(pwm_channel_1_, duty_cycle);
-	}
-	else if (new_direction != last_direction_ && pending_direction_change_==false)
-	{
-		// Direction reversal — coast to stop briefly, then apply new direction.
-		ledcWrite(pwm_channel_0_, 0);
-		ledcWrite(pwm_channel_1_, 0);
-		prev_pwm_reset_time_ = micros();
-		pending_direction_change_ = true;
-	}
+    // Record the raw commanded speed unconditionally, even when the deadzone below
+    // zeroes the actual PWM write — this is the memory term MotorController's
+    // incremental PID reads back via getCurrentTargetSpeed(), so it must keep
+    // accumulating sub-deadzone contributions instead of getting reset to 0 every tick.
+    motor_target_speed_ = speed;
 
-	if (pending_direction_change_){
-		if (micros() - prev_pwm_reset_time_ > SHOOTTHROUGH_GUARD_THRESHOLD_US){
-			if (new_direction > 0) rotateClockwise(duty_cycle);
-			else                   rotateCounterClockwise(duty_cycle);
-			pending_direction_change_ = false;
-			last_direction_ = new_direction;
-			current_motor_speed_ = duty_cycle * new_direction;
-		}
-	}
-	else{
-		last_direction_ = new_direction;
-		current_motor_speed_ = duty_cycle * new_direction;
+    if (pending_direction_change_)
+    {
+        if (micros() - prev_pwm_reset_time_ > SHOOTTHROUGH_GUARD_THRESHOLD_US)
+        {
+            if (new_direction > 0)       rotateClockwise(duty_cycle);
+            else if (new_direction < 0)  rotateCounterClockwise(duty_cycle);
 
-	}
+            last_direction_ = new_direction;
+            pending_direction_change_ = false;
+
+            std::fill_n(velocity_count_buffer_, VELOCITY_BUFFER_SIZE, 0.0);
+            buffer_index_ = 0;
+            buffer_filled_count_ = 0;
+        }
+        else
+        {
+            ledcWrite(pwm_channel_0_, 0);
+            ledcWrite(pwm_channel_1_, 0);
+        }
+        return;
+    }
+
+    if (new_direction == 0)
+    {
+        ledcWrite(pwm_channel_0_, 0);
+        ledcWrite(pwm_channel_1_, 0);
+        // Deliberately NOT resetting last_direction_ here: tickSpeed()'s sign
+        // fallback reads it whenever intended_direction_ is 0, and a command
+        // dithering at the deadzone shouldn't discard real encoder counts by
+        // forcing that fallback to 0 too. A genuinely stopped wheel already
+        // reads 0 velocity because delta_count itself is 0.
+    }
+    else if (new_direction == last_direction_)
+    {
+        if (new_direction > 0) ledcWrite(pwm_channel_0_, duty_cycle);
+        else                   ledcWrite(pwm_channel_1_, duty_cycle);
+    }
+    else
+    {
+        ledcWrite(pwm_channel_0_, 0);
+        ledcWrite(pwm_channel_1_, 0);
+        prev_pwm_reset_time_ = micros();
+        pending_direction_change_ = true;
+    }
 }
 
 void MotorDriver::rotateClockwise(int duty_cycle)
@@ -101,16 +120,16 @@ void MotorDriver::rotateCounterClockwise(int duty_cycle)
 	ledcWrite(pwm_channel_1_, duty_cycle);
 }
 
-int MotorDriver::speedToDutyCycle(double speed){
-	if (std::abs(speed) < MOTOR_SPEED_DEADZONE){
+int MotorDriver::speedToDutyCycle(int speed){
+	int abs_speed = static_cast<int>(std::abs(speed));
+	if (abs_speed < MOTOR_SPEED_DEADZONE){
 		return 0;
 	}
-	int abs_speed = static_cast<int>(std::abs(speed));
 	return std::clamp(abs_speed+40, 0, 255);
 }
-int MotorDriver::get_current_motor_speed()
+double MotorDriver::getCurrentTargetSpeed()
 {
-	return current_motor_speed_;
+	return motor_target_speed_;
 }
 
 uint32_t MotorDriver::getEncoderCount()
@@ -118,20 +137,44 @@ uint32_t MotorDriver::getEncoderCount()
 	return encoder_count_;
 }
 
+void MotorDriver::resetSpeedBaseline()
+{
+    noInterrupts();
+    uint32_t current_count = encoder_count_;
+    interrupts();
+    prev_measurement_encoder_count_ = current_count;
+}
+
 void MotorDriver::tickSpeed()
 {
-	// Unsigned subtraction wraps correctly at 2^32, so this stays valid even
-	// once encoder_count_ has rolled over.
-	uint32_t delta_count = encoder_count_ - prev_measurement_encoder_count_;
-	last_delta_count_ = delta_count;
-	velocity_count_buffer_[buffer_index_] = (delta_count * ENCODER_RESOLUTION_DISTANCE_M) / CONTROL_LOOP_PERIOD;
-	buffer_index_ = (buffer_index_+1)%VELOCITY_BUFFER_SIZE;
-	if (buffer_filled_count_ < VELOCITY_BUFFER_SIZE) buffer_filled_count_++;
+    noInterrupts();
+    uint32_t current_count = encoder_count_;
+    interrupts();
 
-	double sum = 0;
-	for (int i = 0; i < VELOCITY_BUFFER_SIZE; i++) sum += velocity_count_buffer_[i];
-	prev_measurement_encoder_count_ = encoder_count_;
-	wheel_speed_ = last_direction_ * sum / buffer_filled_count_;
+    uint32_t delta_count = current_count - prev_measurement_encoder_count_;
+    prev_measurement_encoder_count_ = current_count;
+    last_delta_count_ = delta_count;
+
+    double raw_speed = (static_cast<double>(delta_count) * ENCODER_RESOLUTION_DISTANCE_M) / MOTOR_CONTROL_LOOP_PERIOD;
+
+    // Use the immediate intended direction to break out-of-phase oscillation
+    int current_sign = intended_direction_;
+    if (current_sign == 0) {
+        current_sign = last_direction_; // Fallback only if stopping entirely
+    }
+
+    velocity_count_buffer_[buffer_index_] = raw_speed * current_sign;
+    buffer_index_ = (buffer_index_ + 1) % VELOCITY_BUFFER_SIZE;
+    if (buffer_filled_count_ < VELOCITY_BUFFER_SIZE) {
+        buffer_filled_count_++;
+    }
+
+    double sum = 0;
+    for (int i = 0; i < VELOCITY_BUFFER_SIZE; i++) {
+        sum += velocity_count_buffer_[i];
+    }
+    
+    wheel_speed_ = sum / buffer_filled_count_;
 }
 
 double MotorDriver::getSpeed(){

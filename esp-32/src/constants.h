@@ -2,10 +2,15 @@
 #include <cstdint>
 
 
-// Control loop — 10 ms period
+// General control loop (line following / orientation), driven by esp_timer_start_periodic.
+// CONTROL_LOOP_PERIOD (seconds) is derived from the µs constant so the two can never drift apart.
 static constexpr int CONTROL_LOOP_PERIOD_US = 10000;        // µs, for esp_timer_start_periodic
-static constexpr int MOTOR_CONTROL_LOOP_PERIOD_US = 1000;        // µs, for esp_timer_start_periodic
-static constexpr double CONTROL_LOOP_PERIOD = 0.01;         // seconds, for PID delta_t
+static constexpr double CONTROL_LOOP_PERIOD = CONTROL_LOOP_PERIOD_US * 1e-6; // seconds, for PID delta_t
+
+// Motor control loop (velocity PID / encoder sampling) — separate cadence from the loop above,
+// kept as its own constant since motor control runs on its own esp_timer.
+static constexpr int MOTOR_CONTROL_LOOP_PERIOD_US = 10000;  // µs, for esp_timer_start_periodic
+static constexpr double MOTOR_CONTROL_LOOP_PERIOD = MOTOR_CONTROL_LOOP_PERIOD_US * 1e-6; // seconds, for PID delta_t
 
 // Photoresistors
 static constexpr int LEFT_PHOTORESISTOR = 39;
@@ -51,7 +56,7 @@ static constexpr int WHEEL_BACK_ENCODER_0 = 2;
 static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.009163; // at 70 mm diameter, 24 ticks-per-rev
 
 // Forward speed during line following (m/s). Tune empirically.
-static constexpr double FORWARD_SPEED = 1;
+static constexpr double FORWARD_SPEED = 0.4;
 
 // Open-loop forward drive test duration (µs) — see MrKrabs::stepControl.
 static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 10000000000; // 1 s
@@ -60,8 +65,6 @@ static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 10000000000; // 1 s
 // the target angle. See OrientationController::reachedTarget.
 static constexpr double ROTATION_TOLERANCE_RAD = 0.05;
 
-// Converts PID output (m/s) to PWM counts. Tune to match motor transfer function.
-static constexpr double VELOCITY_TO_PWM = 200.0;
 
 // Below this commanded PWM magnitude, treat speed as zero instead of applying
 // the deadband floor below. Prevents FP/PID noise around a 0 target (e.g. the

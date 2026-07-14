@@ -29,8 +29,11 @@ public:
 	// protecting the H-bridge from shoot-through without blocking every tick.
 	void set_velocity(double speed);
 
-	// Returns the last PWM value written by set_velocity.
-	int get_current_motor_speed();
+	// Returns the last raw speed passed to set_velocity (pre-deadzone, pre-quantization).
+	// MotorController uses this as the memory term of its incremental PID, so it must
+	// keep accumulating even on ticks where the deadzone zeroes the actual PWM output —
+	// otherwise a sub-deadzone contribution can never build up past the threshold.
+	double getCurrentTargetSpeed();
 
 	// Returns the raw cumulative encoder count since construction (monotonic, unsigned,
 	// wraps at 2^32 — callers must diff with unsigned arithmetic to handle wraparound).
@@ -39,6 +42,12 @@ public:
 	// Computes wheel surface speed (m/s) from encoder count delta since last call.
 	// Must be called once per control loop tick (10 ms) by MotorController.
 	void tickSpeed();
+
+	// Resyncs the speed baseline to the current encoder count. Call once, right
+	// before the periodic timer that drives tickSpeed() starts, so pulses
+	// accumulated between construction and that point aren't misread as a huge
+	// velocity on the first tick.
+	void resetSpeedBaseline();
 
 	double getSpeed();
 
@@ -49,13 +58,14 @@ public:
 	uint32_t getCurrentDeltaCount();
 
 private:
-	int speedToDutyCycle(double speed);
+	int speedToDutyCycle(int speed);
 
 	const int wheel_number_;
 
 
+	int intended_direction_; // Tracks the immediate sign of incoming commands
 	volatile double wheel_speed_;
-	int current_motor_speed_;
+	double motor_target_speed_; // last raw speed passed to set_velocity — see getCurrentTargetSpeed
 	int last_direction_;                  // -1, 0, or 1 — tracks last direction for H-bridge protection and speed tracking
 
 	const int pwm_channel_0_;
