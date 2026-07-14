@@ -4,6 +4,7 @@
 
 // Control loop — 10 ms period
 static constexpr int CONTROL_LOOP_PERIOD_US = 10000;        // µs, for esp_timer_start_periodic
+static constexpr int MOTOR_CONTROL_LOOP_PERIOD_US = 1000;        // µs, for esp_timer_start_periodic
 static constexpr double CONTROL_LOOP_PERIOD = 0.01;         // seconds, for PID delta_t
 
 // Photoresistors

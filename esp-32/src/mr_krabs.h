@@ -28,6 +28,7 @@ public:
 private:
 	// Called every CONTROL_LOOP_PERIOD_US by the esp_timer.
 	void stepControl();
+	void motorStepControl();
 
 	bool is_line_following_;
 	bool is_rotating_;
@@ -42,6 +43,7 @@ private:
 	OrientationController orientation_controller_;
 
 	esp_timer_handle_t control_loop_timer_;
+	esp_timer_handle_t motor_control_loop_timer_;
 
 	// esp_timer_get_time() timestamp (µs) when the open-loop forward drive
 	// test started; used by stepControl to stop after FORWARD_DRIVE_TEST_DURATION_US.

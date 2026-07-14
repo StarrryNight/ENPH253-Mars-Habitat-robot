@@ -44,9 +44,9 @@ public:
 	// Replaces the current velocity target and runs one PID step.
 	void setVelocity(RobotVelocity target_velocity);
 
-	// Applies a one-shot correction on top of the last setVelocity target.
-	// Does NOT modify the stored base target; the next setVelocity() resets it.
-	void addVelocity(RobotVelocity correction_velocity);
+
+	// Runs one PID step for all three wheels and writes PWM output.
+	void applyVelocity(RobotVelocity target);
 
 	// Open-loop drive: converts v directly to wheel PWM via euclidean-to-wheel,
 	// no PID. Still calls tickVelocity() each call to keep encoder counts live.
@@ -76,8 +76,6 @@ private:
 	WheelVelocities euclideanToWheel(RobotVelocity v);
 	RobotVelocity wheelToEuclidean(WheelVelocities v);
 
-	// Runs one PID step for all three wheels and writes PWM output.
-	void applyVelocity_(RobotVelocity target);
 
 	PidController wheel_left_pid_;
 	PidController wheel_right_pid_;

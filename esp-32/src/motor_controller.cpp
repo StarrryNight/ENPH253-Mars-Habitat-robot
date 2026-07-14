@@ -37,16 +37,11 @@ void MotorController::setup()
 void MotorController::setVelocity(RobotVelocity target_velocity)
 {
 	current_target_velocity_ = target_velocity;
-	applyVelocity_(target_velocity);
+	applyVelocity(target_velocity);
 }
 
-void MotorController::addVelocity(RobotVelocity correction_velocity)
-{
-	// Applies a one-shot correction without modifying the stored base target.
-	applyVelocity_(current_target_velocity_ + correction_velocity);
-}
 
-void MotorController::applyVelocity_(RobotVelocity target)
+void MotorController::applyVelocity(RobotVelocity target)
 {
 	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return;
 

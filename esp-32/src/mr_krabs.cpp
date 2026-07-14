@@ -29,6 +29,15 @@ void MrKrabs::setup()
 	};
 	esp_timer_create(&timer_args, &control_loop_timer_);
 	esp_timer_start_periodic(control_loop_timer_, CONTROL_LOOP_PERIOD_US);
+
+	//If use motor control loop
+//	esp_timer_create_args_t motor_timer_args = {
+//		.callback = [](void *arg) { static_cast<MrKrabs *>(arg)->motorStepControl(); },
+//		.arg = this,
+//		.name = "motor_control_loop_timer"
+//	};
+//	esp_timer_create(&motor_timer_args, &motor_control_loop_timer_);
+//	esp_timer_start_periodic(motor_control_loop_timer_, MOTOR_CONTROL_LOOP_PERIOD_US);
 }
 
 void MrKrabs::reset()
@@ -44,7 +53,6 @@ void MrKrabs::stepControl()
 {
 	// Open-loop forward drive test — no PID, no line following.
 	// Stops after FORWARD_DRIVE_TEST_DURATION_US so the robot doesn't run away.
-	motor_controller_->tickMotorSpeeds();
 	bool still_driving = (esp_timer_get_time() - drive_test_start_us_) < FORWARD_DRIVE_TEST_DURATION_US;
 	motor_controller_->driveOpenLoop({0, still_driving ? FORWARD_SPEED : 0.0, 0});
 	if (is_line_following_){
@@ -64,6 +72,12 @@ void MrKrabs::stepControl()
 	}
 
 
+}
+
+void MrKrabs::motorStepControl(){
+	motor_controller_->tickMotorSpeeds();
+	motor_controller_->applyVelocity();
+	
 }
 
 void MrKrabs::startLineFollowing()
