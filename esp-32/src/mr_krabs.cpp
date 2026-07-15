@@ -28,7 +28,6 @@ void MrKrabs::setup()
 
 
 
-	//delay(2000); // wait 2 s before driving so the robot can be placed safel
 	//test_servo_.WritePosEx(/*ID=*/1, /*Position=*/1000, /*Speed=*/2400, /*ACC=*/50); // ~150 deg
 	//delay(2000); // wait 2 s before driving so the robot can be placed safely
 	//test_servo_.WritePosEx(/*ID=*/2, /*Position=*/4000, /*Speed=*/34900, /*ACC=*/50); // ~150 deg
@@ -54,7 +53,10 @@ void MrKrabs::setup()
 	// on the very first tick.
 	motor_controller_->resetSpeedBaselines();
 	esp_timer_start_periodic(motor_control_loop_timer_, MOTOR_CONTROL_LOOP_PERIOD_US);
-	delay(1000);
+//	delay(1000);
+//	arm_->setPose({0,0,0,0});
+//	delay(1000);
+//	arm_->setPose({60,60,60,60});
 }
 
 void MrKrabs::reset()
@@ -63,8 +65,6 @@ void MrKrabs::reset()
 
 void MrKrabs::update()
 {
-	// TODO: read RPi UART (Serial1) and dispatch state commands
-	arm_->tickArm();
 }
 void MrKrabs::stepControl()
 {

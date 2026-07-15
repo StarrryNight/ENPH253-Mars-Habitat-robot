@@ -1,0 +1,38 @@
+#pragma once
+#include "SCServo.h"
+#include "servo.h"
+#include "servo_controller.h"
+
+struct ArmPose{
+	double base_rotation_degrees;
+	double base_pitch_servo_degrees;
+	double elbow_pitch_servo_degrees;
+	double wrist_yaw_servo__degrees;
+	double claw_servo_position;
+
+};
+class Arm
+{
+
+public:
+
+	Arm();
+	void setPose(ArmPose pose);
+
+private:
+	struct PoseAngles
+	{
+		double base_pitch_deg;
+		double elbow_pitch_deg;
+		double wrist_yaw_deg;
+		double claw_deg;
+	};
+
+	static const PoseAngles kPoseAngles[];
+
+	SMS_STS bus_servo_;
+	Servo wrist_servo_;
+	Servo claw_servo_;
+
+	ArmPose current_pose_;
+};

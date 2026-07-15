@@ -1,38 +1,30 @@
 #include "arm.h"
 #include "constants.h"
 
-const Arm::PoseAngles Arm::kPoseAngles[] = {
-	{90, 90, 90, 90},
-	{90, 90, 90, 90},
-	{90, 90, 90, 90},
-	{90, 90, 90, 90},
-};
 
 Arm::Arm()
-	: base_servo_(BASE_ELBOW_PITCH_SERIAL_PIN),
-	  elbow_servo_(BASE_ELBOW_PITCH_SERIAL_PIN),
-	  wrist_servo_(yaw_wrist),
-	  claw_servo_(open_claw),
-	  current_pose_(METAL)
+	: bus_servo_(BASE_ELBOW_PITCH_SERIAL_PIN),
+	  wrist_servo_(WRIST_YAW_SERVO_PIN),
+	  claw_servo_(CLAW_OPEN_SERVO_PIN),
+	  current_pose_({0,0,0,0})
 {
-	servo_controller_.addServo(&base_servo_);
-	servo_controller_.addServo(&elbow_servo_);
-	servo_controller_.addServo(&wrist_servo_);
-	servo_controller_.addServo(&claw_servo_);
 	setPose(current_pose_);
 }
 
-void Arm::tickArm()
-{
-	servo_controller_.update();
-}
 
-void Arm::setPose(ArmPoses pose)
+void Arm::setPose(ArmPose pose)
 {
 	current_pose_ = pose;
-	const PoseAngles &angles = kPoseAngles[pose];
-	base_servo_.setAngleDeg(angles.base_pitch_deg);
-	elbow_servo_.setAngleDeg(angles.elbow_pitch_deg);
-	wrist_servo_.setAngleDeg(angles.wrist_yaw_deg);
-	claw_servo_.setAngleDeg(angles.claw_deg);
+	bus_servo_.WritePosEx(/*ID=*/1, /*Position=*/basePitchPositionConversion(pose.base_pitch_servo_degrees), /*Speed=*/2400, /*ACC=*/50); // ~150 deg
+	bus_servo_.WritePosEx(/*ID=*/2, /*Position=*/elbowPitchPositionConversion(pose.elbow_pitch_servo_degrees), /*Speed=*/34900, /*ACC=*/50); // ~150 deg
+	wrist_servo_.setAngleDeg(pose.wrist_yaw_servo_degrees);
+	claw_servo_.setAngleDeg(pose.claw_servo_degrees);
+}
+
+int Arm::basePitchPositionConversion(double degrees){
+	return degrees/180*(BASE_PITCH_SERVO_MAX - BASE_PITCH_SERVO_MIN)+BASE_PITCH_SERVO_MIN;
+}
+
+int Arm::elbowPitchPositionConversion(double degrees){
+	return degrees/180*(ELBOW_PITCH_SERVO_MAX - ELBOW_PITCH_SERVO_MIN)+ELBOW_PITCH_SERVO_MIN;
 }

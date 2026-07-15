@@ -1,34 +1,37 @@
 #pragma once
+#include "SCServo.h"
 #include "servo.h"
 #include "servo_controller.h"
+
+struct ArmPose{
+	double base_rotation_degrees;
+	double base_pitch_servo_degrees;
+	double elbow_pitch_servo_degrees;
+	double wrist_yaw_servo_degrees;
+	double claw_servo_degrees;
+};
 
 class Arm
 {
 
 public:
-	enum ArmPoses {METAL, GRAB_HABITAT, HOLD_HABITAT, PLACE_HABITAT};
 
 	Arm();
-
-	void tickArm();
-	void setPose(ArmPoses pose);
+	void setPose(ArmPose pose);
 
 private:
-	struct PoseAngles
-	{
-		double base_pitch_deg;
-		double elbow_pitch_deg;
-		double wrist_yaw_deg;
-		double claw_deg;
-	};
+	int basePitchPositionConversion(double degrees);
+	int elbowPitchPositionConversion(double degrees);
 
-	static const PoseAngles kPoseAngles[];
 
-	Servo base_servo_;
-	Servo elbow_servo_;
+	SMS_STS bus_servo_;
 	Servo wrist_servo_;
 	Servo claw_servo_;
-	ServoController servo_controller_;
 
-	ArmPoses current_pose_;
+	ArmPose current_pose_;
+
+	static constexpr int BASE_PITCH_SERVO_MIN = 0;
+	static constexpr int BASE_PITCH_SERVO_MAX = 2048;
+	static constexpr int ELBOW_PITCH_SERVO_MIN = 0;
+	static constexpr int ELBOW_PITCH_SERVO_MAX = 2048;
 };

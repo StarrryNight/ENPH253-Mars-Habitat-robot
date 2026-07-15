@@ -76,8 +76,9 @@ static constexpr int speed8bit = 230; // speed scales linear from 0 to 256
 
 // Arm servo pins
 static constexpr int BASE_ELBOW_PITCH_SERIAL_PIN = 6;
-static constexpr int yaw_wrist = 0;
-static constexpr int open_claw = 0;
+//TODO change
+static constexpr int WRIST_YAW_SERVO_PIN = 13;
+static constexpr int CLAW_OPEN_SERVO_PIN = 14;
 
 // Arm
 
