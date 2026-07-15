@@ -9,7 +9,7 @@
 // multiplied by VELOCITY_TO_PWM to get PWM counts. All three wheels share
 // gains for now — placeholders, tune on hardware.
 static constexpr double WHEEL_PID_P = 3;
-static constexpr double WHEEL_PID_I = 0.1;
+static constexpr double WHEEL_PID_I = 0;
 static constexpr double WHEEL_PID_D = 0;
 static constexpr double WHEEL_PID_MAX_I = 2;
 

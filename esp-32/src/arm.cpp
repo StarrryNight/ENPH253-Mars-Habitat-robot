@@ -9,8 +9,8 @@ const Arm::PoseAngles Arm::kPoseAngles[] = {
 };
 
 Arm::Arm()
-	: base_servo_(pitch_base),
-	  elbow_servo_(pitch_elbow),
+	: base_servo_(BASE_ELBOW_PITCH_SERIAL_PIN),
+	  elbow_servo_(BASE_ELBOW_PITCH_SERIAL_PIN),
 	  wrist_servo_(yaw_wrist),
 	  claw_servo_(open_claw),
 	  current_pose_(METAL)

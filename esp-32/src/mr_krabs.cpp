@@ -71,7 +71,7 @@ void MrKrabs::stepControl()
 
 void MrKrabs::motorStepControl(){
 	motor_controller_->tickMotorSpeeds();
-  motor_controller_->applyVelocity();
+	motor_controller_->applyVelocity();
 	
 }
 
