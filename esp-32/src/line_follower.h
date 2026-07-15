@@ -3,6 +3,17 @@
 #include "motor_controller.h"
 #include <array>
 
+// Photoresistors
+static constexpr int LEFT_PHOTORESISTOR = 39;
+static constexpr int MID_LEFT_PHOTORESISTOR = 40;
+static constexpr int MID_RIGHT_PHOTORESISTOR = 21;
+static constexpr int RIGHT_PHOTORESISTOR = 38;
+
+// Raw 12-bit ADC threshold (0–4095). Calibrate on your surface.
+static constexpr double LIGHT_THRESHOLD_ADC = 2000;
+static constexpr double SMALL_ERROR_VALUE = 1;
+static constexpr double BIG_ERROR_VALUE = 5;
+
 // IR photoresistor line follower with PID-based lateral correction.
 // Uses a 4-sensor array: [left, mid-left, mid-right, right].
 // The two middle sensors drive small corrections; when both mids lose the line,

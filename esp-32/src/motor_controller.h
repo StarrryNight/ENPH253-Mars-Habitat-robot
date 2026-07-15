@@ -4,6 +4,35 @@
 #include <optional>
 #include <cstdint>
 
+// Motor PWM channels and pins
+static constexpr int WHEEL_LEFT_PWM_CHANNEL_0 = 0;
+static constexpr int WHEEL_LEFT_PWM_CHANNEL_1 = 1;
+static constexpr int WHEEL_LEFT_PWM_PIN_0 = 46;
+static constexpr int WHEEL_LEFT_PWM_PIN_1 = 45;
+// "LEFT" on altium
+
+static constexpr int WHEEL_RIGHT_PWM_CHANNEL_0 = 2;
+static constexpr int WHEEL_RIGHT_PWM_CHANNEL_1 = 3;
+static constexpr int WHEEL_RIGHT_PWM_PIN_0 = 41;
+static constexpr int WHEEL_RIGHT_PWM_PIN_1 = 42;
+// "RIGHT" on altium
+
+static constexpr int WHEEL_BACK_PWM_CHANNEL_0 = 4;
+static constexpr int WHEEL_BACK_PWM_CHANNEL_1 = 5;
+static constexpr int WHEEL_BACK_PWM_PIN_0 = 16;
+static constexpr int WHEEL_BACK_PWM_PIN_1 = 15;
+// "BACK" on altium
+
+// Encoder pins; second is set to zero since we're doing 1 encoder pin per wheel
+static constexpr int WHEEL_LEFT_ENCODER_0 = 1;
+// "LEFT"
+
+static constexpr int WHEEL_RIGHT_ENCODER_0 = 3;
+// "RIGHT"
+
+static constexpr int WHEEL_BACK_ENCODER_0 = 2;
+// "BACK"
+
 // Per-wheel speed targets in m/s (positive = forward for that wheel's orientation).
 struct WheelVelocities
 {

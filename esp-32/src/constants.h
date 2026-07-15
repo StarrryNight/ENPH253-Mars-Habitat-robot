@@ -1,104 +1,32 @@
 #pragma once
 #include <cstdint>
 
+// Constants used by exactly one file live as static constexpr at the top of
+// that file's header (e.g. FORWARD_SPEED in mr_krabs.h, ROTATION_TOLERANCE_RAD
+// in orientation_controller.h). Only constants shared across multiple files
+// live here.
 
 // General control loop (line following / orientation), driven by esp_timer_start_periodic.
 // CONTROL_LOOP_PERIOD (seconds) is derived from the µs constant so the two can never drift apart.
+// Shared by MrKrabs (timer period), LineFollower, and OrientationController.
 static constexpr int CONTROL_LOOP_PERIOD_US = 10000;        // µs, for esp_timer_start_periodic
 static constexpr double CONTROL_LOOP_PERIOD = CONTROL_LOOP_PERIOD_US * 1e-6; // seconds, for PID delta_t
 
 // Motor control loop (velocity PID / encoder sampling) — separate cadence from the loop above,
 // kept as its own constant since motor control runs on its own esp_timer.
+// Shared by MrKrabs (timer period), MotorController, and MotorDriver.
 static constexpr int MOTOR_CONTROL_LOOP_PERIOD_US = 10000;  // µs, for esp_timer_start_periodic
 static constexpr double MOTOR_CONTROL_LOOP_PERIOD = MOTOR_CONTROL_LOOP_PERIOD_US * 1e-6; // seconds, for PID delta_t
 
-// Photoresistors
-static constexpr int LEFT_PHOTORESISTOR = 39;
-static constexpr int MID_LEFT_PHOTORESISTOR = 40;
-static constexpr int MID_RIGHT_PHOTORESISTOR = 21;
-static constexpr int RIGHT_PHOTORESISTOR = 38;
-
-// Raw 12-bit ADC threshold (0–4095). Calibrate on your surface.
-static constexpr double LIGHT_THRESHOLD_ADC = 2000;
-static constexpr double SMALL_ERROR_VALUE = 1;
-static constexpr double BIG_ERROR_VALUE = 5;
-
-// Motor PWM channels and pins
-static constexpr int WHEEL_LEFT_PWM_CHANNEL_0 = 0;
-static constexpr int WHEEL_LEFT_PWM_CHANNEL_1 = 1;
-static constexpr int WHEEL_LEFT_PWM_PIN_0 = 46;
-static constexpr int WHEEL_LEFT_PWM_PIN_1 = 45;
-// "LEFT" on altium
-
-static constexpr int WHEEL_RIGHT_PWM_CHANNEL_0 = 2;
-static constexpr int WHEEL_RIGHT_PWM_CHANNEL_1 = 3;
-static constexpr int WHEEL_RIGHT_PWM_PIN_0 = 41;
-static constexpr int WHEEL_RIGHT_PWM_PIN_1 = 42;
-// "RIGHT" on altium
-
-static constexpr int WHEEL_BACK_PWM_CHANNEL_0 = 4;
-static constexpr int WHEEL_BACK_PWM_CHANNEL_1 = 5;
-static constexpr int WHEEL_BACK_PWM_PIN_0 = 16;
-static constexpr int WHEEL_BACK_PWM_PIN_1 = 15;
-// "BACK" on altium 
-
-// Encoder pins; second is set to zero since we're doing 1 encoder pin per wheel
-static constexpr int WHEEL_LEFT_ENCODER_0 = 1;    
-// "LEFT"
-
-static constexpr int WHEEL_RIGHT_ENCODER_0 = 3;
-// "RIGHT"
-
-static constexpr int WHEEL_BACK_ENCODER_0 = 2;
-// "BACK"
-
 // Distance traveled per encoder tick (m). Set from wheel circumference / ticks-per-rev.
+// Shared by MotorController and MotorDriver.
 static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.009163; // at 70 mm diameter, 24 ticks-per-rev
 
-// Forward speed during line following (m/s). Tune empirically.
-static constexpr double FORWARD_SPEED = 2.0;
-
-// Open-loop forward drive test duration (µs) — see MrKrabs::stepControl.
-static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 10000000000; // 1 s
-
-// Rotation is considered complete once within this angular distance (rad) of
-// the target angle. See OrientationController::reachedTarget.
-static constexpr double ROTATION_TOLERANCE_RAD = 0.05;
-
-// Note: DEG_TO_RAD (for converting RobotPose::rotation_degrees into the
-// radians OrientationController/startRotation work in) is already provided
-// by Arduino.h — no need to redefine it here.
-
-// A RobotEvent is considered close enough to trigger once AI::current_state_progress_m
-// is within this distance (m) of the event's robot_progress. See AI::tickAI.
-static constexpr double POSE_EVENT_PROGRESS_TOLERANCE_M = 0.02;
-
-// Non-blocking settle delay (µs) held between the three drive actions
-// (line-following, rotating, applying an arm pose) so each has time to
-// physically settle before the next begins. See MrKrabs::stepControl.
-static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1000000; // 1 s
-
-
-// Below this commanded PWM magnitude, treat speed as zero instead of applying
-// the deadband floor below. Prevents FP/PID noise around a 0 target (e.g. the
-// back wheel while driving straight) from producing a small nonzero duty cycle.
-static constexpr double MOTOR_SPEED_DEADZONE = 5.0;
-
 // Values
+// TODO: unused — no current callers. Remove or wire up.
 static constexpr int speed8bit = 230; // speed scales linear from 0 to 256
 
 // Time to block after commanding a new ArmPose so the SCServos/hobby servos
-// finish moving before the caller proceeds. See MrKrabs::fullPose.
+// finish moving before the caller proceeds.
+// TODO: unused — the referenced caller (MrKrabs::fullPose) no longer exists.
 static constexpr uint32_t SERVO_SETTLE_TIME_MS = 1000;
-
-// Arm servo pins (8V?)
-static constexpr int BASE_ELBOW_PITCH_SERIAL_PIN = 6;
-//TODO change (5V)
-static constexpr int WRIST_YAW_SERVO_PIN = 13;
-static constexpr int CLAW_OPEN_SERVO_PIN = 14;
-
-// Arm
-
-
-// BUFFER SIZE
-static constexpr int VELOCITY_BUFFER_SIZE = 10;

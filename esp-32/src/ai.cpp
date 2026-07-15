@@ -1,6 +1,5 @@
 #include "ai.h"
 #include <cmath>
-#include "constants.h"
 
 AI::AI():
 	current_robot_state_(METAL_DETECTING),

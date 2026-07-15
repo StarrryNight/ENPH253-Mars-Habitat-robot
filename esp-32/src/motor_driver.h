@@ -2,7 +2,14 @@
 #include <Arduino.h>
 #include <cstdint>
 #include <vector>
-#include "constants.h"
+
+// BUFFER SIZE
+static constexpr int VELOCITY_BUFFER_SIZE = 10;
+
+// Below this commanded PWM magnitude, treat speed as zero instead of applying
+// the deadband floor below. Prevents FP/PID noise around a 0 target (e.g. the
+// back wheel while driving straight) from producing a small nonzero duty cycle.
+static constexpr double MOTOR_SPEED_DEADZONE = 5.0;
 
 // Controls a single DC motor with quadrature encoder feedback.
 // PWM is driven via ESP32 LEDC channels. Velocity is measured by tickVelocity(),

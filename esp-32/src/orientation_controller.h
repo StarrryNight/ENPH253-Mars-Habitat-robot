@@ -1,6 +1,9 @@
 #pragma once
 #include "pid_controller.h"
 
+// Rotation is considered complete once within this angular distance (rad) of
+// the target angle. See OrientationController::reachedTarget.
+static constexpr double ROTATION_TOLERANCE_RAD = 0.05;
 
 class OrientationController
 {

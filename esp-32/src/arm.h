@@ -3,6 +3,11 @@
 #include "servo.h"
 #include "servo_controller.h"
 
+// Arm servo pins (8V?)
+//TODO change (5V)
+static constexpr int WRIST_YAW_SERVO_PIN = 13;
+static constexpr int CLAW_OPEN_SERVO_PIN = 14;
+
 struct ArmPose{
 	double base_pitch_servo_degrees;
 	double elbow_pitch_servo_degrees;

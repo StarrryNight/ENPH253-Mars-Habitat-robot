@@ -1,5 +1,4 @@
 #include "arm.h"
-#include "constants.h"
 
 
 Arm::Arm()

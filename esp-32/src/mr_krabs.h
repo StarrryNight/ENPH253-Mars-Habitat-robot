@@ -8,6 +8,20 @@
 #include "ai.h"
 #include <SCServo.h>
 
+// Forward speed during line following (m/s). Tune empirically.
+static constexpr double FORWARD_SPEED = 2.0;
+
+// Open-loop forward drive test duration (µs) — see MrKrabs::stepControl.
+static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 10000000000; // 1 s
+
+// Non-blocking settle delay (µs) held between the three drive actions
+// (line-following, rotating, applying an arm pose) so each has time to
+// physically settle before the next begins. See MrKrabs::stepControl.
+static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1000000; // 1 s
+
+// Arm servo bus pin (single-wire half-duplex UART to the SCServo bus).
+static constexpr int BASE_ELBOW_PITCH_SERIAL_PIN = 6;
+
 class MrKrabs
 {
 

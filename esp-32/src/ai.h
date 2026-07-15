@@ -3,6 +3,10 @@
 #include "arm.h"
 #include "robot_events.h"
 
+// A RobotEvent is considered close enough to trigger once AI::current_state_progress_m
+// is within this distance (m) of the event's robot_progress. See AI::tickAI.
+static constexpr double POSE_EVENT_PROGRESS_TOLERANCE_M = 0.02;
+
 class AI{
 	public:
 		AI();
