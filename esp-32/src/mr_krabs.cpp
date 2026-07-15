@@ -22,6 +22,7 @@ void MrKrabs::setup()
 	// SCServo bus servo: single data wire on GPIO 6, so RX and TX share the
 	// same pin (half-duplex). ST-series default bus baud rate is 1,000,000.
 	Serial2.begin(1000000, SERIAL_8N1, /*rxPin=*/BASE_ELBOW_PITCH_SERIAL_PIN, /*txPin=*/BASE_ELBOW_PITCH_SERIAL_PIN);
+	arm_->begin();
 	test_servo_.pSerial = &Serial2;
 	
 
@@ -53,10 +54,10 @@ void MrKrabs::setup()
 	// on the very first tick.
 	motor_controller_->resetSpeedBaselines();
 	esp_timer_start_periodic(motor_control_loop_timer_, MOTOR_CONTROL_LOOP_PERIOD_US);
-//	delay(1000);
-//	arm_->setPose({0,0,0,0});
-//	delay(1000);
-//	arm_->setPose({60,60,60,60});
+	delay(1000);
+	arm_->setPose({0,0,0,0,0});
+	delay(1000);
+	arm_->setPose({90,90,90,90,90});
 }
 
 void MrKrabs::reset()

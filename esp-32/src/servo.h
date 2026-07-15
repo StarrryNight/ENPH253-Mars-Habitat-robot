@@ -1,7 +1,7 @@
 #pragma once
 
-static constexpr int SERVO_MIN_PULSE_US = 1000;
-static constexpr int SERVO_MAX_PULSE_US = 2000;
+static constexpr int SERVO_MIN_PULSE_US = 500;
+static constexpr int SERVO_MAX_PULSE_US = 2500;
 static constexpr int SERVO_CENTER_PULSE_US = 1500;
 
 class Servo

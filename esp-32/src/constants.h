@@ -74,9 +74,9 @@ static constexpr double MOTOR_SPEED_DEADZONE = 5.0;
 // Values
 static constexpr int speed8bit = 230; // speed scales linear from 0 to 256
 
-// Arm servo pins
+// Arm servo pins (8V?)
 static constexpr int BASE_ELBOW_PITCH_SERIAL_PIN = 6;
-//TODO change
+//TODO change (5V)
 static constexpr int WRIST_YAW_SERVO_PIN = 13;
 static constexpr int CLAW_OPEN_SERVO_PIN = 14;
 

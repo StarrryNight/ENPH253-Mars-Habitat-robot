@@ -17,6 +17,12 @@ class Arm
 public:
 
 	Arm();
+
+	// Binds the SCServo bus to Serial2 and drives the arm to its home pose.
+	// Must be called after Serial2.begin() has run (Arduino init + UART
+	// config), so it can't happen in the constructor.
+	void begin();
+
 	void setPose(ArmPose pose);
 
 private:

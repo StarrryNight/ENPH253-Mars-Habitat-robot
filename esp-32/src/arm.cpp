@@ -3,11 +3,16 @@
 
 
 Arm::Arm()
-	: bus_servo_(BASE_ELBOW_PITCH_SERIAL_PIN),
+	: bus_servo_(),
 	  wrist_servo_(WRIST_YAW_SERVO_PIN),
 	  claw_servo_(CLAW_OPEN_SERVO_PIN),
-	  current_pose_({0,0,0,0})
+	  current_pose_({0,0,0,0,0})
 {
+}
+
+void Arm::begin()
+{
+	bus_servo_.pSerial = &Serial2;
 	setPose(current_pose_);
 }
 

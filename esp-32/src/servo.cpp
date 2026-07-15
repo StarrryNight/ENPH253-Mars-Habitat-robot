@@ -37,8 +37,10 @@ void Servo::setAngleDeg(double deg)
 	if (deg < 0.0) deg = 0.0;
 	if (deg > 180.0) deg = 180.0;
 	
-	// Map 0.0 - 180.0 degrees directly into the microsecond range boundary limits
-	int calculated_pulse = min_pulse_us_ + (int)((max_pulse_us_ - min_pulse_us_) * (deg / 180.0));
+	// Explicitly map 0-180 degrees to your microsecond range
+	double percentage = deg / 180.0;
+	int calculated_pulse = min_pulse_us_ + (int)((max_pulse_us_ - min_pulse_us_) * percentage);
+	
 	setPulseUs(calculated_pulse);
 }
 
