@@ -4,7 +4,6 @@
 #include "servo_controller.h"
 
 struct ArmPose{
-	double base_rotation_degrees;
 	double base_pitch_servo_degrees;
 	double elbow_pitch_servo_degrees;
 	double wrist_yaw_servo_degrees;
@@ -26,8 +25,7 @@ public:
 	void setPose(ArmPose pose);
 
 private:
-	int basePitchPositionConversion(double degrees);
-	int elbowPitchPositionConversion(double degrees);
+	int ServoPositionConversion(double degrees);
 
 
 	SMS_STS bus_servo_;
@@ -36,8 +34,6 @@ private:
 
 	ArmPose current_pose_;
 
-	static constexpr int BASE_PITCH_SERVO_MIN = 0;
-	static constexpr int BASE_PITCH_SERVO_MAX = 2048;
-	static constexpr int ELBOW_PITCH_SERVO_MIN = 0;
-	static constexpr int ELBOW_PITCH_SERVO_MAX = 2048;
+	static constexpr int SERIAL_SERVO_MIN = 0;
+	static constexpr int SERIAL_SERVO_MAX = 2048;
 };

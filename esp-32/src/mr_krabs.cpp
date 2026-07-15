@@ -55,9 +55,9 @@ void MrKrabs::setup()
 	motor_controller_->resetSpeedBaselines();
 	esp_timer_start_periodic(motor_control_loop_timer_, MOTOR_CONTROL_LOOP_PERIOD_US);
 	delay(1000);
-	arm_->setPose({0,0,0,0,0});
+	arm_->setPose({0,0,0,0});
 	delay(1000);
-	arm_->setPose({90,90,90,90,90});
+	arm_->setPose({90,90,90,90});
 }
 
 void MrKrabs::reset()

@@ -74,6 +74,10 @@ static constexpr double MOTOR_SPEED_DEADZONE = 5.0;
 // Values
 static constexpr int speed8bit = 230; // speed scales linear from 0 to 256
 
+// Time to block after commanding a new ArmPose so the SCServos/hobby servos
+// finish moving before the caller proceeds. See MrKrabs::fullPose.
+static constexpr uint32_t SERVO_SETTLE_TIME_MS = 1000;
+
 // Arm servo pins (8V?)
 static constexpr int BASE_ELBOW_PITCH_SERIAL_PIN = 6;
 //TODO change (5V)
