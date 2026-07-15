@@ -41,7 +41,9 @@ public:
 	// from Arduino setup() after the hardware is initialised.
 	void setup();
 
-	// Replaces the current velocity target and runs one PID step.
+	// Replaces the current velocity target. Does not write PWM directly —
+	// the next applyVelocity() call (driven by motor_control_loop_timer_)
+	// picks it up.
 	void setVelocity(RobotVelocity target_velocity);
 
 

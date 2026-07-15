@@ -6,7 +6,7 @@ Arm::Arm()
 	: bus_servo_(),
 	  wrist_servo_(WRIST_YAW_SERVO_PIN),
 	  claw_servo_(CLAW_OPEN_SERVO_PIN),
-	  current_pose_({0,0,0,0,0})
+	  current_pose_({0,0,0,0})
 {
 }
 

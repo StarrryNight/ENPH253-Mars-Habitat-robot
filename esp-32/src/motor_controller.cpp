@@ -37,7 +37,6 @@ void MotorController::setup()
 void MotorController::setVelocity(RobotVelocity target_velocity)
 {
 	current_target_velocity_ = target_velocity;
-	applyVelocity();
 }
 
 

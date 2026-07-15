@@ -65,6 +65,19 @@ static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 10000000000; // 1 s
 // the target angle. See OrientationController::reachedTarget.
 static constexpr double ROTATION_TOLERANCE_RAD = 0.05;
 
+// Note: DEG_TO_RAD (for converting RobotPose::rotation_degrees into the
+// radians OrientationController/startRotation work in) is already provided
+// by Arduino.h — no need to redefine it here.
+
+// A RobotEvent is considered close enough to trigger once AI::current_state_progress_m
+// is within this distance (m) of the event's robot_progress. See AI::tickAI.
+static constexpr double POSE_EVENT_PROGRESS_TOLERANCE_M = 0.02;
+
+// Non-blocking settle delay (µs) held between the three drive actions
+// (line-following, rotating, applying an arm pose) so each has time to
+// physically settle before the next begins. See MrKrabs::stepControl.
+static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1000000; // 1 s
+
 
 // Below this commanded PWM magnitude, treat speed as zero instead of applying
 // the deadband floor below. Prevents FP/PID noise around a 0 target (e.g. the

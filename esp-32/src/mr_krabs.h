@@ -5,6 +5,7 @@
 #include "orientation_controller.h"
 #include "motor_controller.h"
 #include "arm.h"
+#include "ai.h"
 #include <SCServo.h>
 
 class MrKrabs
@@ -31,14 +32,38 @@ private:
 	void stepControl();
 	void motorStepControl();
 
-	bool is_line_following_;
-	bool is_rotating_;
+	// Reconciles AI's desired drive command against drive_mode_, calling
+	// startLineFollowing()/startRotation() on change. Returns true iff a
+	// transition just happened this tick (caller should hold off driving —
+	// the transition already set a fresh settle delay).
+	bool handleDriveTransition();
+
+	// Drives the motors for the currently active drive_mode_: line-following
+	// correction, or rotating toward AI's target heading and, once reached,
+	// telling AI to apply the arm pose.
+	void driveCurrentMode();
+
+	// Which of the two drive-mechanism actions the loop is currently executing.
+	// AI decides which one is wanted (AI::desiredDriveCommand()); rotating is
+	// not tracked separately — it's just the drivetrain's role while
+	// APPLYING_ROBOT_POSE, on the way to letting AI apply the arm pose.
+	AI::DriveCommand drive_mode_;
+
+	// Last heading (deg) passed to startRotation(), so stepControl() only
+	// re-issues it when AI's target actually changes.
+	double last_commanded_rotation_degrees_;
+
+	// Non-blocking settle-delay deadline (esp_timer_get_time() timestamp).
+	// While esp_timer_get_time() < this, stepControl() holds still instead of
+	// starting the next action. 0 means no active wait. See stepControl().
+	uint64_t action_settle_until_us_;
 
 	// Held in optionals so the global MrKrabs object is safe to construct before
 	// Arduino init. setup() emplaces them once hardware is ready.
 	std::optional<LineFollower> line_follower_;
 	std::optional<MotorController> motor_controller_;
 	std::optional<Arm> arm_;
+	std::optional<AI> ai_;
 
 	// OrientationController has no hardware deps in its constructor — safe as direct member.
 	OrientationController orientation_controller_;
