@@ -6,6 +6,7 @@
 #include "motor_controller.h"
 #include "arm.h"
 #include "ai.h"
+#include "pins.h"
 #include <SCServo.h>
 
 // Forward speed during line following (m/s). Tune empirically.
@@ -18,9 +19,6 @@ static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 10000000000; // 1 s
 // (line-following, rotating, applying an arm pose) so each has time to
 // physically settle before the next begins. See MrKrabs::stepControl.
 static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1000000; // 1 s
-
-// Arm servo bus pin (single-wire half-duplex UART to the SCServo bus).
-static constexpr int BASE_ELBOW_PITCH_SERIAL_PIN = 6;
 
 class MrKrabs
 {

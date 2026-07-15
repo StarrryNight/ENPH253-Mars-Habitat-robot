@@ -1,13 +1,8 @@
 #pragma once
 #include "pid_controller.h"
 #include "motor_controller.h"
+#include "pins.h"
 #include <array>
-
-// Photoresistors
-static constexpr int LEFT_PHOTORESISTOR = 39;
-static constexpr int MID_LEFT_PHOTORESISTOR = 40;
-static constexpr int MID_RIGHT_PHOTORESISTOR = 21;
-static constexpr int RIGHT_PHOTORESISTOR = 38;
 
 // Raw 12-bit ADC threshold (0–4095). Calibrate on your surface.
 static constexpr double LIGHT_THRESHOLD_ADC = 2000;
