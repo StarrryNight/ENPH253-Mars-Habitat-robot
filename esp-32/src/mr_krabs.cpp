@@ -54,6 +54,7 @@ void MrKrabs::setup()
 	// on the very first tick.
 	motor_controller_->resetSpeedBaselines();
 	esp_timer_start_periodic(motor_control_loop_timer_, MOTOR_CONTROL_LOOP_PERIOD_US);
+	delay(1000);
 }
 
 void MrKrabs::reset()
@@ -67,6 +68,24 @@ void MrKrabs::update()
 }
 void MrKrabs::stepControl()
 {
+	bool still_driving = (((esp_timer_get_time() - drive_test_start_us_) < FORWARD_DRIVE_TEST_DURATION_US) && ((esp_timer_get_time() - drive_test_start_us_) > 5000000));
+	motor_controller_->setVelocity({0, 0, still_driving ? FORWARD_SPEED : 0.0});
+	if (is_line_following_){
+		double correction = line_follower_->calculateCorrection();
+		motor_controller_->driveOpenLoop({correction, FORWARD_SPEED, 0});	
+	} 
+	else if (is_rotating_){
+		double curr_position = motor_controller_->calculateCurrentOrientation();
+		if (orientation_controller_.reachedTarget(curr_position)){
+			is_rotating_ = false;
+			motor_controller_->setVelocity({0,0,0});
+		}
+		else{
+			double correction = orientation_controller_.calculateCorrection(curr_position);
+			motor_controller_->setVelocity({0,0, correction});
+		}
+	}
+
 }
 
 void MrKrabs::motorStepControl(){

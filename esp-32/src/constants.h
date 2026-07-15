@@ -38,8 +38,8 @@ static constexpr int WHEEL_RIGHT_PWM_PIN_1 = 42;
 
 static constexpr int WHEEL_BACK_PWM_CHANNEL_0 = 4;
 static constexpr int WHEEL_BACK_PWM_CHANNEL_1 = 5;
-static constexpr int WHEEL_BACK_PWM_PIN_0 = 15;
-static constexpr int WHEEL_BACK_PWM_PIN_1 = 16;
+static constexpr int WHEEL_BACK_PWM_PIN_0 = 16;
+static constexpr int WHEEL_BACK_PWM_PIN_1 = 15;
 // "BACK" on altium 
 
 // Encoder pins; second is set to zero since we're doing 1 encoder pin per wheel
@@ -56,7 +56,7 @@ static constexpr int WHEEL_BACK_ENCODER_0 = 2;
 static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.009163; // at 70 mm diameter, 24 ticks-per-rev
 
 // Forward speed during line following (m/s). Tune empirically.
-static constexpr double FORWARD_SPEED = 0.4;
+static constexpr double FORWARD_SPEED = 2.0;
 
 // Open-loop forward drive test duration (µs) — see MrKrabs::stepControl.
 static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 10000000000; // 1 s
