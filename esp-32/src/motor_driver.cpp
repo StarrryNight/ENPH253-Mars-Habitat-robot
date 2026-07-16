@@ -52,7 +52,7 @@ void MotorDriver::set_velocity(double speed)
     else if (speed > 0)    new_direction =  1;
     else                   new_direction = -1;
 
-	Serial.printf("duty_cycle: %d\n",duty_cycle*new_direction);
+	//Serial.printf("duty_cycle: %d\n",duty_cycle*new_direction);
     // CAPTURE INTENT IMMEDIATELY: Tell the encoder math exactly what the PID wants right now
     intended_direction_ = new_direction;
 

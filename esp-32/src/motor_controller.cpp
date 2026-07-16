@@ -163,7 +163,7 @@ void MotorController::tickMotorSpeeds(){
 	current_robot_velocity_ = v;
 
 	//print
-	Serial.printf("wheel_left_velocity: %.5f\n",wheel_left_motor_->getSpeed());
+///	Serial.printf("wheel_left_velocity: %.5f\n",wheel_left_motor_->getSpeed());
 ///	Serial.printf("wheel_right_velocity: %.5f\n",wheel_right_motor_->getSpeed());
 ///	Serial.printf("wheel_back_velocity: %.5f\n",wheel_back_motor_->getSpeed());
 ///	Serial.printf("v_x: %.5f\n", v.x);

@@ -1,5 +1,6 @@
 #include "ai.h"
 #include <cmath>
+#include "robot_events.h"
 
 AI::AI():
 	current_robot_state_(METAL_DETECTING),
@@ -33,6 +34,11 @@ void AI::tickAI(){
 		: DriveCommand::APPLYING_ROBOT_POSE;
 }
 
+void AI::setAIProgress(double progress){
+	current_state_progress_m = progress ;
+
+}
+
 bool AI::onRotationReached(){
 	if (pending_event_index_ == kNoEvent || pending_pose_applied_){
 		return false;
@@ -52,6 +58,7 @@ AI::DriveCommand AI::desiredDriveCommand() const{
 
 void AI::applyRobotPose(const RobotPose& pose){
 	if (arm_){
+		Serial.print(pose.rotation_degrees);
 		arm_->setPose(pose.arm_pose);
 	}
 }

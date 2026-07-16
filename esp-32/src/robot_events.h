@@ -20,8 +20,8 @@ struct RobotEvent{
 // habitat place) once the arm is characterized on hardware.
 const std::vector<RobotEvent> DUMMY_ROBOT_EVENTS = {
 	// Metal detecting: sweep the arm out to scan for metal.
-	{METAL_DETECTING, 0.0, {0.0, {0, 90, 0, 0}}},
-	{METAL_DETECTING, 0.15, {45.0, {30, 60, 0, 0}}},
+	{METAL_DETECTING, 0.0, {0.0, {90, 90, 90, 90}}},
+	{METAL_DETECTING, 0.15, {0, {0, 0, 0, 0}}},
 
 	// Rock picking: lower arm, open claw, close claw around rock, lift.
 	{ROCK_PICKING, 0.0, {0.0, {45, 30, 0, 0}}},

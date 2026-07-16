@@ -22,6 +22,7 @@ class AI{
 		void setArm(Arm* arm);
 
 		double targetRotationDegrees() const;
+		void setAIProgress(double prog);
 
 		enum class DriveCommand { LINE_FOLLOWING, APPLYING_ROBOT_POSE };
 		DriveCommand desiredDriveCommand() const;

@@ -29,12 +29,10 @@ private:
 	int ServoPositionConversion(double degrees);
 
 
-	SMS_STS bus_servo_;
+	STSServo bus_servo_;
 	Servo wrist_servo_;
 	Servo claw_servo_;
 
 	ArmPose current_pose_;
 
-	static constexpr int SERIAL_SERVO_MIN = 0;
-	static constexpr int SERIAL_SERVO_MAX = 2048;
 };

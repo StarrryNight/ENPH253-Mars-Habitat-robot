@@ -27,10 +27,8 @@ void MrKrabs::setup()
 	ai_.emplace();
 
 	// ====================Set up firmware---------------------- //
-	Serial2.begin(1000000, SERIAL_8N1, /*rxPin=*/BASE_ELBOW_PITCH_SERIAL_PIN, /*txPin=*/BASE_ELBOW_PITCH_SERIAL_PIN);
 	arm_->begin();
 	ai_->setArm(&*arm_);
-	test_servo_.pSerial = &Serial2;
 	esp_timer_create_args_t timer_args = {
 		.callback = [](void *arg) { static_cast<MrKrabs *>(arg)->stepControl(); },
 		.arg = this,
@@ -48,6 +46,9 @@ void MrKrabs::setup()
 	esp_timer_start_periodic(control_loop_timer_, CONTROL_LOOP_PERIOD_US);
 	motor_controller_->resetSpeedBaselines();
 	esp_timer_start_periodic(motor_control_loop_timer_, MOTOR_CONTROL_LOOP_PERIOD_US);
+	// Start delay
+	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	
 
 }
 
@@ -63,6 +64,9 @@ void MrKrabs::stepControl()
 	//Testing code	
 	bool still_driving = (((esp_timer_get_time() - drive_test_start_us_) < FORWARD_DRIVE_TEST_DURATION_US) && ((esp_timer_get_time() - drive_test_start_us_) > 5000000));
 	motor_controller_->setVelocity({0, 0, still_driving ? FORWARD_SPEED : 0.0});
+	if (still_driving){
+		ai_->setAIProgress(0.15);
+	}
 
 
 	// tick AI

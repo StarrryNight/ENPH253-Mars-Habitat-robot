@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include "ai.h"
+#include "pins.h"
 #include "servo.h"
 
 Servo::Servo(int pin, int initial_pulse_us)
@@ -52,4 +54,22 @@ int Servo::pin() const
 int Servo::pulseUs() const
 {
 	return pulse_us_;
+}
+
+
+
+
+
+STSServo::STSServo(int pin):servo_1_current_angle_(0),servo_2_current_angle_(0), bus_servo_(){
+	Serial2.begin(1000000, SERIAL_8N1, /*rxPin=*/pin, /*txPin=*/pin);
+	bus_servo_.pSerial = &Serial2;
+}; 
+void STSServo::setAngle(double servo_1_angle, double servo_2_angle){
+	servo_1_angle = ServoPositionConversion(servo_1_angle);
+	servo_2_angle = ServoPositionConversion(servo_2_angle);
+	bus_servo_.WritePosEx(/*ID=*/1, /*Position=*/servo_1_angle, /*Speed=*/servo_1_current_angle_>servo_1_angle ? SERVO_SPEED: SERVO_SPEED	, /*ACC=*/50);
+	bus_servo_.WritePosEx(/*ID=*/2, /*Position=*/servo_2_angle, /*Speed=*/servo_2_current_angle_>servo_2_angle ? SERVO_SPEED: SERVO_SPEED+DIRECTION_FACTOR	, /*ACC=*/50);
+}
+int STSServo::ServoPositionConversion(double degrees){
+	return degrees/180*(SERIAL_SERVO_MAX - SERIAL_SERVO_MIN)+SERIAL_SERVO_MIN;
 }
