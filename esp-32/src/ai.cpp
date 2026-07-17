@@ -17,6 +17,7 @@ void AI::setArm(Arm* arm){
 }
 
 void AI::tickAI(){
+	if(current_robot_state_==ROCK_FINDING ){
 	for (size_t i = 0; i < DUMMY_ROBOT_EVENTS.size(); ++i){
 		const RobotEvent& event = DUMMY_ROBOT_EVENTS[i];
 		bool close_enough = event.robot_state == current_robot_state_ &&
@@ -25,11 +26,14 @@ void AI::tickAI(){
 			pending_event_index_ = i;
 			current_target_rotation_degrees_ = event.robot_pose.rotation_degrees;
 			pending_pose_applied_ = false;
+			current_robot_state_ = METAL_DETECTING;
 			break;
 		}
 	}
 
-	desired_drive_command_ = (current_robot_state_ == LINE_FOLLOWING)
+	}
+
+	desired_drive_command_ = ((current_robot_state_ == LINE_FOLLOWING)|| (current_robot_state_==ROCK_FINDING))
 		? DriveCommand::LINE_FOLLOWING
 		: DriveCommand::APPLYING_ROBOT_POSE;
 }

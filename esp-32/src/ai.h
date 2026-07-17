@@ -2,6 +2,7 @@
 #include <cstddef>
 #include "arm.h"
 #include "robot_events.h"
+#include "metal_detector.h"
 
 // A RobotEvent is considered close enough to trigger once AI::current_state_progress_m
 // is within this distance (m) of the event's robot_progress. See AI::tickAI.
@@ -31,6 +32,7 @@ class AI{
 		void applyRobotPose(const RobotPose& pose);
 
 		static constexpr size_t kNoEvent = SIZE_MAX;
+		MetalDetector metal_detector_;
 
 		RobotState current_robot_state_;
 		// State of robot in meters
