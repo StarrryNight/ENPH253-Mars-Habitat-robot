@@ -12,9 +12,6 @@
 // Forward speed during line following (m/s). Tune empirically.
 static constexpr double FORWARD_SPEED = 2.0;
 
-// Open-loop forward drive test duration (µs) — see MrKrabs::stepControl.
-static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 10000000000; // 1 s
-
 // Non-blocking settle delay (µs) held between the three drive actions
 // (line-following, rotating, applying an arm pose) so each has time to
 // physically settle before the next begins. See MrKrabs::stepControl.
@@ -39,6 +36,9 @@ public:
 	// Enters rotation mode. Turns to target_angle (rad) using encoder dead-reckoning.
 	void startRotation(double target_angle = 0.0);
 
+	// Enters idle mode. Motors held at zero velocity.
+	void startIdle();
+
 private:
 	// Called every CONTROL_LOOP_PERIOD_US by the esp_timer.
 	void stepControl();
@@ -55,11 +55,11 @@ private:
 	// telling AI to apply the arm pose.
 	void driveCurrentMode();
 
-	// Which of the two drive-mechanism actions the loop is currently executing.
-	// AI decides which one is wanted (AI::desiredDriveCommand()); rotating is
-	// not tracked separately — it's just the drivetrain's role while
-	// APPLYING_ROBOT_POSE, on the way to letting AI apply the arm pose.
-	AI::DriveCommand drive_mode_;
+	// Which drive-mechanism action the loop is currently executing. AI decides
+	// which one is wanted (AI::desiredDriveMode()); rotating is not tracked
+	// separately — it's just the drivetrain's role while APPLYING_SEQUENCE, on
+	// the way to letting AI apply the current pose in the sequence.
+	AI::DriveMode drive_mode_;
 
 	// Last heading (deg) passed to startRotation(), so stepControl() only
 	// re-issues it when AI's target actually changes.
@@ -82,10 +82,6 @@ private:
 
 	esp_timer_handle_t control_loop_timer_;
 	esp_timer_handle_t motor_control_loop_timer_;
-
-	// esp_timer_get_time() timestamp (µs) when the open-loop forward drive
-	// test started; used by stepControl to stop after FORWARD_DRIVE_TEST_DURATION_US.
-	uint64_t drive_test_start_us_;
 
 	// SMS_STS/SCSerial's constructor only sets defaults (pSerial = nullptr) and
 	// touches no hardware, so it's safe as a direct member; pSerial is bound to

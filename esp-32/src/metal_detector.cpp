@@ -4,6 +4,8 @@
 #include <Arduino.h>
 
 MetalDetector::MetalDetector():metal_detected_(false) {	
+	pinMode(METAL_DETECTOR_PIN, INPUT_PULLUP);
+	
 	attachInterruptArg(METAL_DETECTOR_PIN, [](void *arg) IRAM_ATTR
 					   {
 	    MetalDetector* m = static_cast<MetalDetector*>(arg);
