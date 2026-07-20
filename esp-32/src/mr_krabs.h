@@ -10,7 +10,7 @@
 #include <SCServo.h>
 
 // Forward speed during line following (m/s). Tune empirically.
-static constexpr double FORWARD_SPEED = 0.5;
+static constexpr double FORWARD_SPEED = 0.4;
 
 // Non-blocking settle delay (µs) held between the three drive actions
 // (line-following, rotating, applying an arm pose) so each has time to
@@ -46,6 +46,9 @@ public:
 	// Enters rotation mode. Turns to target_angle (rad) using encoder dead-reckoning.
 	void startRotation(double target_angle = 0.0);
 
+	// Enters idle mode. Motors held at zero velocity.
+	void startIdle();
+
 private:
 	// Called every CONTROL_LOOP_PERIOD_US by the esp_timer.
 	void stepControl();
@@ -79,11 +82,11 @@ private:
 	// telling AI to apply the arm pose.
 	void driveCurrentMode();
 
-	// Which of the two drive-mechanism actions the loop is currently executing.
-	// AI decides which one is wanted (AI::desiredDriveCommand()); rotating is
-	// not tracked separately — it's just the drivetrain's role while
-	// APPLYING_ROBOT_POSE, on the way to letting AI apply the arm pose.
-	AI::DriveCommand drive_mode_;
+	// Which drive-mechanism action the loop is currently executing. AI decides
+	// which one is wanted (AI::desiredDriveMode()); rotating is not tracked
+	// separately — it's just the drivetrain's role while APPLYING_SEQUENCE, on
+	// the way to letting AI apply the current pose in the sequence.
+	AI::DriveMode drive_mode_;
 
 	// Set by handleTeleopChar() on any teleop keypress, but stepControl()'s
 	// drive dispatch runs the AI pipeline unconditionally and never reads

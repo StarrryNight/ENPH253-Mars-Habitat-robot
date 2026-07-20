@@ -12,18 +12,18 @@
 #include "mr_krabs.h"
 static constexpr double WHEEL_LEFT_PID_P = 10;
 static constexpr double WHEEL_LEFT_PID_I = 0.1;
-static constexpr double WHEEL_LEFT_PID_D = 0.2;
+static constexpr double WHEEL_LEFT_PID_D = 0.1;
 static constexpr double WHEEL_LEFT_PID_MAX_I = 2;
 
 static constexpr double WHEEL_RIGHT_PID_P = 10;
 static constexpr double WHEEL_RIGHT_PID_I = 0.1;
-static constexpr double WHEEL_RIGHT_PID_D = 0.2;
+static constexpr double WHEEL_RIGHT_PID_D = 0.1;
 static constexpr double WHEEL_RIGHT_PID_MAX_I = 2;
 
 // the back wheel oscillates/overshoots.
 static constexpr double WHEEL_BACK_PID_P = 10;
 static constexpr double WHEEL_BACK_PID_I = 0.1;
-static constexpr double WHEEL_BACK_PID_D = 0.2;
+static constexpr double WHEEL_BACK_PID_D = 0.1;
 static constexpr double WHEEL_BACK_PID_MAX_I = 1;
 
 // Converts a wheel velocity (m/s) into a PWM duty magnitude for
@@ -36,7 +36,7 @@ static constexpr int VELOCITY_TO_PWM = 300;
 // two. Used in place of VELOCITY_TO_PWM for the back wheel only, so the PID
 // trim has less steady-state error to make up to begin with. Starting point
 // (30% over VELOCITY_TO_PWM) — tune against real back-wheel speed on hardware.
-static constexpr int WHEEL_BACK_VELOCITY_TO_PWM = 200;
+static constexpr int WHEEL_BACK_VELOCITY_TO_PWM = 300;
 // Orientation (rotate-to-angle) PID (OrientationController). Error in radians.
 static constexpr double ORIENTATION_PID_P = 2;
 static constexpr double ORIENTATION_PID_I = 0;

@@ -1,46 +1,78 @@
 #pragma once
+#include <array>
 #include <cstddef>
 #include "arm.h"
-#include "robot_events.h"
+#include "robot_state.h"
+#include "robot_poses.h"
+#include "sequence_runner.h"
+#include "metal_detector.h"
 
-// A RobotEvent is considered close enough to trigger once AI::current_state_progress_m
-// is within this distance (m) of the event's robot_progress. See AI::tickAI.
-static constexpr double POSE_EVENT_PROGRESS_TOLERANCE_M = 0.02;
-
-class AI{
+// Drives the robot behavior state machine described in CLAUDE.md (rocks A-C,
+// habitat D). Each RobotState either drives forward with line-following
+// (FINDING_ROCK, LINE_FOLLOWING, LINE_FOLLOWING_REVERSE) or runs a stationary
+// RobotSequence (see robot_poses.h) that MrKrabs steps through by rotating to
+// each pose's heading and applying it via SequenceRunner.
+class AI {
 	public:
 		AI();
 
+		// Advances the state machine. Called once per control loop tick by
+		// MrKrabs, but only outside of settle delays.
 		void tickAI();
 
-		// Called by MrKrabs once the drivetrain has reached the current target
-		// heading. Only then does the arm pose actually get written to the
-		// servos. Returns true iff this call just wrote a new pose (so the
-		// caller knows to start a settle delay).
-		bool onRotationReached();
+		// Stub odometry: accumulates distance traveled in the current state.
+		// Currently fed from commanded speed (open-loop dead reckoning) by
+		// MrKrabs, not real encoder feedback — see MrKrabs::driveCurrentMode.
+		void addProgress(double delta_m);
 
 		void setArm(Arm* arm);
 
-		double targetRotationDegrees() const;
-		void setAIProgress(double prog);
+		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, IDLE };
+		// What the drivetrain should currently be doing, derived from current_state_.
+		DriveMode desiredDriveMode() const;
+		// +1 while driving forward, -1 during LINE_FOLLOWING_REVERSE.
+		double lineFollowingDirection() const;
 
-		enum class DriveCommand { LINE_FOLLOWING, APPLYING_ROBOT_POSE };
-		DriveCommand desiredDriveCommand() const;
+		// Valid while desiredDriveMode() == APPLYING_SEQUENCE. Delegates to sequence_runner_.
+		double targetRotationDegrees() const;
+		// Called by MrKrabs once the drivetrain has reached the current target
+		// heading. Delegates to sequence_runner_; returns true iff a pose was
+		// just written (so the caller knows to start a settle delay).
+		bool onRotationReached();
+
+		RobotState currentState() const;
+		// How many times state has been entered (the current state included,
+		// counting from 1). Used by per-state handlers to index checkpoint/
+		// threshold tables — see tickFindingRock, tickLineFollowing.
+		int visits(RobotState state) const;
 
 	private:
-		void applyRobotPose(const RobotPose& pose);
+		void transitionTo(RobotState next);
+		RobotState tickCurrentState();
+		// Shared by tickMetalDetecting/tickPickupRock: once a rock checkpoint
+		// is resolved (picked up or skipped), decide whether to look for the
+		// next rock or move on to the final line-following leg.
+		RobotState nextRockOrDone();
 
-		static constexpr size_t kNoEvent = SIZE_MAX;
+		// Hardware validation only — see RobotState::TEST_ROTATION.
+		RobotState tickTestRotation();
 
-		RobotState current_robot_state_;
-		// State of robot in meters
-		double current_state_progress_m;
+		RobotState tickFindingRock();
+		RobotState tickMetalDetecting();
+		RobotState tickPickupRock();
+		RobotState tickLineFollowing();
+		RobotState tickHabitatPickup();
+		RobotState tickLineFollowingReverse();
+		RobotState tickHabitatPlace();
 
+		static constexpr size_t idx(RobotState s) { return static_cast<size_t>(s); }
+
+		MetalDetector metal_detector_;
 		Arm* arm_;
+		SequenceRunner sequence_runner_;
 
-		size_t pending_event_index_;
-		bool pending_pose_applied_;
-		double current_target_rotation_degrees_;
-
-		DriveCommand desired_drive_command_;
+		RobotState current_state_;
+		std::array<int, kNumRobotStates> state_visit_count_{};
+		// Distance (m) traveled since the current state was entered.
+		double current_state_progress_m_;
 };

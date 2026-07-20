@@ -1,14 +1,15 @@
 #include <Arduino.h>
+#include <cmath>
 #include "mr_krabs.h"
 #include "constants.h"
 #include "esp_timer.h"
 #include "motor_controller.h"
 
 MrKrabs::MrKrabs() :
-	drive_mode_(AI::DriveCommand::LINE_FOLLOWING),
+	drive_mode_(AI::DriveMode::LINE_FOLLOWING),
 	last_commanded_rotation_degrees_(0),
 	action_settle_until_us_(0),
-	is_teleop_(true),
+	is_teleop_(false),
 	teleop_key_last_seen_us_{0},
 	control_loop_timer_(nullptr)
 {}
@@ -135,16 +136,20 @@ void MrKrabs::stepControl()
 
 bool MrKrabs::handleDriveTransition()
 {
-	AI::DriveCommand desired = ai_->desiredDriveCommand();
-	if (desired == AI::DriveCommand::LINE_FOLLOWING){
-		if (drive_mode_ != AI::DriveCommand::LINE_FOLLOWING){
-			startLineFollowing();
-			return true;
+	AI::DriveMode desired = ai_->desiredDriveMode();
+	if (desired != drive_mode_){
+		switch (desired){
+			case AI::DriveMode::LINE_FOLLOWING: startLineFollowing(); break;
+			case AI::DriveMode::APPLYING_SEQUENCE: startRotation(ai_->targetRotationDegrees() * DEG_TO_RAD); break;
+			case AI::DriveMode::IDLE: startIdle(); break;
 		}
+		last_commanded_rotation_degrees_ = ai_->targetRotationDegrees();
+		return true;
 	}
-	else{
+
+	if (desired == AI::DriveMode::APPLYING_SEQUENCE){
 		double target = ai_->targetRotationDegrees();
-		if (drive_mode_ != AI::DriveCommand::APPLYING_ROBOT_POSE || target != last_commanded_rotation_degrees_){
+		if (target != last_commanded_rotation_degrees_){
 			startRotation(target * DEG_TO_RAD);
 			last_commanded_rotation_degrees_ = target;
 			return true;
@@ -155,22 +160,34 @@ bool MrKrabs::handleDriveTransition()
 
 void MrKrabs::driveCurrentMode()
 {
-	if (drive_mode_ == AI::DriveCommand::LINE_FOLLOWING){
-		double correction = line_follower_->calculateCorrection();
-		motor_controller_->driveOpenLoop({correction, FORWARD_SPEED, 0});
-	}
-	else if (drive_mode_ == AI::DriveCommand::APPLYING_ROBOT_POSE){
-		double curr_position = motor_controller_->getElapsedRotation();
-		if (orientation_controller_.reachedTarget(curr_position)){
-			motor_controller_->setVelocity({0,0,0});
-			if (ai_->onRotationReached()){
-				action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	switch (drive_mode_){
+		case AI::DriveMode::LINE_FOLLOWING: {
+			double correction = line_follower_->calculateCorrection();
+			double speed = FORWARD_SPEED * ai_->lineFollowingDirection();
+			motor_controller_->driveOpenLoop({correction, speed, 0});
+			// Stub odometry: integrates commanded speed rather than measured
+			// encoder distance. Replace with real odometry once available.
+			ai_->addProgress(std::abs(speed) * CONTROL_LOOP_PERIOD);
+			break;
+		}
+		case AI::DriveMode::APPLYING_SEQUENCE: {
+			double curr_position = motor_controller_->getElapsedRotation();
+			if (orientation_controller_.reachedTarget(curr_position)){
+				Serial.print("reached target");
+				motor_controller_->setVelocity({0,0,0});
+				if (ai_->onRotationReached()){
+					action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+				}
 			}
+			else{
+				double correction = orientation_controller_.calculateCorrection(curr_position);
+				motor_controller_->setVelocity({0,0, correction});
+			}
+			break;
 		}
-		else{
-			double correction = orientation_controller_.calculateCorrection(curr_position);
-			motor_controller_->setVelocity({0,0, correction});
-		}
+		case AI::DriveMode::IDLE:
+			motor_controller_->setVelocity({0,0,0});
+			break;
 	}
 }
 
@@ -183,17 +200,24 @@ void MrKrabs::motorStepControl(){
 
 void MrKrabs::startLineFollowing()
 {
-	drive_mode_ = AI::DriveCommand::LINE_FOLLOWING;
+	drive_mode_ = AI::DriveMode::LINE_FOLLOWING;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 }
 
 void MrKrabs::startRotation(double target_angle)
 {
 	motor_controller_->driveOpenLoop({0,0,0});
-	drive_mode_ = AI::DriveCommand::APPLYING_ROBOT_POSE;
+	drive_mode_ = AI::DriveMode::APPLYING_SEQUENCE;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 	motor_controller_->startRotation();
 	orientation_controller_.startRotation(target_angle);
+}
+
+void MrKrabs::startIdle()
+{
+	motor_controller_->driveOpenLoop({0,0,0});
+	drive_mode_ = AI::DriveMode::IDLE;
+	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 }
 
 MrKrabs mr_krabs_;
