@@ -10,15 +10,22 @@
 #include <SCServo.h>
 
 // Forward speed during line following (m/s). Tune empirically.
-static constexpr double FORWARD_SPEED = 2.0;
-
-// Open-loop forward drive test duration (µs) — see MrKrabs::stepControl.
-static constexpr uint64_t FORWARD_DRIVE_TEST_DURATION_US = 10000000000; // 1 s
+static constexpr double FORWARD_SPEED = 0.5;
 
 // Non-blocking settle delay (µs) held between the three drive actions
 // (line-following, rotating, applying an arm pose) so each has time to
 // physically settle before the next begins. See MrKrabs::stepControl.
 static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1000000; // 1 s
+
+// Teleoperation (manual numpad/o/p control over USB serial, bypassing the
+// RPi/AI). See MrKrabs::handleTeleopChar. Numpad 7/8/9/4/6/1/2/3 drive the 8
+// compass directions around 5 (stop); o/p rotate CCW/CW.
+static constexpr double TELEOP_LINEAR_SPEED = 0.3;   // m/s
+static constexpr double TELEOP_ANGULAR_SPEED = 2.0;  // rad/s
+// A key is considered "still held" as long as its character keeps arriving at
+// least this often; the sending script must repeat a key while held (raw
+// serial has no key-up event).
+static constexpr uint64_t TELEOP_KEY_TIMEOUT_US = 300000; // 300 ms
 
 class MrKrabs
 {
@@ -44,6 +51,23 @@ private:
 	void stepControl();
 	void motorStepControl();
 
+	// Dispatches one teleop command character (numpad 1-9 + o/p) read from
+	// Serial. Enters teleop mode (taking priority over AI/line-following/
+	// rotation in stepControl) and refreshes that key's "held" timer — see
+	// computeTeleopVelocity. '5' and ' ' are an explicit stop: they clear
+	// every key's held timer immediately without exiting teleop mode.
+	void handleTeleopChar(char c);
+
+	// Sums the RobotVelocity contribution of every teleop key whose timer
+	// hasn't expired, so keys held together combine into a single
+	// diagonal/combined velocity on this holonomic drive.
+	RobotVelocity computeTeleopVelocity();
+
+	enum TeleopKey {
+		TELEOP_1, TELEOP_2, TELEOP_3, TELEOP_4, TELEOP_6, TELEOP_7, TELEOP_8, TELEOP_9,
+		TELEOP_O, TELEOP_P, TELEOP_KEY_COUNT
+	};
+
 	// Reconciles AI's desired drive command against drive_mode_, calling
 	// startLineFollowing()/startRotation() on change. Returns true iff a
 	// transition just happened this tick (caller should hold off driving —
@@ -60,6 +84,16 @@ private:
 	// not tracked separately — it's just the drivetrain's role while
 	// APPLYING_ROBOT_POSE, on the way to letting AI apply the arm pose.
 	AI::DriveCommand drive_mode_;
+
+	// Set by handleTeleopChar() on any teleop keypress, but stepControl()'s
+	// drive dispatch runs the AI pipeline unconditionally and never reads
+	// this — teleop input handling (this flag, computeTeleopVelocity()) is
+	// currently dormant, kept for a future teleop/auto switch.
+	bool is_teleop_;
+
+	// esp_timer_get_time() timestamp (µs) each key's character was last seen;
+	// indexed by TeleopKey. A key counts as held while within TELEOP_KEY_TIMEOUT_US.
+	uint64_t teleop_key_last_seen_us_[TELEOP_KEY_COUNT];
 
 	// Last heading (deg) passed to startRotation(), so stepControl() only
 	// re-issues it when AI's target actually changes.
@@ -82,10 +116,6 @@ private:
 
 	esp_timer_handle_t control_loop_timer_;
 	esp_timer_handle_t motor_control_loop_timer_;
-
-	// esp_timer_get_time() timestamp (µs) when the open-loop forward drive
-	// test started; used by stepControl to stop after FORWARD_DRIVE_TEST_DURATION_US.
-	uint64_t drive_test_start_us_;
 
 	// SMS_STS/SCSerial's constructor only sets defaults (pSerial = nullptr) and
 	// touches no hardware, so it's safe as a direct member; pSerial is bound to

@@ -11,10 +11,10 @@ MotorController::MotorController()
 	  current_wheel_velocities_({0, 0, 0}),
 	  prev_step_time_us_(0),
 	  accumulated_angle_(0),
-	  accumulated_rotation_distance_m_(0),
-	  wheel_left_pid_(PidController(WHEEL_PID_P, WHEEL_PID_I, WHEEL_PID_D, WHEEL_PID_MAX_I)),
-	  wheel_right_pid_(PidController(WHEEL_PID_P, WHEEL_PID_I, WHEEL_PID_D, WHEEL_PID_MAX_I)),
-	  wheel_back_pid_(PidController(WHEEL_PID_P, WHEEL_PID_I, WHEEL_PID_D, WHEEL_PID_MAX_I))
+	  current_rotation_rad_(0),
+	  wheel_left_pid_(PidController(WHEEL_LEFT_PID_P, WHEEL_LEFT_PID_I, WHEEL_LEFT_PID_D, WHEEL_LEFT_PID_MAX_I)),
+	  wheel_right_pid_(PidController(WHEEL_RIGHT_PID_P, WHEEL_RIGHT_PID_I, WHEEL_RIGHT_PID_D, WHEEL_RIGHT_PID_MAX_I)),
+	  wheel_back_pid_(PidController(WHEEL_BACK_PID_P, WHEEL_BACK_PID_I, WHEEL_BACK_PID_D, WHEEL_BACK_PID_MAX_I))
 {
 	// Motors are NOT constructed here — setup() does that after Arduino init.
 }
@@ -55,20 +55,28 @@ void MotorController::applyVelocity()
 
 	WheelVelocities target_wheel_velocity = euclideanToWheel(current_target_velocity_);
 
+	// Feedforward (VELOCITY_TO_PWM * target) + PID trim on the residual error.
+	// Using the current target as the baseline — instead of accumulating the
+	// PID output onto the previous PWM — means PWM tracks the target directly:
+	// it jumps to roughly the right duty the instant a new target is set
+	// (fixing slow-to-start-from-0) and collapses to 0 the instant target
+	// goes back to 0 (fixing slow-to-stop), with no separate kickstart term
+	// needed. MotorDriver::primeForRestart (called from stopImmediate) still
+	// forces that from-stop jump through the H-bridge coast/dead-time guard.
 	// PID error is in m/s; multiply output by VELOCITY_TO_PWM to get PWM counts.
 int wheel_left_pwm = static_cast<int>(
-    wheel_left_motor_->getCurrentTargetSpeed() +
-    wheel_left_pid_.step(target_wheel_velocity.wheel_left - current_wheel_velocities_.wheel_left, delta_t) 
+    target_wheel_velocity.wheel_left * VELOCITY_TO_PWM +
+    wheel_left_pid_.step(target_wheel_velocity.wheel_left - current_wheel_velocities_.wheel_left, delta_t)
 );
 
 int wheel_right_pwm = static_cast<int>(
-    wheel_right_motor_->getCurrentTargetSpeed() +
-    wheel_right_pid_.step(target_wheel_velocity.wheel_right - current_wheel_velocities_.wheel_right, delta_t) 
+    target_wheel_velocity.wheel_right * VELOCITY_TO_PWM +
+    wheel_right_pid_.step(target_wheel_velocity.wheel_right - current_wheel_velocities_.wheel_right, delta_t)
 );
 
 int wheel_back_pwm = static_cast<int>(
-    wheel_back_motor_->getCurrentTargetSpeed() +
-    wheel_back_pid_.step(target_wheel_velocity.wheel_back - current_wheel_velocities_.wheel_back, delta_t) 
+    target_wheel_velocity.wheel_back * WHEEL_BACK_VELOCITY_TO_PWM +
+    wheel_back_pid_.step(target_wheel_velocity.wheel_back - current_wheel_velocities_.wheel_back, delta_t)
 );
 
 	wheel_left_motor_->set_velocity(wheel_left_pwm);
@@ -81,10 +89,28 @@ void MotorController::driveOpenLoop(RobotVelocity v)
 	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return;
 
 	WheelVelocities target = euclideanToWheel(v);
-	wheel_left_motor_->set_velocity(target.wheel_left  );
-	wheel_right_motor_->set_velocity(target.wheel_right) ;
-	wheel_back_motor_->set_velocity(target.wheel_back  );
+	wheel_left_motor_->set_velocity(target.wheel_left  * VELOCITY_TO_PWM);
+	wheel_right_motor_->set_velocity(target.wheel_right * VELOCITY_TO_PWM);
+	wheel_back_motor_->set_velocity(target.wheel_back  * WHEEL_BACK_VELOCITY_TO_PWM);
 
+}
+
+void MotorController::stopImmediate()
+{
+	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return;
+
+	current_target_velocity_ = {0, 0, 0};
+	wheel_left_pid_.reset();
+	wheel_right_pid_.reset();
+	wheel_back_pid_.reset();
+	driveOpenLoop({0, 0, 0});
+	// So the next start — even in the same direction as before this stop —
+	// still coasts one control cycle before applying the kickstart PWM in
+	// applyVelocity(), instead of jumping straight to full duty. See
+	// MotorDriver::primeForRestart.
+	wheel_left_motor_->primeForRestart();
+	wheel_right_motor_->primeForRestart();
+	wheel_back_motor_->primeForRestart();
 }
 
 double MotorController::computeAngle()
@@ -173,26 +199,23 @@ void MotorController::tickMotorSpeeds(){
 }
 
 void MotorController::startRotation(){
-	accumulated_rotation_distance_m_ = 0.0;
+	current_rotation_rad_ = 0.0;
 }
-double MotorController::calculateCurrentOrientation(){
-	// Reuses the delta each MotorDriver already computed this tick in tickSpeed()
-	// (called via tickMotorSpeeds() earlier in the same control loop step) instead
-	// of independently re-diffing getEncoderCount().
-	WheelVelocities delta_wheel{
-		wheel_left_motor_->getCurrentDeltaCount() * ENCODER_RESOLUTION_DISTANCE_M,
-		wheel_right_motor_->getCurrentDeltaCount() * ENCODER_RESOLUTION_DISTANCE_M,
-		wheel_back_motor_->getCurrentDeltaCount() * ENCODER_RESOLUTION_DISTANCE_M
-	};
+void MotorController::updateRotationTracking(){
+	// current_wheel_velocities_ is set by tickMotorSpeeds() (must run first
+	// this tick — see MrKrabs::motorStepControl) from each MotorDriver's
+	// getSpeed(), which is already smoothed by that driver's internal
+	// VELOCITY_BUFFER_SIZE-sample moving average. Integrating that filtered
+	// per-wheel velocity is much less quantization-noisy tick-to-tick than
+	// diffing raw encoder counts directly. wheelToEuclidean's omega term
+	// averages all three wheels via the same kiwi-drive kinematics used
+	// elsewhere (omega = (w_left+w_right+w_back)/(3R)).
+	double omega = wheelToEuclidean(current_wheel_velocities_).omega;
+	current_rotation_rad_ += omega * MOTOR_CONTROL_LOOP_PERIOD;
+}
 
-	// wheelToEuclidean's omega term is (w_left+w_right+w_back)/(3R) — the same kiwi-drive
-	// kinematics used for accumulated_angle_ in applyVelocity_. Feeding it per-tick
-	// wheel distance deltas (instead of velocities) yields the per-tick angle delta
-	// directly, correctly combining all three wheels instead of taking their max.
-	double omega_delta = wheelToEuclidean(delta_wheel).omega;
-	accumulated_rotation_distance_m_ += omega_delta * WHEEL_DISTANCE_FROM_CENTER_M;
-
-	return accumulated_rotation_distance_m_/WHEEL_DISTANCE_FROM_CENTER_M;
+double MotorController::getElapsedRotation() const{
+	return current_rotation_rad_;
 }
 
 RobotVelocity MotorController::getCurrentRobotVelocity(){

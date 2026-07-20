@@ -3,8 +3,13 @@
 #include <cstdint>
 #include <vector>
 
-// BUFFER SIZE
-static constexpr int VELOCITY_BUFFER_SIZE = 10;
+// Moving-average window (ticks, at MOTOR_CONTROL_LOOP_PERIOD_US each) for
+// getSpeed(). Bigger = smoother velocity reading (also consumed by
+// MotorController::updateRotationTracking() for elapsed-rotation tracking)
+// but more lag in the wheel velocity PID's feedback in applyVelocity() —
+// don't push this much further without checking the PID still responds
+// crisply to target changes.
+static constexpr int VELOCITY_BUFFER_SIZE = 20;
 
 // Below this commanded PWM magnitude, treat speed as zero instead of applying
 // the deadband floor below. Prevents FP/PID noise around a 0 target (e.g. the
@@ -37,9 +42,6 @@ public:
 	void set_velocity(double speed);
 
 	// Returns the last raw speed passed to set_velocity (pre-deadzone, pre-quantization).
-	// MotorController uses this as the memory term of its incremental PID, so it must
-	// keep accumulating even on ticks where the deadzone zeroes the actual PWM output —
-	// otherwise a sub-deadzone contribution can never build up past the threshold.
 	double getCurrentTargetSpeed();
 
 	// Returns the raw cumulative encoder count since construction (monotonic, unsigned,
@@ -64,6 +66,17 @@ public:
 	// instead of independently diffing getEncoderCount().
 	uint32_t getCurrentDeltaCount();
 
+	// Forgets the last driven direction, so the next set_velocity() call —
+	// whichever direction it's for — is treated as a direction change and
+	// goes through the coast/dead-time guard in set_velocity() instead of
+	// jumping straight to full duty cycle. Call this on a deliberate full
+	// stop (MotorController::stopImmediate) so a kickstart PWM applied on
+	// the next start still coasts one control cycle first, same as a real
+	// direction reversal. Distinct from the ordinary new_direction==0 path
+	// in set_velocity, which intentionally leaves last_direction_ alone to
+	// preserve tickSpeed()'s sign fallback during deadzone dithering.
+	void primeForRestart();
+
 private:
 	int speedToDutyCycle(int speed);
 
@@ -72,7 +85,7 @@ private:
 
 	int intended_direction_; // Tracks the immediate sign of incoming commands
 	volatile double wheel_speed_;
-	double motor_target_speed_; // last raw speed passed to set_velocity — see getCurrentTargetSpeed
+	double motor_target_speed_; // last raw speed passed to set_velocity
 	int last_direction_;                  // -1, 0, or 1 — tracks last direction for H-bridge protection and speed tracking
 
 	const int pwm_channel_0_;

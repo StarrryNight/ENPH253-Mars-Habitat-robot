@@ -3,7 +3,7 @@
 #include "robot_events.h"
 
 AI::AI():
-	current_robot_state_(METAL_DETECTING),
+	current_robot_state_(TEST_ROTATION),
 	current_state_progress_m(0),
 	arm_(nullptr),
 	pending_event_index_(kNoEvent),

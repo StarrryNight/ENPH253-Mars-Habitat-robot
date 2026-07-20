@@ -19,11 +19,13 @@ double LineFollower::calculateCorrection()
     if (current_state[1] == 1 && current_state[2] == 0)
     {
         correction = line_followng_pid_.step(-SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
+    prev_state_ = current_state;
     }
     // steer right if mid-right is on the line and mid-left isn't (robot drifted left)
     else if (current_state[1] == 0 && current_state[2] == 1)
     {
         correction = line_followng_pid_.step(SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
+    prev_state_ = current_state;
     }
     // both mids lost the line — use previous mid state as memory for big correction
     else if (current_state[1] == 0 && current_state[2] == 0)
@@ -37,7 +39,6 @@ double LineFollower::calculateCorrection()
             correction = line_followng_pid_.step(BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
         }
     }
-    prev_state_ = current_state;
     return correction;
 }
 

@@ -57,9 +57,8 @@ void MotorDriver::set_velocity(double speed)
     intended_direction_ = new_direction;
 
     // Record the raw commanded speed unconditionally, even when the deadzone below
-    // zeroes the actual PWM write — this is the memory term MotorController's
-    // incremental PID reads back via getCurrentTargetSpeed(), so it must keep
-    // accumulating sub-deadzone contributions instead of getting reset to 0 every tick.
+    // zeroes the actual PWM write, so getCurrentTargetSpeed() reflects what was
+    // actually requested rather than what got written to the pins.
     motor_target_speed_ = speed;
 
     if (pending_direction_change_)
@@ -130,6 +129,11 @@ int MotorDriver::speedToDutyCycle(int speed){
 double MotorDriver::getCurrentTargetSpeed()
 {
 	return motor_target_speed_;
+}
+
+void MotorDriver::primeForRestart()
+{
+	last_direction_ = 0;
 }
 
 uint32_t MotorDriver::getEncoderCount()

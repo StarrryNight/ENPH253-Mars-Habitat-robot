@@ -68,6 +68,13 @@ public:
 	// no PID. Still calls tickVelocity() each call to keep encoder counts live.
 	void driveOpenLoop(RobotVelocity v);
 
+	// Immediately zeroes PWM output and clears the wheel PIDs' accumulated
+	// state. Unlike setVelocity({0,0,0}), which only changes the target and
+	// lets applyVelocity's incremental PID (pwm[n] = pwm[n-1] + Kp*error) wind
+	// itself down over several ticks, this snaps the wheels to a stop right
+	// away — used when teleop releases all keys.
+	void stopImmediate();
+
 	// Returns accumulated heading (rad) estimated from wheel encoder deltas.
 	// Uses kiwi-drive kinematics: omega = (w_left+w_right+w_back) / (3*R).
 	double computeAngle();
@@ -84,10 +91,20 @@ public:
 	// MotorDriver's tickSpeed() (must run before this is called each tick — see
 	// MrKrabs::stepControl).
 	void startRotation();
-	// Returns total rotation (degrees) accumulated since startRotation(), computed by
-	// adding each wheel's most recent tickSpeed() delta every time this is called,
-	// then converting distance to angle via wheel-to-euclidean.
-	double calculateCurrentOrientation();
+
+	// Folds this tick's per-wheel encoder deltas (from tickMotorSpeeds(), which
+	// must run first this tick) into the cached elapsed-rotation angle. Called
+	// once per motor-control tick by MrKrabs::motorStepControl(), so rotation
+	// tracking stays synchronized with the same 10 ms cadence the deltas are
+	// computed on rather than being recomputed whenever some other timer's
+	// callback happens to ask.
+	void updateRotationTracking();
+
+	// Returns the cached rotation (rad) accumulated since startRotation(), as
+	// of the most recent updateRotationTracking() call. Pure getter — safe to
+	// call from any tick (e.g. a different timer than motorStepControl's)
+	// without perturbing the accumulation.
+	double getElapsedRotation() const;
 
 	RobotVelocity getCurrentRobotVelocity();
 private:
@@ -113,11 +130,17 @@ private:
 	uint64_t prev_step_time_us_;  // µs from esp_timer_get_time(); avoids std::chrono unreliability
 	double accumulated_angle_;    // radians; updated each applyVelocity_ call
 
-	// Running total (m) of signed rotation distance accumulated one control-loop
-	// delta at a time since startRotation().
-	double accumulated_rotation_distance_m_;
-	// Distance from robot center to each wheel contact point (m).
-	static constexpr double WHEEL_DISTANCE_FROM_CENTER_M = 0.3;
+	// Rotation (rad) accumulated since startRotation(), integrated one
+	// control-loop tick at a time by updateRotationTracking() from the
+	// filtered per-wheel velocities. External callers should read
+	// getElapsedRotation() instead of this directly.
+	double current_rotation_rad_;
+	// Distance from robot center to each wheel contact point (m). Measured
+	// on hardware as 10 cm — was previously 0.3 (3x too large), which made
+	// current_rotation_rad_ (∝ 1/R) systematically underestimate true
+	// rotation, so the rotate-to-angle loop kept driving well past the real
+	// target before its own deflated estimate caught up.
+	static constexpr double WHEEL_DISTANCE_FROM_CENTER_M = 0.11465;
 
 	RobotVelocity current_robot_velocity_;
 };

@@ -9,7 +9,11 @@ OrientationController::OrientationController()
 
 double OrientationController::calculateCorrection(double current_angle)
 {
-    return orientation_pid.step(target_angle_ - current_angle, CONTROL_LOOP_PERIOD);
+    double correction = orientation_pid.step(target_angle_ - current_angle, CONTROL_LOOP_PERIOD);
+    if (std::abs(correction) < MIN_ROTATION_OMEGA_RAD_S) {
+        correction = std::copysign(MIN_ROTATION_OMEGA_RAD_S, correction);
+    }
+    return correction;
 }
 
 bool OrientationController::reachedTarget(double current_angle) const

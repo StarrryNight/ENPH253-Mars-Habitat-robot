@@ -7,7 +7,7 @@ struct RobotPose{
 	ArmPose arm_pose;
 };
 
-enum RobotState{LINE_FOLLOWING, METAL_DETECTING, ROCK_PICKING, TELETUBBYING, HABITAT_PICKING};
+enum RobotState{TEST_ROTATION, LINE_FOLLOWING, METAL_DETECTING, ROCK_PICKING, TELETUBBYING, HABITAT_PICKING};
 
 struct RobotEvent{
 	RobotState robot_state;
@@ -19,6 +19,12 @@ struct RobotEvent{
 // poses in CLAUDE.md (home, sweep, rock pickup, rock deposit, habitat grab,
 // habitat place) once the arm is characterized on hardware.
 const std::vector<RobotEvent> DUMMY_ROBOT_EVENTS = {
+	// Test rotation: rotate in place 90 degrees, arm held neutral. Validates
+	// the AI -> handleDriveTransition -> driveCurrentMode -> onRotationReached
+	// pipeline end to end using the same closed-loop rotation path as the
+	// other states below.
+	{TEST_ROTATION, 0.0, {90.0, {0, 0, 0, 0}}},
+
 	// Metal detecting: sweep the arm out to scan for metal.
 	{METAL_DETECTING, 0.0, {0.0, {90, 90, 90, 90}}},
 	{METAL_DETECTING, 0.15, {0, {0, 0, 0, 0}}},

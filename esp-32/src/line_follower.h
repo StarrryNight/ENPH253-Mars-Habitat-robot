@@ -6,8 +6,8 @@
 
 // Raw 12-bit ADC threshold (0–4095). Calibrate on your surface.
 static constexpr double LIGHT_THRESHOLD_ADC = 2000;
-static constexpr double SMALL_ERROR_VALUE = 1;
-static constexpr double BIG_ERROR_VALUE = 5;
+static constexpr double SMALL_ERROR_VALUE = 0.4;
+static constexpr double BIG_ERROR_VALUE =1.5;
 
 // IR photoresistor line follower with PID-based lateral correction.
 // Uses a 4-sensor array: [left, mid-left, mid-right, right].

@@ -6,16 +6,16 @@
 // not a wire.
 
 // Motor PWM pins
-static constexpr int WHEEL_LEFT_PWM_PIN_0 = 46;
-static constexpr int WHEEL_LEFT_PWM_PIN_1 = 45;
+static constexpr int WHEEL_LEFT_PWM_PIN_0 = 45;
+static constexpr int WHEEL_LEFT_PWM_PIN_1 = 46;
 // "LEFT" on altium
 
 static constexpr int WHEEL_RIGHT_PWM_PIN_0 = 41;
 static constexpr int WHEEL_RIGHT_PWM_PIN_1 = 42;
 // "RIGHT" on altium
 
-static constexpr int WHEEL_BACK_PWM_PIN_0 = 16;
-static constexpr int WHEEL_BACK_PWM_PIN_1 = 15;
+static constexpr int WHEEL_BACK_PWM_PIN_0 = 15;
+static constexpr int WHEEL_BACK_PWM_PIN_1 = 16;
 // "BACK" on altium
 
 // Encoder pins; second is set to zero since we're doing 1 encoder pin per wheel
@@ -29,10 +29,10 @@ static constexpr int WHEEL_BACK_ENCODER_0 = 2;
 // "BACK"
 
 // Photoresistors
-static constexpr int LEFT_PHOTORESISTOR = 39;
-static constexpr int MID_LEFT_PHOTORESISTOR = 40;
-static constexpr int MID_RIGHT_PHOTORESISTOR = 21;
-static constexpr int RIGHT_PHOTORESISTOR = 38;
+static constexpr int LEFT_PHOTORESISTOR = 7;
+static constexpr int MID_LEFT_PHOTORESISTOR = 8;
+static constexpr int MID_RIGHT_PHOTORESISTOR = 9;
+static constexpr int RIGHT_PHOTORESISTOR = 10;
 
 // Arm servo pins (8V?)
 //TODO change (5V)
