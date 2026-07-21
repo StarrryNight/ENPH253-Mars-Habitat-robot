@@ -1,0 +1,23 @@
+description: Ultralytics best model trained on /datasets/real-ca2fce41/data.yaml
+author: Ultralytics
+date: '2026-07-21T18:06:10.977270'
+version: 8.4.103
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+head: Detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: laa-laa
+  1: Tinky winky
+  2: Dipsy
+  3: po
+args:
+  batch: 1
+  quantize: 16
+channels: 3
+end2end: false

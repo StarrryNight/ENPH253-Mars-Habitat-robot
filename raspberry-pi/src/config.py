@@ -9,7 +9,7 @@ CAMERA_INDEX = (
     1  # /dev/videoN — on the robot this is 0 (only camera); this dev machine needs 1
 )
 MODEL_PATH = os.path.expanduser(
-    "~/best_ncnn_model"
+    "../best_ncnn_model"
 )  # directory containing .param and .bin files
 CV_CONF = 0.04
 CV_IOU = 0.7
