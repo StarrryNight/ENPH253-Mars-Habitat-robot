@@ -12,6 +12,11 @@
 // Forward speed during line following (m/s). Tune empirically.
 static constexpr double FORWARD_SPEED = 0.4;
 
+// Fixed rotation speed (rad/s), one direction, while searching for the line
+// in AI::DriveMode::SEARCHING_FOR_LINE. Deliberately gentler than
+// TELEOP_ANGULAR_SPEED for a controlled sweep. Tune empirically.
+static constexpr double LINE_SEARCH_OMEGA_RAD_S = 0.5;
+
 // Non-blocking settle delay (µs) held between the three drive actions
 // (line-following, rotating, applying an arm pose) so each has time to
 // physically settle before the next begins. See MrKrabs::stepControl.
@@ -48,6 +53,10 @@ public:
 
 	// Enters idle mode. Motors held at zero velocity.
 	void startIdle();
+
+	// Enters line-search mode. Rotates at a fixed LINE_SEARCH_OMEGA_RAD_S
+	// until AI's state transitions away (see RobotState::REACQUIRING_LINE).
+	void startSearchingForLine();
 
 private:
 	// Called every CONTROL_LOOP_PERIOD_US by the esp_timer.

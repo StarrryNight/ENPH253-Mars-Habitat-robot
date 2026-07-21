@@ -189,9 +189,9 @@ void MotorController::tickMotorSpeeds(){
 	current_robot_velocity_ = v;
 
 	//print
-///	Serial.printf("wheel_left_velocity: %.5f\n",wheel_left_motor_->getSpeed());
-///	Serial.printf("wheel_right_velocity: %.5f\n",wheel_right_motor_->getSpeed());
-///	Serial.printf("wheel_back_velocity: %.5f\n",wheel_back_motor_->getSpeed());
+	Serial.printf("wheel_left_velocity: %.5f\n",wheel_left_motor_->getSpeed());
+	Serial.printf("wheel_right_velocity: %.5f\n",wheel_right_motor_->getSpeed());
+	Serial.printf("wheel_back_velocity: %.5f\n",wheel_back_motor_->getSpeed());
 ///	Serial.printf("v_x: %.5f\n", v.x);
 ///	Serial.printf("v_y: %.5f\n", v.y);
 ///	Serial.printf("omega: %.5f\n", v.omega);
@@ -200,6 +200,12 @@ void MotorController::tickMotorSpeeds(){
 
 void MotorController::startRotation(){
 	current_rotation_rad_ = 0.0;
+	// A new/changed rotation target means whatever the wheel velocity PIDs
+	// accumulated chasing the previous target (or previous drive mode) is
+	// stale — don't let it carry into this one.
+	wheel_left_pid_.reset();
+	wheel_right_pid_.reset();
+	wheel_back_pid_.reset();
 }
 void MotorController::updateRotationTracking(){
 	// current_wheel_velocities_ is set by tickMotorSpeeds() (must run first

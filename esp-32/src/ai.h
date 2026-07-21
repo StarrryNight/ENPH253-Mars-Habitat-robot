@@ -2,6 +2,7 @@
 #include <array>
 #include <cstddef>
 #include "arm.h"
+#include "line_follower.h"
 #include "robot_state.h"
 #include "robot_poses.h"
 #include "sequence_runner.h"
@@ -26,8 +27,9 @@ class AI {
 		void addProgress(double delta_m);
 
 		void setArm(Arm* arm);
+		void setLineFollower(LineFollower* line_follower);
 
-		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, IDLE };
+		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE };
 		// What the drivetrain should currently be doing, derived from current_state_.
 		DriveMode desiredDriveMode() const;
 		// +1 while driving forward, -1 during LINE_FOLLOWING_REVERSE.
@@ -57,6 +59,9 @@ class AI {
 		// Hardware validation only — see RobotState::TEST_ROTATION.
 		RobotState tickTestRotation();
 
+		// See RobotState::REACQUIRING_LINE.
+		RobotState tickReacquiringLine();
+
 		RobotState tickFindingRock();
 		RobotState tickMetalDetecting();
 		RobotState tickPickupRock();
@@ -69,10 +74,15 @@ class AI {
 
 		MetalDetector metal_detector_;
 		Arm* arm_;
+		LineFollower* line_follower_;
 		SequenceRunner sequence_runner_;
 
 		RobotState current_state_;
 		std::array<int, kNumRobotStates> state_visit_count_{};
 		// Distance (m) traveled since the current state was entered.
 		double current_state_progress_m_;
+		// Where tickReacquiringLine() should hand off once the line is
+		// found. Set by whichever tick*() function transitions into
+		// REACQUIRING_LINE (see nextRockOrDone, tickHabitatPickup, etc.).
+		RobotState post_reacquire_state_;
 };

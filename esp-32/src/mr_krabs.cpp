@@ -31,6 +31,7 @@ void MrKrabs::setup()
 	// ====================Set up firmware---------------------- //
 	arm_->begin();
 	ai_->setArm(&*arm_);
+	ai_->setLineFollower(&*line_follower_);
 	esp_timer_create_args_t timer_args = {
 		.callback = [](void *arg) { static_cast<MrKrabs *>(arg)->stepControl(); },
 		.arg = this,
@@ -141,6 +142,7 @@ bool MrKrabs::handleDriveTransition()
 		switch (desired){
 			case AI::DriveMode::LINE_FOLLOWING: startLineFollowing(); break;
 			case AI::DriveMode::APPLYING_SEQUENCE: startRotation(ai_->targetRotationDegrees() * DEG_TO_RAD); break;
+			case AI::DriveMode::SEARCHING_FOR_LINE: startSearchingForLine(); break;
 			case AI::DriveMode::IDLE: startIdle(); break;
 		}
 		last_commanded_rotation_degrees_ = ai_->targetRotationDegrees();
@@ -175,6 +177,7 @@ void MrKrabs::driveCurrentMode()
 			if (orientation_controller_.reachedTarget(curr_position)){
 				Serial.print("reached target");
 				motor_controller_->setVelocity({0,0,0});
+				orientation_controller_.reset();
 				if (ai_->onRotationReached()){
 					action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 				}
@@ -185,6 +188,12 @@ void MrKrabs::driveCurrentMode()
 			}
 			break;
 		}
+		case AI::DriveMode::SEARCHING_FOR_LINE:
+			// AI::tickReacquiringLine() (called via ai_->tickAI() earlier this
+			// tick) already checked the line sensors and will transition the
+			// state once found — this just keeps spinning until that happens.
+			motor_controller_->setVelocity({0, 0, LINE_SEARCH_OMEGA_RAD_S});
+			break;
 		case AI::DriveMode::IDLE:
 			motor_controller_->setVelocity({0,0,0});
 			break;
@@ -218,6 +227,17 @@ void MrKrabs::startIdle()
 	motor_controller_->driveOpenLoop({0,0,0});
 	drive_mode_ = AI::DriveMode::IDLE;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+}
+
+void MrKrabs::startSearchingForLine()
+{
+	motor_controller_->driveOpenLoop({0,0,0});
+	drive_mode_ = AI::DriveMode::SEARCHING_FOR_LINE;
+	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	// Not using orientation_controller_ here (no fixed target — this spins
+	// until AI transitions the state), but still worth clearing the wheel
+	// PIDs' stale integral from whatever drive mode preceded this.
+	motor_controller_->startRotation();
 }
 
 MrKrabs mr_krabs_;

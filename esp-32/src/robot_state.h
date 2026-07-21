@@ -14,7 +14,13 @@ enum class RobotState {
 	HABITAT_PICKUP,
 	LINE_FOLLOWING_REVERSE,
 	HABITAT_PLACE,
+	// Rotates in place (fixed small omega, one direction) until the line
+	// follower's two middle sensors both detect the line, then hands off to
+	// AI::post_reacquire_state_. Entered by any sequence-driven state once
+	// its arm sequence completes, since rotating to arbitrary pose headings
+	// can leave the robot facing off the line. See AI::tickReacquiringLine.
+	REACQUIRING_LINE,
 	DONE,
 };
 
-static constexpr size_t kNumRobotStates = 9;
+static constexpr size_t kNumRobotStates = 10;

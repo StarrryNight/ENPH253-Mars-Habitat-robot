@@ -10,21 +10,21 @@
 // gains — the three motors don't respond identically, so tune independently
 // on hardware.
 #include "mr_krabs.h"
-static constexpr double WHEEL_LEFT_PID_P = 10;
-static constexpr double WHEEL_LEFT_PID_I = 0.1;
-static constexpr double WHEEL_LEFT_PID_D = 0.1;
+static constexpr double WHEEL_LEFT_PID_P = 20;
+static constexpr double WHEEL_LEFT_PID_I = 0.2;
+static constexpr double WHEEL_LEFT_PID_D = 0.10;
 static constexpr double WHEEL_LEFT_PID_MAX_I = 2;
 
-static constexpr double WHEEL_RIGHT_PID_P = 10;
-static constexpr double WHEEL_RIGHT_PID_I = 0.1;
+static constexpr double WHEEL_RIGHT_PID_P = 20;
+static constexpr double WHEEL_RIGHT_PID_I = 0.2;
 static constexpr double WHEEL_RIGHT_PID_D = 0.1;
 static constexpr double WHEEL_RIGHT_PID_MAX_I = 2;
 
 // the back wheel oscillates/overshoots.
-static constexpr double WHEEL_BACK_PID_P = 10;
-static constexpr double WHEEL_BACK_PID_I = 0.1;
-static constexpr double WHEEL_BACK_PID_D = 0.1;
-static constexpr double WHEEL_BACK_PID_MAX_I = 1;
+static constexpr double WHEEL_BACK_PID_P = 20;
+static constexpr double WHEEL_BACK_PID_I = 0.2;
+static constexpr double WHEEL_BACK_PID_D = 0.10;
+static constexpr double WHEEL_BACK_PID_MAX_I = 2;
 
 // Converts a wheel velocity (m/s) into a PWM duty magnitude for
 // MotorDriver::set_velocity (which expects commanded PWM, not m/s — see
@@ -40,7 +40,7 @@ static constexpr int WHEEL_BACK_VELOCITY_TO_PWM = 300;
 // Orientation (rotate-to-angle) PID (OrientationController). Error in radians.
 static constexpr double ORIENTATION_PID_P = 2;
 static constexpr double ORIENTATION_PID_I = 0;
-static constexpr double ORIENTATION_PID_D = 0.4;
+static constexpr double ORIENTATION_PID_D = 0.5;
 static constexpr double ORIENTATION_PID_MAX_I = 1;
 
 // Line-following lateral correction PID (LineFollower). Error from the

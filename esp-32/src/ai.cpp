@@ -25,14 +25,20 @@ namespace {
 
 AI::AI():
 	arm_(nullptr),
+	line_follower_(nullptr),
 	current_state_(RobotState::TEST_ROTATION),
-	current_state_progress_m_(0)
+	current_state_progress_m_(0),
+	post_reacquire_state_(RobotState::LINE_FOLLOWING)
 {
 	transitionTo(RobotState::TEST_ROTATION);
 }
 
 void AI::setArm(Arm* arm){
 	arm_ = arm;
+}
+
+void AI::setLineFollower(LineFollower* line_follower){
+	line_follower_ = line_follower;
 }
 
 void AI::addProgress(double delta_m){
@@ -60,6 +66,7 @@ void AI::tickAI(){
 RobotState AI::tickCurrentState(){
 	switch (current_state_){
 		case RobotState::TEST_ROTATION: return tickTestRotation();
+		case RobotState::REACQUIRING_LINE: return tickReacquiringLine();
 		case RobotState::FINDING_ROCK: return tickFindingRock();
 		case RobotState::METAL_DETECTING: return tickMetalDetecting();
 		case RobotState::PICKUP_ROCK: return tickPickupRock();
@@ -74,17 +81,29 @@ RobotState AI::tickCurrentState(){
 
 RobotState AI::tickTestRotation(){
 	// Hardware validation only — stay here running the sequence, then hand
-	// off to DONE (forcing IDLE) once complete instead of falling through:
+	// off to REACQUIRING_LINE once complete instead of falling through:
 	// SequenceRunner::targetRotationDegrees() reverts to 0.0 once complete(),
 	// which handleDriveTransition() would otherwise read as a fresh target
 	// and rotate back to heading 0.
-	return sequence_runner_.complete() ? RobotState::DONE : RobotState::TEST_ROTATION;
+	if (!sequence_runner_.complete()){
+		return RobotState::TEST_ROTATION;
+	}
+	post_reacquire_state_ = RobotState::LINE_FOLLOWING;
+	return RobotState::REACQUIRING_LINE;
+}
+
+RobotState AI::tickReacquiringLine(){
+	if (!line_follower_ || !line_follower_->bothMidSensorsOnLine()){
+		return RobotState::REACQUIRING_LINE;
+	}
+	return post_reacquire_state_;
 }
 
 RobotState AI::nextRockOrDone(){
-	return visits(RobotState::FINDING_ROCK) >= kNumRocks
+	post_reacquire_state_ = visits(RobotState::FINDING_ROCK) >= kNumRocks
 		? RobotState::LINE_FOLLOWING
 		: RobotState::FINDING_ROCK;
+	return RobotState::REACQUIRING_LINE;
 }
 
 RobotState AI::tickFindingRock(){
@@ -122,7 +141,8 @@ RobotState AI::tickHabitatPickup(){
 	if (!sequence_runner_.complete()){
 		return RobotState::HABITAT_PICKUP;
 	}
-	return RobotState::LINE_FOLLOWING_REVERSE;
+	post_reacquire_state_ = RobotState::LINE_FOLLOWING_REVERSE;
+	return RobotState::REACQUIRING_LINE;
 }
 
 RobotState AI::tickLineFollowingReverse(){
@@ -135,12 +155,19 @@ RobotState AI::tickHabitatPlace(){
 	if (!sequence_runner_.complete()){
 		return RobotState::HABITAT_PLACE;
 	}
-	return visits(RobotState::HABITAT_PLACE) >= kNumHabitatCycles ? RobotState::DONE : RobotState::LINE_FOLLOWING;
+	if (visits(RobotState::HABITAT_PLACE) >= kNumHabitatCycles){
+		return RobotState::DONE; // finished — no need to reacquire, robot goes IDLE
+	}
+	post_reacquire_state_ = RobotState::LINE_FOLLOWING;
+	return RobotState::REACQUIRING_LINE;
 }
 
 AI::DriveMode AI::desiredDriveMode() const{
 	if (current_state_ == RobotState::DONE){
 		return DriveMode::IDLE;
+	}
+	if (current_state_ == RobotState::REACQUIRING_LINE){
+		return DriveMode::SEARCHING_FOR_LINE;
 	}
 	return sequenceForState(current_state_) ? DriveMode::APPLYING_SEQUENCE : DriveMode::LINE_FOLLOWING;
 }

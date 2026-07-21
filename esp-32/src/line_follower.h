@@ -25,6 +25,11 @@ public:
 	// Positive x = steer right, negative x = steer left.
 	double calculateCorrection();
 
+	// True once both middle sensors detect the line — used by
+	// AI::tickReacquiringLine to tell when a search rotation has reoriented
+	// the robot back onto the line.
+	bool bothMidSensorsOnLine();
+
 private:
 	// Returns binarised sensor readings (1 = on line, 0 = off line)
 	// ordered as {left, mid-left, mid-right, right}.

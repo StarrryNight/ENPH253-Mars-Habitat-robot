@@ -21,6 +21,10 @@ using RobotSequence = std::vector<RobotPose>;
 const RobotSequence kTestRotationSequence = {
 	{90.0, {0, 0, 0, 0}},  // rotate 90 degrees, arm neutral
 	{-90.0, {0, 0, 0, 0}}, // rotate back -90 degrees, arm neutral
+	{90.0, {0, 0, 0, 0}}, // rotate back -90 degrees, arm neutral
+	{-90.0, {0, 0, 0, 0}}, // rotate back -90 degrees, arm neutral
+	{90.0, {0, 0, 0, 0}}, // rotate back -90 degrees, arm neutral
+	{-90.0, {0, 0, 0, 0}}, // rotate back -90 degrees, arm neutral
 };
 
 const RobotSequence kMetalDetectingSequence = {

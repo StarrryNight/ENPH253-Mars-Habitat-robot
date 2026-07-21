@@ -9,7 +9,7 @@
 // but more lag in the wheel velocity PID's feedback in applyVelocity() —
 // don't push this much further without checking the PID still responds
 // crisply to target changes.
-static constexpr int VELOCITY_BUFFER_SIZE = 20;
+static constexpr int VELOCITY_BUFFER_SIZE = 5;
 
 // Below this commanded PWM magnitude, treat speed as zero instead of applying
 // the deadband floor below. Prevents FP/PID noise around a 0 target (e.g. the
@@ -74,7 +74,10 @@ public:
 	// the next start still coasts one control cycle first, same as a real
 	// direction reversal. Distinct from the ordinary new_direction==0 path
 	// in set_velocity, which intentionally leaves last_direction_ alone to
-	// preserve tickSpeed()'s sign fallback during deadzone dithering.
+	// preserve tickSpeed()'s sign fallback during deadzone dithering. Also
+	// clears the velocity moving-average buffer (same as a real direction
+	// reversal), so getSpeed() reads 0 immediately instead of decaying down
+	// from stale pre-stop samples.
 	void primeForRestart();
 
 private:
