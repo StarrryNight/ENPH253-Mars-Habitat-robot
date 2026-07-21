@@ -1,10 +1,11 @@
-from dataclasses import dataclass, field
+import os
+from dataclasses import dataclass
 
 import cv2
+import ncnn
 import numpy as np
-from ultralytics import YOLO
 
-from config import MODEL_PATH, CV_CONF, CV_IOU, CV_IMGSZ, HFOV_DEG, TELETUBBY_LABELS, CAMERA_INDEX
+from config import MODEL_PATH, CV_CONF, CV_IOU, CV_IMGSZ, HFOV_DEG, TELETUBBY_LABELS, CAMERA_INDEX, CLASS_NAMES
 
 
 @dataclass
@@ -53,6 +54,21 @@ class TeletubbySensor:
         return len(self.detected) >= 2
 
 
+def _letterbox(frame: np.ndarray, size: int) -> tuple[np.ndarray, float, int, int]:
+    """Resize preserving aspect ratio and pad to (size, size) with grey.
+    Returns the padded image plus the scale and (pad_x, pad_y) needed to map
+    detection boxes back to original frame coordinates."""
+    h, w = frame.shape[:2]
+    scale = min(size / w, size / h)
+    new_w, new_h = round(w * scale), round(h * scale)
+    resized = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+
+    pad_x, pad_y = (size - new_w) // 2, (size - new_h) // 2
+    padded = np.full((size, size, 3), 114, dtype=np.uint8)
+    padded[pad_y:pad_y + new_h, pad_x:pad_x + new_w] = resized
+    return padded, scale, pad_x, pad_y
+
+
 class ComputerVision:
     def __init__(
         self, camera_index: int = CAMERA_INDEX, frame_width: int = 640, frame_height: int = 480
@@ -66,8 +82,53 @@ class ComputerVision:
         if not self.cap.isOpened():
             raise RuntimeError(f"Could not open camera {camera_index}")
 
-        self.model = YOLO(MODEL_PATH, task="detect")
+        self.net = ncnn.Net()
+        self.net.load_param(os.path.join(MODEL_PATH, "model.ncnn.param"))
+        self.net.load_model(os.path.join(MODEL_PATH, "model.ncnn.bin"))
+
         self.teletubby_sensor = TeletubbySensor()
+
+    def _infer(self, frame: np.ndarray) -> list[tuple[float, float, float, float, float, int]]:
+        """Run NCNN inference on a BGR frame. Returns (x1, y1, x2, y2, conf,
+        class_id) boxes in original-frame pixel coordinates, already filtered
+        by confidence threshold and NMS."""
+        padded, scale, pad_x, pad_y = _letterbox(frame, CV_IMGSZ)
+
+        blob = cv2.cvtColor(padded, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        blob = np.ascontiguousarray(blob.transpose(2, 0, 1))  # HWC -> CHW
+
+        ex = self.net.create_extractor()
+        ex.input("in0", ncnn.Mat(blob))
+        _, out0 = ex.extract("out0")
+        pred = np.array(out0)  # (4 + num_classes, num_anchors)
+        if pred.shape[0] == 4 + len(CLASS_NAMES):
+            pred = pred.T  # -> (num_anchors, 4 + num_classes)
+
+        class_scores = pred[:, 4:]
+        class_ids = class_scores.argmax(axis=1)
+        confs = class_scores[np.arange(len(pred)), class_ids]
+
+        keep = confs >= CV_CONF
+        pred, confs, class_ids = pred[keep], confs[keep], class_ids[keep]
+        if len(pred) == 0:
+            return []
+
+        cx, cy, w, h = pred[:, 0], pred[:, 1], pred[:, 2], pred[:, 3]
+        boxes_xywh = np.stack([cx - w / 2, cy - h / 2, w, h], axis=1)
+
+        indices = cv2.dnn.NMSBoxes(boxes_xywh.tolist(), confs.tolist(), CV_CONF, CV_IOU)
+        if len(indices) == 0:
+            return []
+
+        results = []
+        for i in np.array(indices).flatten():
+            x, y, w_box, h_box = boxes_xywh[i]
+            x1 = (x - pad_x) / scale
+            y1 = (y - pad_y) / scale
+            x2 = (x + w_box - pad_x) / scale
+            y2 = (y + h_box - pad_y) / scale
+            results.append((x1, y1, x2, y2, float(confs[i]), int(class_ids[i])))
+        return results
 
     def capture(self) -> Detection | None:
         """Grab a frame, run local NCNN inference, return the highest-confidence
@@ -77,31 +138,20 @@ class ComputerVision:
         if not ok:
             return None
 
-        results = self.model(frame, conf=CV_CONF, iou=CV_IOU, imgsz=CV_IMGSZ, verbose=False)
-
-        boxes = results[0].boxes
-        if boxes is None or len(boxes) == 0:
+        detections = self._infer(frame)
+        teletubby_dets = [d for d in detections if CLASS_NAMES[d[5]] in TELETUBBY_LABELS]
+        if not teletubby_dets:
             return None
 
-        names = results[0].names
-        teletubby_idxs = [
-            i for i in range(len(boxes)) if names[int(boxes.cls[i])] in TELETUBBY_LABELS
-        ]
-        if not teletubby_idxs:
-            return None
+        x1, y1, x2, y2, conf, class_id = max(teletubby_dets, key=lambda d: d[4])
+        label = CLASS_NAMES[class_id]
 
-        best_idx = max(teletubby_idxs, key=lambda i: float(boxes.conf[i]))
-        x1, y1, x2, y2 = [int(v) for v in boxes.xyxy[best_idx].tolist()]
-        conf = float(boxes.conf[best_idx])
-        label = names[int(boxes.cls[best_idx])]
-
-        cx = (x1 + x2) // 2
-        cy = (y1 + y2) // 2
+        cx = int((x1 + x2) / 2)
+        cy = int((y1 + y2) / 2)
 
         bearing_deg = ((cx - self.frame_width / 2) / self.frame_width) * HFOV_DEG
 
-        # bbox as (x, y, w, h) for TeletubbySensor
-        bbox = (x1, y1, x2 - x1, y2 - y1)
+        bbox = (int(x1), int(y1), int(x2 - x1), int(y2 - y1))
         is_new = self.teletubby_sensor.record(frame, bbox)
 
         return Detection(

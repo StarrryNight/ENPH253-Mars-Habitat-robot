@@ -4,7 +4,7 @@ Not used by mrs_krabs.py — the robot itself is headless.
 import cv2
 
 from computer_vision import ComputerVision
-from config import CV_CONF, CV_IOU, CV_IMGSZ
+from config import CLASS_NAMES
 
 cv_ = ComputerVision()
 
@@ -14,8 +14,12 @@ while True:
     if not ok:
         continue
 
-    results = cv_.model(frame, conf=CV_CONF, iou=CV_IOU, imgsz=CV_IMGSZ, verbose=False)
-    annotated = results[0].plot()
+    annotated = frame.copy()
+    for x1, y1, x2, y2, conf, class_id in cv_._infer(frame):
+        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        label = f"{CLASS_NAMES[class_id]} {conf:.2f}"
+        cv2.putText(annotated, label, (x1, max(y1 - 5, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
     cv2.imshow("mrs_krabs camera", annotated)
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
