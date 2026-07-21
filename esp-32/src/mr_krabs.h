@@ -8,6 +8,7 @@
 #include "ai.h"
 #include "pins.h"
 #include <SCServo.h>
+#include "proto_gen/robot_messages.pb.h"
 
 // Forward speed during line following (m/s). Tune empirically.
 static constexpr double FORWARD_SPEED = 0.4;
@@ -31,6 +32,16 @@ static constexpr double TELEOP_ANGULAR_SPEED = 2.0;  // rad/s
 // least this often; the sending script must repeat a key while held (raw
 // serial has no key-up event).
 static constexpr uint64_t TELEOP_KEY_TIMEOUT_US = 300000; // 300 ms
+
+// Length-prefixed nanopb framing for RPi -> ESP32 Command messages (see
+// MrKrabs::handleProtoByte). Wire format: 4-byte little-endian payload
+// length, then that many bytes of a serialized Command. Shares the Serial
+// stream with teleop keys (see isTeleopChar) — while a frame is mid-flight,
+// every byte is consumed as frame data regardless of its ASCII value.
+static constexpr size_t MAX_PROTO_PAYLOAD_SIZE = 64; // Command_size is 2; ample margin
+// If no further frame byte arrives within this window, the partial frame is
+// abandoned (protects against desyncing forever on stray/teleop bytes).
+static constexpr uint64_t PROTO_FRAME_TIMEOUT_US = 200000; // 200 ms
 
 class MrKrabs
 {
@@ -75,6 +86,22 @@ private:
 	// diagonal/combined velocity on this holonomic drive.
 	RobotVelocity computeTeleopVelocity();
 
+	// True for the raw bytes handleTeleopChar recognizes (plus CR/LF, which
+	// it silently ignores). Used by update() to decide, while idle between
+	// proto frames, whether an incoming byte is a teleop key or the first
+	// byte of a length-prefixed Command frame.
+	static bool isTeleopChar(uint8_t c);
+
+	// Feeds one raw Serial byte through the length-prefix framing state
+	// machine (proto_rx_state_). Once a full frame is assembled, decodes it
+	// as a Command and hands it to handleCommand().
+	void handleProtoByte(uint8_t b);
+
+	// Called once a Command has been fully received and nanopb-decoded.
+	// Currently just logs on teletubby_detected=true; wire up real behavior
+	// (e.g. flashing the Teletubby light) here.
+	void handleCommand(const Command &cmd);
+
 	enum TeleopKey {
 		TELEOP_1, TELEOP_2, TELEOP_3, TELEOP_4, TELEOP_6, TELEOP_7, TELEOP_8, TELEOP_9,
 		TELEOP_O, TELEOP_P, TELEOP_KEY_COUNT
@@ -106,6 +133,16 @@ private:
 	// esp_timer_get_time() timestamp (µs) each key's character was last seen;
 	// indexed by TeleopKey. A key counts as held while within TELEOP_KEY_TIMEOUT_US.
 	uint64_t teleop_key_last_seen_us_[TELEOP_KEY_COUNT];
+
+	// State for handleProtoByte()'s length-prefixed Command framing.
+	enum ProtoRxState { PROTO_RX_IDLE, PROTO_RX_LENGTH, PROTO_RX_PAYLOAD };
+	ProtoRxState proto_rx_state_ = PROTO_RX_IDLE;
+	uint8_t proto_len_buf_[4];
+	size_t proto_len_bytes_read_ = 0;
+	uint32_t proto_payload_len_ = 0;
+	uint8_t proto_payload_buf_[MAX_PROTO_PAYLOAD_SIZE];
+	size_t proto_payload_bytes_read_ = 0;
+	uint64_t proto_last_byte_us_ = 0;
 
 	// Last heading (deg) passed to startRotation(), so stepControl() only
 	// re-issues it when AI's target actually changes.

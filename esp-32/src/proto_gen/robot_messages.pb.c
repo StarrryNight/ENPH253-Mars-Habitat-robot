@@ -6,12 +6,10 @@
 #error Regenerate this file with the current version of nanopb generator.
 #endif
 
-PB_BIND(Detection, Detection, AUTO)
+PB_BIND(Command, Command, AUTO)
 
 
-PB_BIND(Status, Status, AUTO)
-
-
+PB_BIND(SensorState, SensorState, AUTO)
 
 
 

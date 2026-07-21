@@ -4,6 +4,7 @@
 #include "constants.h"
 #include "esp_timer.h"
 #include "motor_controller.h"
+#include <pb_decode.h>
 
 MrKrabs::MrKrabs() :
 	drive_mode_(AI::DriveMode::LINE_FOLLOWING),
@@ -62,7 +63,92 @@ void MrKrabs::reset()
 void MrKrabs::update()
 {
 	while (Serial.available()) {
-		handleTeleopChar(static_cast<char>(Serial.read()));
+		uint8_t b = static_cast<uint8_t>(Serial.read());
+		uint64_t now = esp_timer_get_time();
+
+		if (proto_rx_state_ != PROTO_RX_IDLE && (now - proto_last_byte_us_) > PROTO_FRAME_TIMEOUT_US) {
+			Serial.println("[MrKrabs] proto frame timed out mid-flight, discarding");
+			proto_rx_state_ = PROTO_RX_IDLE;
+		}
+		proto_last_byte_us_ = now;
+
+		if (proto_rx_state_ == PROTO_RX_IDLE && isTeleopChar(b)) {
+			handleTeleopChar(static_cast<char>(b));
+			continue;
+		}
+
+		handleProtoByte(b);
+	}
+}
+
+bool MrKrabs::isTeleopChar(uint8_t c)
+{
+	switch (c) {
+		case '1': case '2': case '3': case '4': case '5':
+		case '6': case '7': case '8': case '9':
+		case 'o': case 'p': case ' ': case '\r': case '\n':
+			return true;
+		default:
+			return false;
+	}
+}
+
+void MrKrabs::handleProtoByte(uint8_t b)
+{
+	switch (proto_rx_state_) {
+		case PROTO_RX_IDLE:
+			proto_len_buf_[0] = b;
+			proto_len_bytes_read_ = 1;
+			proto_rx_state_ = PROTO_RX_LENGTH;
+			break;
+
+		case PROTO_RX_LENGTH:
+			proto_len_buf_[proto_len_bytes_read_++] = b;
+			if (proto_len_bytes_read_ < 4) {
+				break;
+			}
+			proto_payload_len_ = static_cast<uint32_t>(proto_len_buf_[0]) |
+				(static_cast<uint32_t>(proto_len_buf_[1]) << 8) |
+				(static_cast<uint32_t>(proto_len_buf_[2]) << 16) |
+				(static_cast<uint32_t>(proto_len_buf_[3]) << 24);
+			if (proto_payload_len_ > sizeof(proto_payload_buf_)) {
+				Serial.printf("[MrKrabs] proto frame too large (%u bytes), dropping\n", proto_payload_len_);
+				proto_rx_state_ = PROTO_RX_IDLE;
+				break;
+			}
+			proto_payload_bytes_read_ = 0;
+			if (proto_payload_len_ == 0) {
+				Command cmd = Command_init_zero;
+				handleCommand(cmd);
+				proto_rx_state_ = PROTO_RX_IDLE;
+			} else {
+				proto_rx_state_ = PROTO_RX_PAYLOAD;
+			}
+			break;
+
+		case PROTO_RX_PAYLOAD:
+			proto_payload_buf_[proto_payload_bytes_read_++] = b;
+			if (proto_payload_bytes_read_ < proto_payload_len_) {
+				break;
+			}
+			{
+				Command cmd = Command_init_zero;
+				pb_istream_t stream = pb_istream_from_buffer(proto_payload_buf_, proto_payload_len_);
+				if (pb_decode(&stream, Command_fields, &cmd)) {
+					handleCommand(cmd);
+				} else {
+					Serial.printf("[MrKrabs] failed to decode Command: %s\n", PB_GET_ERROR(&stream));
+				}
+			}
+			proto_rx_state_ = PROTO_RX_IDLE;
+			break;
+	}
+}
+
+void MrKrabs::handleCommand(const Command &cmd)
+{
+	if (cmd.teletubby_detected) {
+		Serial.println("[MrKrabs] Teletubby detected!");
 	}
 }
 
@@ -175,7 +261,7 @@ void MrKrabs::driveCurrentMode()
 		case AI::DriveMode::APPLYING_SEQUENCE: {
 			double curr_position = motor_controller_->getElapsedRotation();
 			if (orientation_controller_.reachedTarget(curr_position)){
-				Serial.print("reached target");
+				//Serial.print("reached target");
 				motor_controller_->setVelocity({0,0,0});
 				orientation_controller_.reset();
 				if (ai_->onRotationReached()){

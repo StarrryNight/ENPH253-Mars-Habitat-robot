@@ -9,75 +9,55 @@
 #error Regenerate this file with the current version of nanopb generator.
 #endif
 
-/* Enum definitions */
-typedef enum _Status_TopState {
-    Status_TopState_LINE_FOLLOWING = 0,
-    Status_TopState_METAL_DETECTING = 1,
-    Status_TopState_TELETUBBYING = 2,
-    Status_TopState_HABITATING = 3
-} Status_TopState;
-
 /* Struct definitions */
-/* RPi -> ESP32: fired whenever CV confirms a new teletubby sighting. */
-typedef struct _Detection {
-    float bearing_deg; /* degrees from frame center; + = right of center */
-    bool is_new; /* true only for a not-yet-seen hue (dedup done on RPi) */
-} Detection;
+typedef struct _Command {
+    bool teletubby_detected;
+} Command;
 
-/* ESP32 -> RPi: current top-level state, sent every control loop.
- RPi uses this to gate CV work (e.g. skip inference while not line_following). */
-typedef struct _Status {
-    Status_TopState state;
-} Status;
+typedef struct _SensorState {
+    bool state_completed;
+    bool metal_detected;
+} SensorState;
 
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Helper constants for enums */
-#define _Status_TopState_MIN Status_TopState_LINE_FOLLOWING
-#define _Status_TopState_MAX Status_TopState_HABITATING
-#define _Status_TopState_ARRAYSIZE ((Status_TopState)(Status_TopState_HABITATING+1))
-
-
-#define Status_state_ENUMTYPE Status_TopState
-
-
 /* Initializer values for message structs */
-#define Detection_init_default                   {0, 0}
-#define Status_init_default                      {_Status_TopState_MIN}
-#define Detection_init_zero                      {0, 0}
-#define Status_init_zero                         {_Status_TopState_MIN}
+#define Command_init_default                     {0}
+#define SensorState_init_default                 {0, 0}
+#define Command_init_zero                        {0}
+#define SensorState_init_zero                    {0, 0}
 
 /* Field tags (for use in manual encoding/decoding) */
-#define Detection_bearing_deg_tag                1
-#define Detection_is_new_tag                     2
-#define Status_state_tag                         1
+#define Command_teletubby_detected_tag           1
+#define SensorState_state_completed_tag          1
+#define SensorState_metal_detected_tag           2
 
 /* Struct field encoding specification for nanopb */
-#define Detection_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, FLOAT,    bearing_deg,       1) \
-X(a, STATIC,   SINGULAR, BOOL,     is_new,            2)
-#define Detection_CALLBACK NULL
-#define Detection_DEFAULT NULL
+#define Command_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, BOOL,     teletubby_detected,   1)
+#define Command_CALLBACK NULL
+#define Command_DEFAULT NULL
 
-#define Status_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, UENUM,    state,             1)
-#define Status_CALLBACK NULL
-#define Status_DEFAULT NULL
+#define SensorState_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, BOOL,     state_completed,   1) \
+X(a, STATIC,   SINGULAR, BOOL,     metal_detected,    2)
+#define SensorState_CALLBACK NULL
+#define SensorState_DEFAULT NULL
 
-extern const pb_msgdesc_t Detection_msg;
-extern const pb_msgdesc_t Status_msg;
+extern const pb_msgdesc_t Command_msg;
+extern const pb_msgdesc_t SensorState_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
-#define Detection_fields &Detection_msg
-#define Status_fields &Status_msg
+#define Command_fields &Command_msg
+#define SensorState_fields &SensorState_msg
 
 /* Maximum encoded size of messages (where known) */
-#define Detection_size                           7
-#define ROBOT_MESSAGES_PB_H_MAX_SIZE             Detection_size
-#define Status_size                              2
+#define Command_size                             2
+#define ROBOT_MESSAGES_PB_H_MAX_SIZE             SensorState_size
+#define SensorState_size                         4
 
 #ifdef __cplusplus
 } /* extern "C" */

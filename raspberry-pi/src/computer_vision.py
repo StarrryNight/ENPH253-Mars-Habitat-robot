@@ -15,6 +15,7 @@ class Detection:
     # positive = target is right of frame center, negative = left.
     # Caller uses this to generate an omega correction for the drive command.
     bearing_deg: float
+    label: str
     is_new_teletubby: bool = False
 
 
@@ -92,6 +93,7 @@ class ComputerVision:
         best_idx = max(teletubby_idxs, key=lambda i: float(boxes.conf[i]))
         x1, y1, x2, y2 = [int(v) for v in boxes.xyxy[best_idx].tolist()]
         conf = float(boxes.conf[best_idx])
+        label = names[int(boxes.cls[best_idx])]
 
         cx = (x1 + x2) // 2
         cy = (y1 + y2) // 2
@@ -107,6 +109,7 @@ class ComputerVision:
             cx=cx,
             cy=cy,
             bearing_deg=bearing_deg,
+            label=label,
             is_new_teletubby=is_new,
         )
 

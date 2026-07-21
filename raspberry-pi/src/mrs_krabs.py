@@ -9,23 +9,22 @@ uart = serial.Serial(UART_PORT, UART_BAUD)
 cv = ComputerVision()
 
 
-def send_command(teletubby_bearing_deg: float):
+def send_command(teletubby_detected: bool):
     msg = proto.Command()
-    msg.state = "teletubbying"
-    msg.teletubby_bearing_deg = teletubby_bearing_deg
+    msg.teletubby_detected = teletubby_detected
     data = msg.SerializeToString()
     uart.write(len(data).to_bytes(4, "little") + data)
-    print(f"[mrs_krabs] sent teletubby command, bearing={teletubby_bearing_deg:.1f} deg")
+    print(f"[mrs_krabs] sent teletubby_detected={teletubby_detected}")
 
 
 # Main loop
 print("[mrs_krabs] running")
 _last_heartbeat = time.monotonic()
 while True:
-    if not cv.teletubby_maxed_out():
-        detection = cv.capture()
-        if detection is not None and detection.is_new_teletubby:
-            send_command(detection.bearing_deg)
+    detection = cv.capture()
+    if detection is not None:
+        print(f"[mrs_krabs] found {detection.label} (conf={detection.confidence:.2f})")
+        send_command(True)
 
     now = time.monotonic()
     if now - _last_heartbeat >= 2.0:

@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14robot_messages.proto\"7\n\x07\x43ommand\x12\r\n\x05state\x18\x01 \x01(\t\x12\x1d\n\x15teletubby_bearing_deg\x18\x02 \x01(\x02\">\n\x0bSensorState\x12\x17\n\x0fstate_completed\x18\x01 \x01(\x08\x12\x16\n\x0emetal_detected\x18\x02 \x01(\x08\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14robot_messages.proto\"%\n\x07\x43ommand\x12\x1a\n\x12teletubby_detected\x18\x01 \x01(\x08\">\n\x0bSensorState\x12\x17\n\x0fstate_completed\x18\x01 \x01(\x08\x12\x16\n\x0emetal_detected\x18\x02 \x01(\x08\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'robot_messages_pb2', globals())
@@ -21,7 +21,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
   _COMMAND._serialized_start=24
-  _COMMAND._serialized_end=79
-  _SENSORSTATE._serialized_start=81
-  _SENSORSTATE._serialized_end=143
+  _COMMAND._serialized_end=61
+  _SENSORSTATE._serialized_start=63
+  _SENSORSTATE._serialized_end=125
 # @@protoc_insertion_point(module_scope)
