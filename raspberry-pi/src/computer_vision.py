@@ -77,12 +77,15 @@ class ComputerVision:
         self.frame_height = frame_height
 
         self.cap = cv2.VideoCapture(camera_index)
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # always read the latest frame, not a queued stale one
         if not self.cap.isOpened():
             raise RuntimeError(f"Could not open camera {camera_index}")
 
         self.net = ncnn.Net()
+        self.net.opt.num_threads = os.cpu_count()
         self.net.load_param(os.path.join(MODEL_PATH, "model.ncnn.param"))
         self.net.load_model(os.path.join(MODEL_PATH, "model.ncnn.bin"))
 
