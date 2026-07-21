@@ -1,0 +1,5 @@
+opencv-python-headless>=4.13
+numpy>=2.4
+ultralytics>=8.4
+pyserial>=3.5
+protobuf>=7.35
