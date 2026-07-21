@@ -4,12 +4,11 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-from config import MODEL_PATH, CV_CONF, CV_IOU, CV_IMGSZ, HFOV_DEG
+from config import MODEL_PATH, CV_CONF, CV_IOU, CV_IMGSZ, HFOV_DEG, TELETUBBY_LABELS, CAMERA_INDEX
 
 
 @dataclass
 class Detection:
-    label: str
     confidence: float
     cx: int          # pixel x of bounding box center
     cy: int          # pixel y of bounding box center
@@ -55,7 +54,7 @@ class TeletubbySensor:
 
 class ComputerVision:
     def __init__(
-        self, camera_index: int = 0, frame_width: int = 640, frame_height: int = 480
+        self, camera_index: int = CAMERA_INDEX, frame_width: int = 640, frame_height: int = 480
     ):
         self.frame_width = frame_width
         self.frame_height = frame_height
@@ -70,8 +69,9 @@ class ComputerVision:
         self.teletubby_sensor = TeletubbySensor()
 
     def capture(self) -> Detection | None:
-        """Grab a frame, run local NCNN inference, return highest-confidence detection or None.
-        Sets is_new_teletubby=True only when the detection is a colour not seen before."""
+        """Grab a frame, run local NCNN inference, return the highest-confidence
+        teletubby detection or None. Sets is_new_teletubby=True only when the
+        detection is a colour not seen before."""
         ok, frame = self.cap.read()
         if not ok:
             return None
@@ -82,10 +82,16 @@ class ComputerVision:
         if boxes is None or len(boxes) == 0:
             return None
 
-        best_idx = int(boxes.conf.argmax())
+        names = results[0].names
+        teletubby_idxs = [
+            i for i in range(len(boxes)) if names[int(boxes.cls[i])] in TELETUBBY_LABELS
+        ]
+        if not teletubby_idxs:
+            return None
+
+        best_idx = max(teletubby_idxs, key=lambda i: float(boxes.conf[i]))
         x1, y1, x2, y2 = [int(v) for v in boxes.xyxy[best_idx].tolist()]
-        conf  = float(boxes.conf[best_idx])
-        label = results[0].names[int(boxes.cls[best_idx])]
+        conf = float(boxes.conf[best_idx])
 
         cx = (x1 + x2) // 2
         cy = (y1 + y2) // 2
@@ -97,7 +103,6 @@ class ComputerVision:
         is_new = self.teletubby_sensor.record(frame, bbox)
 
         return Detection(
-            label=label,
             confidence=conf,
             cx=cx,
             cy=cy,
@@ -107,10 +112,6 @@ class ComputerVision:
 
     def teletubby_maxed_out(self) -> bool:
         return self.teletubby_sensor.maxed_out()
-
-    # TODO: Transform coordinates
-    def transformCoordinates(detection):
-        return detection
 
     def close(self):
         self.cap.release()
