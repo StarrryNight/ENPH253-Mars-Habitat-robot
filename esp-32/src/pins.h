@@ -6,40 +6,42 @@
 // not a wire.
 
 // Motor PWM pins
-static constexpr int WHEEL_LEFT_PWM_PIN_0 = 45;
-static constexpr int WHEEL_LEFT_PWM_PIN_1 = 46;
-// "LEFT" on altium
+static constexpr int WHEEL_LEFT_PWM_PIN_0 = 47;
+static constexpr int WHEEL_LEFT_PWM_PIN_1 = 48; // "LEFT" on altium
 
-static constexpr int WHEEL_RIGHT_PWM_PIN_0 = 41;
-static constexpr int WHEEL_RIGHT_PWM_PIN_1 = 42;
+static constexpr int WHEEL_RIGHT_PWM_PIN_0 = 38;
+static constexpr int WHEEL_RIGHT_PWM_PIN_1 = 39;
 // "RIGHT" on altium
 
-static constexpr int WHEEL_BACK_PWM_PIN_0 = 15;
-static constexpr int WHEEL_BACK_PWM_PIN_1 = 16;
+static constexpr int WHEEL_BACK_PWM_PIN_0 = 21;
+static constexpr int WHEEL_BACK_PWM_PIN_1 = 40;
 // "BACK" on altium
 
 // Encoder pins; second is set to zero since we're doing 1 encoder pin per wheel
-static constexpr int WHEEL_LEFT_ENCODER_0 = 1;
+static constexpr int WHEEL_LEFT_ENCODER_0 = 9;
 // "LEFT"
 
-static constexpr int WHEEL_RIGHT_ENCODER_0 = 3;
+static constexpr int WHEEL_RIGHT_ENCODER_0 = 8;
 // "RIGHT"
 
-static constexpr int WHEEL_BACK_ENCODER_0 = 2;
+static constexpr int WHEEL_BACK_ENCODER_0 = 7;
 // "BACK"
 
 // Photoresistors
-static constexpr int LEFT_PHOTORESISTOR = 7;
-static constexpr int MID_LEFT_PHOTORESISTOR = 8;
-static constexpr int MID_RIGHT_PHOTORESISTOR = 9;
-static constexpr int RIGHT_PHOTORESISTOR = 10;
+static constexpr int LEFT_PHOTORESISTOR = 15;
+static constexpr int MID_LEFT_PHOTORESISTOR = 16;
+static constexpr int MID_RIGHT_PHOTORESISTOR = 17;
+static constexpr int RIGHT_PHOTORESISTOR = 18;
 
 //Arm servo
-static constexpr int WRIST_YAW_SERVO_PIN = 13;
-static constexpr int CLAW_OPEN_SERVO_PIN = 14;
+static constexpr int WRIST_YAW_SERVO_PIN = 5;
+static constexpr int CLAW_OPEN_SERVO_PIN = 4;
 // Arm servo bus pin (single-wire half-duplex UART to the SCServo bus).
 static constexpr int BASE_ELBOW_PITCH_SERIAL_PIN = 6;
 
 
 //Metal detecting
-static constexpr int METAL_DETECTOR_PIN = 7;
+static constexpr int METAL_DETECTOR_PIN = 10;
+
+// Go
+static constexpr int GO_PIN = 11;

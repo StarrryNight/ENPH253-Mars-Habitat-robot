@@ -15,8 +15,16 @@ double LineFollower::calculateCorrection()
 {
     std::array<double, 4> current_state = readPhotoresistors();
     double correction = 0;
+    // Both mids on the line: dead center, no drift to correct. Reset the PID
+    // so stale integral/derivative from the last correction doesn't leak
+    // into the next one.
+    if (current_state[1] == 1 && current_state[2] == 1)
+    {
+        line_followng_pid_.reset();
+        prev_state_ = current_state;
+    }
     // steer left if mid-left is on the line and mid-right isn't (robot drifted right)
-    if (current_state[1] == 1 && current_state[2] == 0)
+    else if (current_state[1] == 1 && current_state[2] == 0)
     {
         correction = line_followng_pid_.step(-SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
     prev_state_ = current_state;
@@ -39,6 +47,7 @@ double LineFollower::calculateCorrection()
             correction = line_followng_pid_.step(BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
         }
     }
+	//Serial.printf("%f.2\n", correction);
     return correction;
 }
 

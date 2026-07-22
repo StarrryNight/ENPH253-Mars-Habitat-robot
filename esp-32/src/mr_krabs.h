@@ -9,14 +9,22 @@
 #include "pins.h"
 #include <SCServo.h>
 #include "proto_gen/robot_messages.pb.h"
+#include "constants.h"
 
-// Forward speed during line following (m/s). Tune empirically.
-static constexpr double FORWARD_SPEED = 0.4;
-
-// Fixed rotation speed (rad/s), one direction, while searching for the line
-// in AI::DriveMode::SEARCHING_FOR_LINE. Deliberately gentler than
-// TELEOP_ANGULAR_SPEED for a controlled sweep. Tune empirically.
+// Fixed rotation speed magnitude (rad/s) while searching for the line in
+// AI::DriveMode::SEARCHING_FOR_LINE. The direction applied is the reverse of
+// the last commanded rotation (see last_rotation_sign_) — the assumption
+// being the line was overshot while rotating that way, so sweeping back is
+// more likely to reacquire it than continuing the same direction.
+// Deliberately gentler than TELEOP_ANGULAR_SPEED for a controlled sweep.
+// Tune empirically.
 static constexpr double LINE_SEARCH_OMEGA_RAD_S = 0.5;
+
+// Hardware validation: fixed angular speed (rad/s) driven open-loop (no wheel
+// PID, no dead-reckoning target) from the moment setup() finishes. Re-issued
+// every stepControl() tick since driveOpenLoop()'s raw PWM write is otherwise
+// clobbered by the next motor_control_loop_timer_ tick (see stepControl).
+static constexpr double OPEN_LOOP_TEST_OMEGA_RAD_S = 2.0;
 
 // Non-blocking settle delay (µs) held between the three drive actions
 // (line-following, rotating, applying an arm pose) so each has time to
@@ -65,8 +73,9 @@ public:
 	// Enters idle mode. Motors held at zero velocity.
 	void startIdle();
 
-	// Enters line-search mode. Rotates at a fixed LINE_SEARCH_OMEGA_RAD_S
-	// until AI's state transitions away (see RobotState::REACQUIRING_LINE).
+	// Enters line-search mode. Rotates at LINE_SEARCH_OMEGA_RAD_S, in the
+	// direction opposite last_rotation_sign_, until AI's state transitions
+	// away (see RobotState::REACQUIRING_LINE).
 	void startSearchingForLine();
 
 private:
@@ -148,10 +157,30 @@ private:
 	// re-issues it when AI's target actually changes.
 	double last_commanded_rotation_degrees_;
 
+	// Sign (+1/-1) of the last nonzero angle passed to startRotation().
+	// Zero-degree targets (an unrotated pose in a sequence) leave this
+	// unchanged, so it always reflects the most recent actual turn.
+	// startSearchingForLine() reverses this to pick a search direction.
+	double last_rotation_sign_;
+
+	// Angular velocity (rad/s, signed) driven during SEARCHING_FOR_LINE,
+	// latched by startSearchingForLine() from last_rotation_sign_.
+	double search_omega_rad_s_;
+
 	// Non-blocking settle-delay deadline (esp_timer_get_time() timestamp).
 	// While esp_timer_get_time() < this, stepControl() holds still instead of
 	// starting the next action. 0 means no active wait. See stepControl().
 	uint64_t action_settle_until_us_;
+
+	// esp_timer_get_time() timestamp of the last periodic debug state print
+	// (see stepControl). Rate-limited so it doesn't flood Serial at the
+	// control loop's 100 Hz.
+	uint64_t last_state_print_us_;
+
+	// Set once per stepControl() call (rate-limited off last_state_print_us_)
+	// and read by driveCurrentMode() so its per-mode debug print fires on the
+	// same tick as the general one, without re-checking the clock.
+	bool debug_print_now_;
 
 	// Held in optionals so the global MrKrabs object is safe to construct before
 	// Arduino init. setup() emplaces them once hardware is ready.

@@ -9,20 +9,20 @@
 // multiplied by VELOCITY_TO_PWM to get PWM counts. Each wheel gets its own
 // gains — the three motors don't respond identically, so tune independently
 // on hardware.
-#include "mr_krabs.h"
+#include "constants.h"
 static constexpr double WHEEL_LEFT_PID_P = 20;
-static constexpr double WHEEL_LEFT_PID_I = 0.2;
+static constexpr double WHEEL_LEFT_PID_I = 0;
 static constexpr double WHEEL_LEFT_PID_D = 0.10;
 static constexpr double WHEEL_LEFT_PID_MAX_I = 2;
 
 static constexpr double WHEEL_RIGHT_PID_P = 20;
-static constexpr double WHEEL_RIGHT_PID_I = 0.2;
+static constexpr double WHEEL_RIGHT_PID_I = 0;
 static constexpr double WHEEL_RIGHT_PID_D = 0.1;
 static constexpr double WHEEL_RIGHT_PID_MAX_I = 2;
 
 // the back wheel oscillates/overshoots.
 static constexpr double WHEEL_BACK_PID_P = 20;
-static constexpr double WHEEL_BACK_PID_I = 0.2;
+static constexpr double WHEEL_BACK_PID_I = 0;
 static constexpr double WHEEL_BACK_PID_D = 0.10;
 static constexpr double WHEEL_BACK_PID_MAX_I = 2;
 
@@ -38,14 +38,14 @@ static constexpr int VELOCITY_TO_PWM = 300;
 // (30% over VELOCITY_TO_PWM) — tune against real back-wheel speed on hardware.
 static constexpr int WHEEL_BACK_VELOCITY_TO_PWM = 300;
 // Orientation (rotate-to-angle) PID (OrientationController). Error in radians.
-static constexpr double ORIENTATION_PID_P = 2;
+static constexpr double ORIENTATION_PID_P = FORWARD_SPEED;
 static constexpr double ORIENTATION_PID_I = 0;
 static constexpr double ORIENTATION_PID_D = 0.5;
 static constexpr double ORIENTATION_PID_MAX_I = 1;
 
 // Line-following lateral correction PID (LineFollower). Error from the
 // photoresistor array (SMALL_ERROR_VALUE / BIG_ERROR_VALUE units).
-static constexpr double LINE_PID_P = FORWARD_SPEED;
-static constexpr double LINE_PID_I = 0;
+static constexpr double LINE_PID_P = 1;
+static constexpr double LINE_PID_I = 0.3;
 static constexpr double LINE_PID_D = 0;
-static constexpr double LINE_PID_MAX_I = 2;
+static constexpr double LINE_PID_MAX_I = 1;

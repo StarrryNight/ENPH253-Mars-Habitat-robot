@@ -1,4 +1,7 @@
 #pragma once
+#include <fcntl.h>
+#include "constants.h"
+#include "pid_config.h"
 #include "pid_controller.h"
 #include "motor_controller.h"
 #include "pins.h"
@@ -6,8 +9,9 @@
 
 // Raw 12-bit ADC threshold (0–4095). Calibrate on your surface.
 static constexpr double LIGHT_THRESHOLD_ADC = 2000;
-static constexpr double SMALL_ERROR_VALUE = 0.4;
-static constexpr double BIG_ERROR_VALUE =1.5;
+static constexpr double TURNING_RADIUS = 0.13;
+static constexpr double SMALL_ERROR_VALUE = 1.0;
+static constexpr double BIG_ERROR_VALUE =FORWARD_SPEED/(TURNING_RADIUS);
 
 // IR photoresistor line follower with PID-based lateral correction.
 // Uses a 4-sensor array: [left, mid-left, mid-right, right].

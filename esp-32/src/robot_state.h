@@ -3,9 +3,9 @@
 
 enum class RobotState {
 	// Hardware validation state: rotate 90 degrees then -90 degrees, arm
-	// neutral throughout. Temporary — set as AI's initial state while the
-	// drivetrain/rotation pipeline is being bring-up tested; not part of the
-	// real CLAUDE.md state machine.
+	// neutral throughout. Temporary bring-up aid for the drivetrain/rotation
+	// pipeline; not part of the real CLAUDE.md state machine and not
+	// currently entered by AI on startup (see AI::AI()).
 	TEST_ROTATION,
 	FINDING_ROCK,
 	METAL_DETECTING,
@@ -24,3 +24,20 @@ enum class RobotState {
 };
 
 static constexpr size_t kNumRobotStates = 10;
+
+// Debug/serial-print helper — not used by any control-flow logic.
+inline const char* robotStateName(RobotState s) {
+	switch (s) {
+		case RobotState::TEST_ROTATION: return "TEST_ROTATION";
+		case RobotState::FINDING_ROCK: return "FINDING_ROCK";
+		case RobotState::METAL_DETECTING: return "METAL_DETECTING";
+		case RobotState::PICKUP_ROCK: return "PICKUP_ROCK";
+		case RobotState::LINE_FOLLOWING: return "LINE_FOLLOWING";
+		case RobotState::HABITAT_PICKUP: return "HABITAT_PICKUP";
+		case RobotState::LINE_FOLLOWING_REVERSE: return "LINE_FOLLOWING_REVERSE";
+		case RobotState::HABITAT_PLACE: return "HABITAT_PLACE";
+		case RobotState::REACQUIRING_LINE: return "REACQUIRING_LINE";
+		case RobotState::DONE: return "DONE";
+	}
+	return "?";
+}

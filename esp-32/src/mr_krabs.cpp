@@ -9,7 +9,11 @@
 MrKrabs::MrKrabs() :
 	drive_mode_(AI::DriveMode::LINE_FOLLOWING),
 	last_commanded_rotation_degrees_(0),
+	last_rotation_sign_(1.0),
+	search_omega_rad_s_(-LINE_SEARCH_OMEGA_RAD_S),
 	action_settle_until_us_(0),
+	last_state_print_us_(0),
+	debug_print_now_(false),
 	is_teleop_(false),
 	teleop_key_last_seen_us_{0},
 	control_loop_timer_(nullptr)
@@ -205,26 +209,48 @@ RobotVelocity MrKrabs::computeTeleopVelocity()
 	return v;
 }
 
+// How often the periodic debug state print (see stepControl/driveCurrentMode)
+// fires. Deliberately much slower than the 100 Hz control loop.
+static constexpr uint64_t STATE_PRINT_PERIOD_US = 500000; // 500 ms
+
 void MrKrabs::stepControl()
 {
-	if (esp_timer_get_time() < action_settle_until_us_){
-		motor_controller_->setVelocity({0, 0, 0});
-		return;
-	}
+	//uint64_t now = esp_timer_get_time();
+	//debug_print_now_ = (now - last_state_print_us_) >= STATE_PRINT_PERIOD_US;
+	//if (debug_print_now_){
+	//	last_state_print_us_ = now;
+	//}
 
-	ai_->tickAI();
+	//if (now < action_settle_until_us_){
+	//	motor_controller_->setVelocity({0, 0, 0});
+	//	if (debug_print_now_){
+	//		Serial.printf("[MrKrabs] settling, %.0f ms left\n", (action_settle_until_us_ - now) / 1000.0);
+	//	}
+	//	return;
+	//}
+	motor_controller_->driveOpenLoop({0,0,2.0});
 
-	if (handleDriveTransition()){
-		return;
-	}
+	//ai_->tickAI();
 
-	driveCurrentMode();
+	//if (debug_print_now_){
+	//	Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
+	//		robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
+	//}
+
+	//if (handleDriveTransition()){
+	//	return;
+	//}
+
+	//driveCurrentMode();
 }
 
 bool MrKrabs::handleDriveTransition()
 {
 	AI::DriveMode desired = ai_->desiredDriveMode();
 	if (desired != drive_mode_){
+		Serial.printf("[MrKrabs] drive_mode %d -> %d (state=%s, target_deg=%.1f)\n",
+			static_cast<int>(drive_mode_), static_cast<int>(desired),
+			robotStateName(ai_->currentState()), ai_->targetRotationDegrees());
 		switch (desired){
 			case AI::DriveMode::LINE_FOLLOWING: startLineFollowing(); break;
 			case AI::DriveMode::APPLYING_SEQUENCE: startRotation(ai_->targetRotationDegrees() * DEG_TO_RAD); break;
@@ -252,7 +278,16 @@ void MrKrabs::driveCurrentMode()
 		case AI::DriveMode::LINE_FOLLOWING: {
 			double correction = line_follower_->calculateCorrection();
 			double speed = FORWARD_SPEED * ai_->lineFollowingDirection();
-			motor_controller_->driveOpenLoop({correction, speed, 0});
+			// setVelocity(), not driveOpenLoop(): motor_control_loop_timer_
+			// calls MotorController::applyVelocity() independently every 10ms
+			// regardless of drive mode, and it drives off current_target_velocity_
+			// (set only by setVelocity()). driveOpenLoop() writes PWM directly
+			// without touching that target, so its command was immediately
+			// clobbered back to whatever setVelocity() last set (0,0,0 by
+			// default) on the very next applyVelocity() tick — the wheels never
+			// got a chance to actually turn.
+			Serial.printf("correction: %f.2\n", correction);
+			motor_controller_->setVelocity({0, speed, -correction});
 			// Stub odometry: integrates commanded speed rather than measured
 			// encoder distance. Replace with real odometry once available.
 			ai_->addProgress(std::abs(speed) * CONTROL_LOOP_PERIOD);
@@ -278,7 +313,9 @@ void MrKrabs::driveCurrentMode()
 			// AI::tickReacquiringLine() (called via ai_->tickAI() earlier this
 			// tick) already checked the line sensors and will transition the
 			// state once found — this just keeps spinning until that happens.
-			motor_controller_->setVelocity({0, 0, LINE_SEARCH_OMEGA_RAD_S});
+			// Direction (search_omega_rad_s_) was latched by
+			// startSearchingForLine() as the reverse of the last rotation.
+			motor_controller_->setVelocity({0, 0, search_omega_rad_s_});
 			break;
 		case AI::DriveMode::IDLE:
 			motor_controller_->setVelocity({0,0,0});
@@ -287,9 +324,9 @@ void MrKrabs::driveCurrentMode()
 }
 
 void MrKrabs::motorStepControl(){
-	motor_controller_->tickMotorSpeeds();
-	motor_controller_->updateRotationTracking();
-	motor_controller_->applyVelocity();
+	//motor_controller_->tickMotorSpeeds();
+	//motor_controller_->updateRotationTracking();
+	//motor_controller_->applyVelocity();
 
 }
 
@@ -301,11 +338,18 @@ void MrKrabs::startLineFollowing()
 
 void MrKrabs::startRotation(double target_angle)
 {
+	Serial.printf("[MrKrabs] startRotation(%.3f rad = %.1f deg)\n", target_angle, target_angle * RAD_TO_DEG);
 	motor_controller_->driveOpenLoop({0,0,0});
 	drive_mode_ = AI::DriveMode::APPLYING_SEQUENCE;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 	motor_controller_->startRotation();
 	orientation_controller_.startRotation(target_angle);
+	// A zero-degree pose ("stay facing this way") isn't an actual turn —
+	// leave last_rotation_sign_ reflecting whichever way we last really
+	// rotated, for startSearchingForLine() to reverse.
+	if (target_angle != 0.0){
+		last_rotation_sign_ = (target_angle > 0.0) ? 1.0 : -1.0;
+	}
 }
 
 void MrKrabs::startIdle()
@@ -324,6 +368,10 @@ void MrKrabs::startSearchingForLine()
 	// until AI transitions the state), but still worth clearing the wheel
 	// PIDs' stale integral from whatever drive mode preceded this.
 	motor_controller_->startRotation();
+	// Sweep back the way we came: opposite sign of the last real rotation.
+	search_omega_rad_s_ = -last_rotation_sign_ * LINE_SEARCH_OMEGA_RAD_S;
+	Serial.printf("[MrKrabs] startSearchingForLine, last_rotation_sign=%.0f omega=%.2f\n",
+		last_rotation_sign_, search_omega_rad_s_);
 }
 
 MrKrabs mr_krabs_;

@@ -1,4 +1,5 @@
 #include "ai.h"
+#include <Arduino.h>
 #include <array>
 
 // Dummy tuning constants — placeholders pending real localization/testing,
@@ -30,7 +31,13 @@ AI::AI():
 	current_state_progress_m_(0),
 	post_reacquire_state_(RobotState::LINE_FOLLOWING)
 {
-	transitionTo(RobotState::TEST_ROTATION);
+	Serial.printf("[AI] constructed, initial state: %s\n", robotStateName(current_state_));
+	// visits(LINE_FOLLOWING) must return 1 the first time through —
+	// tickLineFollowing() and friends index checkpoint tables with
+	// (visits(state) - 1). Set the counter directly rather than routing
+	// through transitionTo(), which would also print a self-transition and
+	// (re-)start a sequence lookup that's irrelevant for LINE_FOLLOWING.
+	state_visit_count_[idx(current_state_)] = 1;
 }
 
 void AI::setArm(Arm* arm){
@@ -46,6 +53,7 @@ void AI::addProgress(double delta_m){
 }
 
 void AI::transitionTo(RobotState next){
+	Serial.printf("[AI] %s -> %s\n", robotStateName(current_state_), robotStateName(next));
 	current_state_ = next;
 	state_visit_count_[idx(next)]++;
 	current_state_progress_m_ = 0;
@@ -132,9 +140,10 @@ RobotState AI::tickPickupRock(){
 }
 
 RobotState AI::tickLineFollowing(){
-	int n = visits(RobotState::LINE_FOLLOWING); // 1-based
-	double trigger_m = kHabitatApproachDistancesM[n - 1];
-	return current_state_progress_m_ >= trigger_m ? RobotState::HABITAT_PICKUP : RobotState::LINE_FOLLOWING;
+	// Hardware bring-up: stay in LINE_FOLLOWING indefinitely instead of
+	// handing off to HABITAT_PICKUP, so line-following can be tested in
+	// isolation without the rest of the state machine kicking in.
+	return RobotState::LINE_FOLLOWING;
 }
 
 RobotState AI::tickHabitatPickup(){
