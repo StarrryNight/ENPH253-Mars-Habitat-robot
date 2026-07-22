@@ -38,6 +38,15 @@ AI::AI():
 	// through transitionTo(), which would also print a self-transition and
 	// (re-)start a sequence lookup that's irrelevant for LINE_FOLLOWING.
 	state_visit_count_[idx(current_state_)] = 1;
+	// transitionTo() is skipped for the initial state (see above), but it's
+	// also the only place that starts sequence_runner_ — without this, a
+	// sequence-driven initial state (like TEST_ROTATION) would find
+	// sequence_runner_.complete() == true immediately (sequence_ == nullptr)
+	// and skip its whole sequence on the first tick.
+	const RobotSequence* initial_sequence = sequenceForState(current_state_);
+	if (initial_sequence){
+		sequence_runner_.start(*initial_sequence);
+	}
 }
 
 void AI::setArm(Arm* arm){

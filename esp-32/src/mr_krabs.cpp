@@ -37,6 +37,11 @@ void MrKrabs::setup()
 	arm_->begin();
 	ai_->setArm(&*arm_);
 	ai_->setLineFollower(&*line_follower_);
+
+	// arm_.emplace() (above) already ran Arm's constructor, which begins
+	// Serial2 for the SCServo bus — safe to bind test_servo_ to it now.
+	test_servo_.pSerial = &Serial2;
+
 	esp_timer_create_args_t timer_args = {
 		.callback = [](void *arg) { static_cast<MrKrabs *>(arg)->stepControl(); },
 		.arg = this,
@@ -215,33 +220,40 @@ static constexpr uint64_t STATE_PRINT_PERIOD_US = 500000; // 500 ms
 
 void MrKrabs::stepControl()
 {
-	//uint64_t now = esp_timer_get_time();
-	//debug_print_now_ = (now - last_state_print_us_) >= STATE_PRINT_PERIOD_US;
-	//if (debug_print_now_){
-	//	last_state_print_us_ = now;
-	//}
+	uint64_t now = esp_timer_get_time();
+	debug_print_now_ = (now - last_state_print_us_) >= STATE_PRINT_PERIOD_US;
+	if (debug_print_now_){
+		last_state_print_us_ = now;
+	}
 
-	//if (now < action_settle_until_us_){
-	//	motor_controller_->setVelocity({0, 0, 0});
-	//	if (debug_print_now_){
-	//		Serial.printf("[MrKrabs] settling, %.0f ms left\n", (action_settle_until_us_ - now) / 1000.0);
-	//	}
-	//	return;
-	//}
-	motor_controller_->driveOpenLoop({0,0,2.0});
+	if (now < action_settle_until_us_){
+		motor_controller_->setVelocity({0, 0, 0});
+		if (debug_print_now_){
+			Serial.printf("[MrKrabs] settling, %.0f ms left\n", (action_settle_until_us_ - now) / 1000.0);
+		}
+		return;
+	}
+	int16_t pos_1 = test_servo_.ReadPos(/*ID=*/1);
+	int16_t pos_2 = test_servo_.ReadPos(/*ID=*/2);
+	if (debug_print_now_){
+		Serial.print("Servo 1 Position: ");
+		Serial.print(pos_1);
+		Serial.print("  Servo 2 Position: ");
+		Serial.println(pos_2);
+	}
 
-	//ai_->tickAI();
+	ai_->tickAI();
 
-	//if (debug_print_now_){
-	//	Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
-	//		robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
-	//}
+	if (debug_print_now_){
+		Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
+			robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
+	}
 
-	//if (handleDriveTransition()){
-	//	return;
-	//}
+	if (handleDriveTransition()){
+		return;
+	}
 
-	//driveCurrentMode();
+	driveCurrentMode();
 }
 
 bool MrKrabs::handleDriveTransition()
@@ -324,10 +336,9 @@ void MrKrabs::driveCurrentMode()
 }
 
 void MrKrabs::motorStepControl(){
-	//motor_controller_->tickMotorSpeeds();
-	//motor_controller_->updateRotationTracking();
-	//motor_controller_->applyVelocity();
-
+	motor_controller_->tickMotorSpeeds();
+	motor_controller_->updateRotationTracking();
+	motor_controller_->applyVelocity();
 }
 
 void MrKrabs::startLineFollowing()
