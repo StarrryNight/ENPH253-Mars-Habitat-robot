@@ -6,6 +6,21 @@
 #include "motor_controller.h"
 #include <pb_decode.h>
 
+namespace {
+// Arm-only bench test (see arm_test_pose_index_ in mr_krabs.h). base_pitch
+// clamped to [0,70] deg from vertical, elbow_pitch to [23,70] deg down from
+// horizontal — see STSServo's SERVO_1_*/SERVO_2_* calibration in servo.h.
+constexpr ArmPose kArmTestPoses[] = {
+	{0, 50, 0, 10},
+	{30, 50, 0, 10},
+	{70, 50, 0, 10},
+	{70, 90, 0, 10},
+	{45, 30, 0, 10},
+};
+constexpr size_t kArmTestPoseCount = sizeof(kArmTestPoses) / sizeof(kArmTestPoses[0]);
+constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
+}
+
 MrKrabs::MrKrabs() :
 	drive_mode_(AI::DriveMode::LINE_FOLLOWING),
 	last_commanded_rotation_degrees_(0),
@@ -16,7 +31,9 @@ MrKrabs::MrKrabs() :
 	debug_print_now_(false),
 	is_teleop_(false),
 	teleop_key_last_seen_us_{0},
-	control_loop_timer_(nullptr)
+	control_loop_timer_(nullptr),
+	arm_test_pose_index_(0),
+	arm_test_pose_until_us_(0)
 {}
 
 void MrKrabs::setup()
@@ -233,27 +250,54 @@ void MrKrabs::stepControl()
 		}
 		return;
 	}
-	int16_t pos_1 = test_servo_.ReadPos(/*ID=*/1);
-	int16_t pos_2 = test_servo_.ReadPos(/*ID=*/2);
+	// Throttled to STATE_PRINT_PERIOD_US (500ms), not run every 10ms tick:
+	// each ReadPos/Ping is a full blocking Serial2 round-trip, and four of
+	// them every tick was saturating the half-duplex bus and the USB serial
+	// output badly enough to garble the printed text itself.
 	if (debug_print_now_){
+		int16_t pos_1 = test_servo_.ReadPos(/*ID=*/1);
+		int16_t pos_2 = test_servo_.ReadPos(/*ID=*/2);
+		// Ping is a much simpler transaction than ReadPos (no data payload) —
+		// returns the responding ID on success, -1 on no/garbled reply.
+		int ping_1 = test_servo_.Ping(1);
+		int ping_2 = test_servo_.Ping(2);
 		Serial.print("Servo 1 Position: ");
 		Serial.print(pos_1);
-		Serial.print("  Servo 2 Position: ");
-		Serial.println(pos_2);
+		Serial.print(" (ping=");
+		Serial.print(ping_1);
+		Serial.print(")  Servo 2 Position: ");
+		Serial.print(pos_2);
+		Serial.print(" (ping=");
+		Serial.print(ping_2);
+		Serial.println(")");
 	}
 
-	ai_->tickAI();
-
-	if (debug_print_now_){
-		Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
-			robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
+	// Arm-only bench test (AI/rotation dispatch disabled — see
+	// arm_test_pose_index_ in mr_krabs.h for why). Cycles through
+	// kArmTestPoses on a timer, independent of the drivetrain.
+	motor_controller_->setVelocity({0, 0, 0});
+	if (now >= arm_test_pose_until_us_){
+		const ArmPose &pose = kArmTestPoses[arm_test_pose_index_];
+		arm_->setPose(pose);
+		Serial.printf("[ArmTest] pose %u/%u: base=%.0f elbow=%.0f\n, claw = %.0f\n",
+			(unsigned)arm_test_pose_index_ + 1, (unsigned)kArmTestPoseCount,
+			pose.base_pitch_servo_degrees,pose.elbow_pitch_servo_degrees ,pose.claw_servo_degrees);
+		arm_test_pose_index_ = (arm_test_pose_index_ + 1) % kArmTestPoseCount;
+		arm_test_pose_until_us_ = now + ARM_TEST_POSE_PERIOD_US;
 	}
 
-	if (handleDriveTransition()){
-		return;
-	}
-
-	driveCurrentMode();
+	// ai_->tickAI();
+	//
+	// if (debug_print_now_){
+	// 	Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
+	// 		robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
+	// }
+	//
+	// if (handleDriveTransition()){
+	// 	return;
+	// }
+	//
+	// driveCurrentMode();
 }
 
 bool MrKrabs::handleDriveTransition()

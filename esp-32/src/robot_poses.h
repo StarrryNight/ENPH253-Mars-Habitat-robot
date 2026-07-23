@@ -24,10 +24,10 @@ using RobotSequence = std::vector<RobotPose>;
 // (from vertical) and elbow_pitch to [23,70] deg (down from horizontal) —
 // see STSServo's SERVO_1_*/SERVO_2_* calibration constants in servo.h.
 const RobotSequence kTestRotationSequence = {
-	{00.0, {70, 40, 0, 0}},    // rotate 90 deg, arm high/flat
-	{-90.0, {70, 70, 0, 0}},  // rotate back, arm upright/down
-	{90.0, {35, 45, 0, 0}},   // rotate 90 deg, arm mid pose
-	{-90.0, {0, 23, 0, 0}},   // rotate back, arm high/flat
+	//{00.0, {70, 40, 0,90}},    // rotate 90 deg, arm high/flat
+	//{-90.0, {70, 70, 0, 0}},  // rotate back, arm upright/down
+	//{90.0, {35, 45, 0, 0}},   // rotate 90 deg, arm mid pose
+	//{-90.0, {0, 23, 0, 0}},   // rotate back, arm high/flat
 };
 
 const RobotSequence kMetalDetectingSequence = {

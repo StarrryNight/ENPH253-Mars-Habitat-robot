@@ -11,7 +11,7 @@ Arm::Arm()
 	  // in range for both bus servos (base: [0,70], elbow: [23,70], see
 	  // STSServo's SERVO_1_*/SERVO_2_* calibration in servo.h). Applied fresh
 	  // by begin() on every setup(), not just used as a default.
-	  current_pose_({0, 70, 0, 0})
+	  current_pose_({0, 30, 0, 0})
 {
 }
 
@@ -20,7 +20,7 @@ void Arm::begin()
 	// Single-wire half-duplex UART: rx and tx are the same physical pin.
 	// Always reset to the home pose on startup, regardless of whatever
 	// current_pose_ might otherwise hold.
-	setPose({0, 70, 0, 0});
+	setPose({0, 30, 0, 50});
 }
 
 

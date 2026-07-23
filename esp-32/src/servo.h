@@ -50,13 +50,13 @@ void setAngle(double servo_1_angle, double servo_2_angle);
 	// landing at the physical 0 deg position and vice versa).
 	static constexpr double SERVO_1_MIN_DEG = 0.0;   // raw 1000
 	static constexpr double SERVO_1_MAX_DEG = 70.0;  // raw 100
-	static constexpr int SERVO_1_MIN_RAW = 1000;
-	static constexpr int SERVO_1_MAX_RAW = 100;
+	static constexpr int SERVO_1_MIN_RAW = 1200;
+	static constexpr int SERVO_1_MAX_RAW = 1850;
 
 	// Calibration (measured on hardware): forearm servo (ID 2), angle down
 	// from horizontal.
 	static constexpr double SERVO_2_MIN_DEG = 23.0;  // raw 2800, "high"
-	static constexpr double SERVO_2_MAX_DEG = 70.0;  // raw 3300, "down"
-	static constexpr int SERVO_2_MIN_RAW = 2800;
-	static constexpr int SERVO_2_MAX_RAW = 3300;
+	static constexpr double SERVO_2_MAX_DEG = 90.0;  // raw 3300, "down"
+	static constexpr int SERVO_2_MIN_RAW = 4000;
+	static constexpr int SERVO_2_MAX_RAW = 3100;
 };

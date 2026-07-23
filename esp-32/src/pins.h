@@ -34,8 +34,8 @@ static constexpr int MID_RIGHT_PHOTORESISTOR = 17;
 static constexpr int RIGHT_PHOTORESISTOR = 18;
 
 //Arm servo
-static constexpr int WRIST_YAW_SERVO_PIN = 5;
 static constexpr int CLAW_OPEN_SERVO_PIN = 4;
+static constexpr int WRIST_YAW_SERVO_PIN = 5;
 // Arm servo bus pin (single-wire half-duplex UART to the SCServo bus).
 static constexpr int BASE_ELBOW_PITCH_SERIAL_PIN = 6;
 
