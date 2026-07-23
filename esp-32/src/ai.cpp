@@ -8,14 +8,26 @@ namespace {
 	constexpr int kNumRocks = 6;
 	constexpr int kNumHabitatCycles = 2;
 
-	// Distance (m) into FINDING_ROCK's Nth visit at which rock N's checkpoint
-	// is reached. Indexed by AI::visits(FINDING_ROCK) - 1. First entry
-	// shortened to 0.15 for bench testing the rock-finding sequence
-	// (line-follow -> stop -> METAL_DETECTING -> reacquire) without needing
-	// the full field run.
-	constexpr std::array<double, kNumRocks> kRockCheckpointsM = {
-		0.15, 0.6, 0.9, 1.2, 1.5, 1.8,
+	// Per-rock: distance (m) into FINDING_ROCK's Nth visit at which rock N's
+	// checkpoint is reached, the one-time rotation to face the scan
+	// direction, and the sweep poses to apply there. Indexed by
+	// AI::visits(FINDING_ROCK) - 1 — see AI::tickFindingRock/transitionTo.
+	// NOT constexpr: ArmPoseSequence holds a std::vector, a non-literal type.
+	struct RockCheckpoint {
+		double trigger_progress_m;
+		ArmPoseSequence scan;
 	};
+	const std::array<RockCheckpoint, kNumRocks> kRockCheckpoints = {{
+		// First entry shortened to 0.15 for bench testing the rock-finding
+		// sequence (line-follow -> stop -> METAL_DETECTING -> reacquire)
+		// without needing the full field run.
+		{0.40, {-45.0, {{30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
+		{0.55,  {45.0,{ {30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
+		{0.45,  {-45.0, {{30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
+		{0.5,  {-30.0,{ {30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
+		{2.5,  {55.0, {{30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
+		{3.0,  {-30.0,{ {30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
+	}};
 
 	// Distance (m) into LINE_FOLLOWING's Nth visit at which the habitat is
 	// reached. Indexed by AI::visits(LINE_FOLLOWING) - 1.
@@ -36,16 +48,9 @@ AI::AI():
 {
 	Serial.printf("[AI] constructed, initial state: %s\n", robotStateName(current_state_));
 	// Set the counter directly rather than routing through transitionTo(),
-	// which would also print a self-transition.
+	// which would also print a self-transition. FINDING_ROCK has no arm
+	// sequence, so there's nothing to start on the sequence runner.
 	state_visit_count_[idx(current_state_)] = 1;
-	// FINDING_ROCK has no arm sequence (it's line-following, tracked by
-	// current_state_progress_m_ against kRockCheckpointsM) — only start the
-	// sequence runner for states that actually have one, unlike the
-	// sequence-driven states (METAL_DETECTING, etc.) which get theirs loaded
-	// via transitionTo() when entered normally.
-	if (const RobotSequence* initial_sequence = sequenceForState(current_state_)) {
-		sequence_runner_.start(*initial_sequence);
-	}
 }
 
 void AI::setArm(Arm* arm){
@@ -66,8 +71,14 @@ void AI::transitionTo(RobotState next){
 	state_visit_count_[idx(next)]++;
 	current_state_progress_m_ = 0;
 
-	const RobotSequence* sequence = sequenceForState(next);
-	if (sequence){
+	if (next == RobotState::METAL_DETECTING){
+		// Per-rock scan sequence, not a fixed sequenceForState() entry —
+		// visits(FINDING_ROCK) is still the checkpoint we just reached
+		// (FINDING_ROCK's own visit count doesn't bump again until we
+		// return to it via nextRockOrDone()).
+		int rock_index = visits(RobotState::FINDING_ROCK) - 1;
+		sequence_runner_.start(kRockCheckpoints[rock_index].scan);
+	} else if (const ArmPoseSequence* sequence = sequenceForState(next)){
 		sequence_runner_.start(*sequence);
 	}
 }
@@ -81,7 +92,6 @@ void AI::tickAI(){
 
 RobotState AI::tickCurrentState(){
 	switch (current_state_){
-		case RobotState::TEST_ROTATION: return tickTestRotation();
 		case RobotState::REACQUIRING_LINE: return tickReacquiringLine();
 		case RobotState::FINDING_ROCK: return tickFindingRock();
 		case RobotState::METAL_DETECTING: return tickMetalDetecting();
@@ -93,19 +103,6 @@ RobotState AI::tickCurrentState(){
 		case RobotState::DONE: return RobotState::DONE;
 	}
 	return current_state_;
-}
-
-RobotState AI::tickTestRotation(){
-	// Hardware validation only — stay here running the sequence, then hand
-	// off to REACQUIRING_LINE once complete instead of falling through:
-	// SequenceRunner::targetRotationDegrees() reverts to 0.0 once complete(),
-	// which handleDriveTransition() would otherwise read as a fresh target
-	// and rotate back to heading 0.
-	if (!sequence_runner_.complete()){
-		return RobotState::TEST_ROTATION;
-	}
-	post_reacquire_state_ = RobotState::LINE_FOLLOWING;
-	return RobotState::REACQUIRING_LINE;
 }
 
 RobotState AI::tickReacquiringLine(){
@@ -127,7 +124,7 @@ RobotState AI::tickFindingRock(){
 	if (n > kNumRocks){
 		return RobotState::LINE_FOLLOWING;
 	}
-	if (current_state_progress_m_ >= kRockCheckpointsM[n - 1]){
+	if (current_state_progress_m_ >= kRockCheckpoints[n - 1].trigger_progress_m){
 		return RobotState::METAL_DETECTING;
 	}
 	return RobotState::FINDING_ROCK;
@@ -185,6 +182,11 @@ AI::DriveMode AI::desiredDriveMode() const{
 	}
 	if (current_state_ == RobotState::REACQUIRING_LINE){
 		return DriveMode::SEARCHING_FOR_LINE;
+	}
+	if (current_state_ == RobotState::METAL_DETECTING){
+		// Per-rock sequence, not a fixed sequenceForState() entry (see
+		// transitionTo) — special-cased here the same way.
+		return DriveMode::APPLYING_SEQUENCE;
 	}
 	return sequenceForState(current_state_) ? DriveMode::APPLYING_SEQUENCE : DriveMode::LINE_FOLLOWING;
 }

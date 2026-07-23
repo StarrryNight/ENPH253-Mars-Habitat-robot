@@ -203,8 +203,8 @@ private:
 	// Arm-only bench test: cycles the arm through kArmTestPoses (mr_krabs.cpp)
 	// on a fixed timer, completely bypassing AI/rotation/SequenceRunner. Used
 	// in place of the normal AI dispatch in stepControl() while the
-	// drivetrain isn't wired up / powered — TEST_ROTATION's arm poses are
-	// gated behind real rotation-complete feedback (see
+	// drivetrain isn't wired up / powered — sequence-driven states' arm
+	// poses are gated behind real rotation-complete feedback (see
 	// OrientationController::reachedTarget), which never fires without wheels.
 	size_t arm_test_pose_index_;
 	uint64_t arm_test_pose_until_us_;

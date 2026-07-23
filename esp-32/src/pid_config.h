@@ -38,7 +38,7 @@ static constexpr int VELOCITY_TO_PWM = 300;
 // (30% over VELOCITY_TO_PWM) — tune against real back-wheel speed on hardware.
 static constexpr int WHEEL_BACK_VELOCITY_TO_PWM = 300;
 // Orientation (rotate-to-angle) PID (OrientationController). Error in radians.
-static constexpr double ORIENTATION_PID_P = FORWARD_SPEED*3;
+static constexpr double ORIENTATION_PID_P = FORWARD_SPEED*4;
 static constexpr double ORIENTATION_PID_I = 0;
 static constexpr double ORIENTATION_PID_D = 0.2;
 static constexpr double ORIENTATION_PID_MAX_I = 1;

@@ -2,12 +2,6 @@
 #include <cstddef>
 
 enum class RobotState {
-	// Hardware validation state: rotate 90 degrees, arm neutral, then hand
-	// off to REACQUIRING_LINE. Temporary bring-up aid for testing the
-	// reacquire-line search direction; not part of the real CLAUDE.md state
-	// machine. Not entered automatically — see AI::AI() for the real initial
-	// state (FINDING_ROCK).
-	TEST_ROTATION,
 	FINDING_ROCK,
 	METAL_DETECTING,
 	PICKUP_ROCK,
@@ -24,12 +18,11 @@ enum class RobotState {
 	DONE,
 };
 
-static constexpr size_t kNumRobotStates = 10;
+static constexpr size_t kNumRobotStates = 9;
 
 // Debug/serial-print helper — not used by any control-flow logic.
 inline const char* robotStateName(RobotState s) {
 	switch (s) {
-		case RobotState::TEST_ROTATION: return "TEST_ROTATION";
 		case RobotState::FINDING_ROCK: return "FINDING_ROCK";
 		case RobotState::METAL_DETECTING: return "METAL_DETECTING";
 		case RobotState::PICKUP_ROCK: return "PICKUP_ROCK";

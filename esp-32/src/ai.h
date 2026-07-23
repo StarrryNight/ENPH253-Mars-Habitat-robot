@@ -11,8 +11,8 @@
 // Drives the robot behavior state machine described in CLAUDE.md (rocks A-C,
 // habitat D). Each RobotState either drives forward with line-following
 // (FINDING_ROCK, LINE_FOLLOWING, LINE_FOLLOWING_REVERSE) or runs a stationary
-// RobotSequence (see robot_poses.h) that MrKrabs steps through by rotating to
-// each pose's heading and applying it via SequenceRunner.
+// ArmPoseSequence (see robot_poses.h) that MrKrabs steps through by rotating
+// once to the sequence's heading, then applying each pose via SequenceRunner.
 class AI {
 	public:
 		AI();
@@ -55,9 +55,6 @@ class AI {
 		// is resolved (picked up or skipped), decide whether to look for the
 		// next rock or move on to the final line-following leg.
 		RobotState nextRockOrDone();
-
-		// Hardware validation only — see RobotState::TEST_ROTATION.
-		RobotState tickTestRotation();
 
 		// See RobotState::REACQUIRING_LINE.
 		RobotState tickReacquiringLine();
