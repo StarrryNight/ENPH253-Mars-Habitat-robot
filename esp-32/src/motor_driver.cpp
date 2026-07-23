@@ -7,6 +7,7 @@
 #include "driver/ledc.h"
 #include "constants.h"
 #include "esp32-hal-gpio.h"
+#include "esp_timer.h"
 #include "motor_driver.h"
 
 MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1, int pwm_pin_0, int pwm_pin_1, int encoder_pin_0)
@@ -63,7 +64,7 @@ void MotorDriver::set_velocity(double speed)
 
     if (pending_direction_change_)
     {
-        if (micros() - prev_pwm_reset_time_ > SHOOTTHROUGH_GUARD_THRESHOLD_US)
+        if (static_cast<uint64_t>(esp_timer_get_time()) - prev_pwm_reset_time_ > SHOOTTHROUGH_GUARD_THRESHOLD_US)
         {
             if (new_direction > 0)       rotateClockwise(duty_cycle);
             else if (new_direction < 0)  rotateCounterClockwise(duty_cycle);
@@ -102,7 +103,7 @@ void MotorDriver::set_velocity(double speed)
     {
         ledcWrite(pwm_channel_0_, 0);
         ledcWrite(pwm_channel_1_, 0);
-        prev_pwm_reset_time_ = micros();
+        prev_pwm_reset_time_ = static_cast<uint64_t>(esp_timer_get_time());
         pending_direction_change_ = true;
     }
 }
