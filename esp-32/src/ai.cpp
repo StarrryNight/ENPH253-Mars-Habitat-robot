@@ -32,12 +32,13 @@ AI::AI():
 	post_reacquire_state_(RobotState::LINE_FOLLOWING)
 {
 	Serial.printf("[AI] constructed, initial state: %s\n", robotStateName(current_state_));
-	// visits(LINE_FOLLOWING) must return 1 the first time through —
-	// tickLineFollowing() and friends index checkpoint tables with
-	// (visits(state) - 1). Set the counter directly rather than routing
-	// through transitionTo(), which would also print a self-transition and
-	// (re-)start a sequence lookup that's irrelevant for LINE_FOLLOWING.
+	// Set the counter directly rather than routing through transitionTo(),
+	// which would also print a self-transition.
 	state_visit_count_[idx(current_state_)] = 1;
+	// Unlike LINE_FOLLOWING, TEST_ROTATION is sequence-driven — load its
+	// sequence directly since transitionTo() (which normally does this) is
+	// skipped for the initial state.
+	sequence_runner_.start(*sequenceForState(current_state_));
 }
 
 void AI::setArm(Arm* arm){

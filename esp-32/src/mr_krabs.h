@@ -18,7 +18,7 @@
 // more likely to reacquire it than continuing the same direction.
 // Deliberately gentler than TELEOP_ANGULAR_SPEED for a controlled sweep.
 // Tune empirically.
-static constexpr double LINE_SEARCH_OMEGA_RAD_S = 0.5;
+static constexpr double LINE_SEARCH_OMEGA_RAD_S = 1.5;
 
 // Hardware validation: fixed angular speed (rad/s) driven open-loop (no wheel
 // PID, no dead-reckoning target) from the moment setup() finishes. Re-issued

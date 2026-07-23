@@ -2,10 +2,10 @@
 #include <cstddef>
 
 enum class RobotState {
-	// Hardware validation state: rotate 90 degrees then -90 degrees, arm
-	// neutral throughout. Temporary bring-up aid for the drivetrain/rotation
-	// pipeline; not part of the real CLAUDE.md state machine and not
-	// currently entered by AI on startup (see AI::AI()).
+	// Hardware validation state: rotate 90 degrees, arm neutral, then hand
+	// off to REACQUIRING_LINE. Temporary bring-up aid for testing the
+	// reacquire-line search direction; not part of the real CLAUDE.md state
+	// machine. Currently the AI's initial state (see AI::AI()).
 	TEST_ROTATION,
 	FINDING_ROCK,
 	METAL_DETECTING,

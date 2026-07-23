@@ -19,12 +19,7 @@ using RobotSequence = std::vector<RobotPose>;
 // the arm is characterized on hardware.
 
 const RobotSequence kTestRotationSequence = {
-	{90.0, {0, 0, 0, 0}},  // rotate 90 degrees, arm neutral
-	{-90.0, {0, 0, 0, 0}}, // rotate back -90 degrees, arm neutral
-	{90.0, {0, 0, 0, 0}}, // rotate back -90 degrees, arm neutral
-	{-90.0, {0, 0, 0, 0}}, // rotate back -90 degrees, arm neutral
-	{90.0, {0, 0, 0, 0}}, // rotate back -90 degrees, arm neutral
-	{-90.0, {0, 0, 0, 0}}, // rotate back -90 degrees, arm neutral
+	{90.0, {0, 0, 0, 0}},  // rotate 90 degrees, arm neutral, then hand off to REACQUIRING_LINE
 };
 
 const RobotSequence kMetalDetectingSequence = {
