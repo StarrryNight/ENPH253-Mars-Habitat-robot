@@ -51,10 +51,11 @@ double LineFollower::calculateCorrection()
     return correction;
 }
 
+//currently changed
 bool LineFollower::bothMidSensorsOnLine()
 {
     std::array<double, 4> current_state = readPhotoresistors();
-    return current_state[1] == 1 && current_state[2] == 1;
+    return current_state[1] == 1 || current_state[2] == 1;
 }
 
 // Issue: For metal detecting, we will need to spin the robot arm while following line to be efficient. But our robot cannot support both actions at once.

@@ -18,13 +18,22 @@ using RobotSequence = std::vector<RobotPose>;
 // (home, sweep, rock pickup, rock deposit, habitat grab, habitat place) once
 // the arm is characterized on hardware.
 
+// Hardware validation: rotate through a few headings while sweeping the arm
+// through distinct calibrated poses, so both the drivetrain rotation and the
+// bus servos get exercised together. base_pitch is clamped to [0,70] deg
+// (from vertical) and elbow_pitch to [23,70] deg (down from horizontal) —
+// see STSServo's SERVO_1_*/SERVO_2_* calibration constants in servo.h.
 const RobotSequence kTestRotationSequence = {
 	{90.0, {0, 0, 0, 0}},  // rotate 90 degrees, arm neutral, then hand off to REACQUIRING_LINE
 };
 
 const RobotSequence kMetalDetectingSequence = {
-	{0.0, {90, 90, 90, 90}}, // sweep arm out to scan for metal
-	{0.0, {0, 0, 0, 0}},     // rest
+	{90.0,{0, 30, 0, 50}},
+	{0,{30, 50, 0, 10}},
+	{0,{70, 20, 0, 10}},
+	{0,{70, 40, 0, 10}},
+	{0,{45, 30, 0, 10}},
+	{0,{0, 30, 0, 50}},
 };
 
 const RobotSequence kPickupRockSequence = {

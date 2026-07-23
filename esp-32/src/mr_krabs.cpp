@@ -6,6 +6,21 @@
 #include "motor_controller.h"
 #include <pb_decode.h>
 
+namespace {
+// Arm-only bench test (see arm_test_pose_index_ in mr_krabs.h). base_pitch
+// clamped to [0,70] deg from vertical, elbow_pitch to [23,70] deg down from
+// horizontal — see STSServo's SERVO_1_*/SERVO_2_* calibration in servo.h.
+constexpr ArmPose kArmTestPoses[] = {
+	{0, 50, 0, 10},
+	{30, 50, 0, 10},
+	{70, 20, 0, 10},
+	{70, 40, 0, 10},
+	{45, 30, 0, 10},
+};
+constexpr size_t kArmTestPoseCount = sizeof(kArmTestPoses) / sizeof(kArmTestPoses[0]);
+constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
+}
+
 MrKrabs::MrKrabs() :
 	drive_mode_(AI::DriveMode::LINE_FOLLOWING),
 	last_commanded_rotation_degrees_(0),
@@ -16,7 +31,9 @@ MrKrabs::MrKrabs() :
 	debug_print_now_(false),
 	is_teleop_(false),
 	teleop_key_last_seen_us_{0},
-	control_loop_timer_(nullptr)
+	control_loop_timer_(nullptr),
+	arm_test_pose_index_(0),
+	arm_test_pose_until_us_(0)
 {}
 
 void MrKrabs::setup()
@@ -37,6 +54,11 @@ void MrKrabs::setup()
 	arm_->begin();
 	ai_->setArm(&*arm_);
 	ai_->setLineFollower(&*line_follower_);
+
+	// arm_.emplace() (above) already ran Arm's constructor, which begins
+	// Serial2 for the SCServo bus — safe to bind test_servo_ to it now.
+	test_servo_.pSerial = &Serial2;
+
 	esp_timer_create_args_t timer_args = {
 		.callback = [](void *arg) { static_cast<MrKrabs *>(arg)->stepControl(); },
 		.arg = this,
@@ -215,32 +237,58 @@ static constexpr uint64_t STATE_PRINT_PERIOD_US = 500000; // 500 ms
 
 void MrKrabs::stepControl()
 {
-uint64_t now = esp_timer_get_time();
-debug_print_now_ = (now - last_state_print_us_) >= STATE_PRINT_PERIOD_US;
-if (debug_print_now_){
-	last_state_print_us_ = now;
-}
-
-if (now < action_settle_until_us_){
-	motor_controller_->setVelocity({0, 0, 0});
+	uint64_t now = esp_timer_get_time();
+	debug_print_now_ = (now - last_state_print_us_) >= STATE_PRINT_PERIOD_US;
 	if (debug_print_now_){
-		Serial.printf("[MrKrabs] settling, %.0f ms left\n", (action_settle_until_us_ - now) / 1000.0);
+		last_state_print_us_ = now;
 	}
-	return;
-}
 
-ai_->tickAI();
+	if (now < action_settle_until_us_){
+		motor_controller_->setVelocity({0, 0, 0});
+		if (debug_print_now_){
+			Serial.printf("[MrKrabs] settling, %.0f ms left\n", (action_settle_until_us_ - now) / 1000.0);
+		}
+		return;
+	}
+	// Throttled to STATE_PRINT_PERIOD_US (500ms), not run every 10ms tick:
+	// each ReadPos/Ping is a full blocking Serial2 round-trip, and four of
+	// them every tick was saturating the half-duplex bus and the USB serial
+	// output badly enough to garble the printed text itself.
+	if (debug_print_now_){
+		int16_t pos_1 = test_servo_.ReadPos(/*ID=*/1);
+		int16_t pos_2 = test_servo_.ReadPos(/*ID=*/2);
+		// Ping is a much simpler transaction than ReadPos (no data payload) —
+		// returns the responding ID on success, -1 on no/garbled reply.
+		int ping_1 = test_servo_.Ping(1);
+		int ping_2 = test_servo_.Ping(2);
+		Serial.print("Servo 1 Position: ");
+		Serial.print(pos_1);
+		Serial.print(" (ping=");
+		Serial.print(ping_1);
+		Serial.print(")  Servo 2 Position: ");
+		Serial.print(pos_2);
+		Serial.print(" (ping=");
+		Serial.print(ping_2);
+		Serial.println(")");
+	}
 
-if (debug_print_now_){
-	Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
-		robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
-}
+	// Arm-only bench test (AI/rotation dispatch disabled — see
+	// arm_test_pose_index_ in mr_krabs.h for why). Cycles through
+	// kArmTestPoses on a timer, independent of the drivetrain.
+	motor_controller_->setVelocity({0, 0, 0});
 
-if (handleDriveTransition()){
-	return;
-}
-
-driveCurrentMode();
+	 ai_->tickAI();
+	
+	 if (debug_print_now_){
+	 	Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
+	 		robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
+	 }
+	
+	 if (handleDriveTransition()){
+	 	return;
+	 }
+	
+	 driveCurrentMode();
 }
 
 bool MrKrabs::handleDriveTransition()
@@ -277,19 +325,14 @@ void MrKrabs::driveCurrentMode()
 		case AI::DriveMode::LINE_FOLLOWING: {
 			double correction = line_follower_->calculateCorrection();
 			double speed = FORWARD_SPEED * ai_->lineFollowingDirection();
-			// setVelocity(), not driveOpenLoop(): motor_control_loop_timer_
-			// calls MotorController::applyVelocity() independently every 10ms
-			// regardless of drive mode, and it drives off current_target_velocity_
-			// (set only by setVelocity()). driveOpenLoop() writes PWM directly
-			// without touching that target, so its command was immediately
-			// clobbered back to whatever setVelocity() last set (0,0,0 by
-			// default) on the very next applyVelocity() tick — the wheels never
-			// got a chance to actually turn.
-			Serial.printf("correction: %f.2\n", correction);
 			motor_controller_->setVelocity({0, speed, -correction});
-			// Stub odometry: integrates commanded speed rather than measured
-			// encoder distance. Replace with real odometry once available.
-			ai_->addProgress(std::abs(speed) * CONTROL_LOOP_PERIOD);
+			// Real odometry: encoder-measured translational speed (updated
+			// each tick by MotorController::tickMotorSpeeds(), called from
+			// motorStepControl), not the commanded speed above — so progress
+			// reflects actual distance traveled instead of assuming the
+			// wheels hit the target speed exactly (slip, stalls, PID lag).
+			RobotVelocity measured = motor_controller_->getCurrentRobotVelocity();
+			ai_->addProgress(std::hypot(measured.x, measured.y) * CONTROL_LOOP_PERIOD);
 			break;
 		}
 		case AI::DriveMode::APPLYING_SEQUENCE: {
@@ -326,7 +369,6 @@ void MrKrabs::motorStepControl(){
 	motor_controller_->tickMotorSpeeds();
 	motor_controller_->updateRotationTracking();
 	motor_controller_->applyVelocity();
-
 }
 
 void MrKrabs::startLineFollowing()

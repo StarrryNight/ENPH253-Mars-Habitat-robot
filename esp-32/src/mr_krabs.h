@@ -18,7 +18,7 @@
 // more likely to reacquire it than continuing the same direction.
 // Deliberately gentler than TELEOP_ANGULAR_SPEED for a controlled sweep.
 // Tune empirically.
-static constexpr double LINE_SEARCH_OMEGA_RAD_S = 1.5;
+static constexpr double LINE_SEARCH_OMEGA_RAD_S = 1.3;
 
 // Hardware validation: fixed angular speed (rad/s) driven open-loop (no wheel
 // PID, no dead-reckoning target) from the moment setup() finishes. Re-issued
@@ -199,5 +199,14 @@ private:
 	// touches no hardware, so it's safe as a direct member; pSerial is bound to
 	// Serial2 in setup() once Arduino init (and Serial2.begin()) has run.
 	SMS_STS test_servo_;
+
+	// Arm-only bench test: cycles the arm through kArmTestPoses (mr_krabs.cpp)
+	// on a fixed timer, completely bypassing AI/rotation/SequenceRunner. Used
+	// in place of the normal AI dispatch in stepControl() while the
+	// drivetrain isn't wired up / powered — TEST_ROTATION's arm poses are
+	// gated behind real rotation-complete feedback (see
+	// OrientationController::reachedTarget), which never fires without wheels.
+	size_t arm_test_pose_index_;
+	uint64_t arm_test_pose_until_us_;
 
 };

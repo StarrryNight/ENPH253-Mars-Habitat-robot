@@ -199,3 +199,8 @@ uint32_t MotorDriver::getCurrentDeltaCount()
 {
 	return last_delta_count_;
 }
+
+int MotorDriver::getIntendedDirection()
+{
+	return intended_direction_;
+}

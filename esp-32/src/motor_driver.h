@@ -66,6 +66,14 @@ public:
 	// instead of independently diffing getEncoderCount().
 	uint32_t getCurrentDeltaCount();
 
+	// Sign of the most recent set_velocity() command (-1, 0, or 1) — the same
+	// unsmoothed direction signal tickSpeed() uses internally to sign raw_speed
+	// before it goes into the velocity moving average. Callers that want to
+	// sign getCurrentDeltaCount() themselves (e.g. rotation tracking, to avoid
+	// depending on getSpeed()'s smoothing) should use this rather than
+	// re-deriving direction from getSpeed() or getCurrentTargetSpeed().
+	int getIntendedDirection();
+
 	// Forgets the last driven direction, so the next set_velocity() call —
 	// whichever direction it's for — is treated as a direction change and
 	// goes through the coast/dead-time guard in set_velocity() instead of

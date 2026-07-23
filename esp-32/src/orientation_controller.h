@@ -3,7 +3,7 @@
 
 // Rotation is considered complete once within this angular distance (rad) of
 // the target angle. See OrientationController::reachedTarget.
-static constexpr double ROTATION_TOLERANCE_RAD = 0.01;
+static constexpr double ROTATION_TOLERANCE_RAD = 0.05;
 
 // Minimum |omega| (rad/s) calculateCorrection() will ever return while actively
 // rotating (i.e. reachedTarget() is false), so the PID's proportional term can't

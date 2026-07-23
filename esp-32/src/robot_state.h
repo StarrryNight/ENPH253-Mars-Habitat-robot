@@ -5,7 +5,8 @@ enum class RobotState {
 	// Hardware validation state: rotate 90 degrees, arm neutral, then hand
 	// off to REACQUIRING_LINE. Temporary bring-up aid for testing the
 	// reacquire-line search direction; not part of the real CLAUDE.md state
-	// machine. Currently the AI's initial state (see AI::AI()).
+	// machine. Not entered automatically — see AI::AI() for the real initial
+	// state (FINDING_ROCK).
 	TEST_ROTATION,
 	FINDING_ROCK,
 	METAL_DETECTING,

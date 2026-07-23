@@ -9,9 +9,12 @@ namespace {
 	constexpr int kNumHabitatCycles = 2;
 
 	// Distance (m) into FINDING_ROCK's Nth visit at which rock N's checkpoint
-	// is reached. Indexed by AI::visits(FINDING_ROCK) - 1.
+	// is reached. Indexed by AI::visits(FINDING_ROCK) - 1. First entry
+	// shortened to 0.15 for bench testing the rock-finding sequence
+	// (line-follow -> stop -> METAL_DETECTING -> reacquire) without needing
+	// the full field run.
 	constexpr std::array<double, kNumRocks> kRockCheckpointsM = {
-		0.3, 0.6, 0.9, 1.2, 1.5, 1.8,
+		0.15, 0.6, 0.9, 1.2, 1.5, 1.8,
 	};
 
 	// Distance (m) into LINE_FOLLOWING's Nth visit at which the habitat is
@@ -27,7 +30,7 @@ namespace {
 AI::AI():
 	arm_(nullptr),
 	line_follower_(nullptr),
-	current_state_(RobotState::TEST_ROTATION),
+	current_state_(RobotState::FINDING_ROCK),
 	current_state_progress_m_(0),
 	post_reacquire_state_(RobotState::LINE_FOLLOWING)
 {
@@ -35,10 +38,14 @@ AI::AI():
 	// Set the counter directly rather than routing through transitionTo(),
 	// which would also print a self-transition.
 	state_visit_count_[idx(current_state_)] = 1;
-	// Unlike LINE_FOLLOWING, TEST_ROTATION is sequence-driven — load its
-	// sequence directly since transitionTo() (which normally does this) is
-	// skipped for the initial state.
-	sequence_runner_.start(*sequenceForState(current_state_));
+	// FINDING_ROCK has no arm sequence (it's line-following, tracked by
+	// current_state_progress_m_ against kRockCheckpointsM) — only start the
+	// sequence runner for states that actually have one, unlike the
+	// sequence-driven states (METAL_DETECTING, etc.) which get theirs loaded
+	// via transitionTo() when entered normally.
+	if (const RobotSequence* initial_sequence = sequenceForState(current_state_)) {
+		sequence_runner_.start(*initial_sequence);
+	}
 }
 
 void AI::setArm(Arm* arm){

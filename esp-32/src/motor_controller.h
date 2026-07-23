@@ -130,17 +130,30 @@ private:
 	uint64_t prev_step_time_us_;  // µs from esp_timer_get_time(); avoids std::chrono unreliability
 	double accumulated_angle_;    // radians; updated each applyVelocity_ call
 
-	// Rotation (rad) accumulated since startRotation(), integrated one
-	// control-loop tick at a time by updateRotationTracking() from the
-	// filtered per-wheel velocities. External callers should read
+	// Rotation (rad) since startRotation(), recomputed each tick by
+	// updateRotationTracking() directly from the signed cumulative encoder
+	// counts below rather than integrated tick-by-tick from filtered
+	// velocity — avoids compounding the velocity moving-average's smoothing/
+	// rounding error over a long rotation. External callers should read
 	// getElapsedRotation() instead of this directly.
 	double current_rotation_rad_;
+
+	// Signed cumulative encoder pulses per wheel since startRotation() —
+	// exact integer running totals (not distance/angle yet), incremented
+	// each tick in updateRotationTracking() by
+	// getCurrentDeltaCount() * getIntendedDirection() (the encoder itself is
+	// single-phase/unsigned, so direction has to come from the commanded
+	// sign). Converted to distance/angle only when read, so there's no
+	// repeated floating-point accumulation to drift.
+	int64_t wheel_left_rotation_count_;
+	int64_t wheel_right_rotation_count_;
+	int64_t wheel_back_rotation_count_;
 	// Distance from robot center to each wheel contact point (m). Measured
 	// on hardware as 10 cm — was previously 0.3 (3x too large), which made
 	// current_rotation_rad_ (∝ 1/R) systematically underestimate true
 	// rotation, so the rotate-to-angle loop kept driving well past the real
 	// target before its own deflated estimate caught up.
-	static constexpr double WHEEL_DISTANCE_FROM_CENTER_M = 0.11465;
+	static constexpr double WHEEL_DISTANCE_FROM_CENTER_M = 0.1087;
 
 	RobotVelocity current_robot_velocity_;
 };

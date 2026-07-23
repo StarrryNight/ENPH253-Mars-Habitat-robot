@@ -12,6 +12,9 @@ MotorController::MotorController()
 	  prev_step_time_us_(0),
 	  accumulated_angle_(0),
 	  current_rotation_rad_(0),
+	  wheel_left_rotation_count_(0),
+	  wheel_right_rotation_count_(0),
+	  wheel_back_rotation_count_(0),
 	  wheel_left_pid_(PidController(WHEEL_LEFT_PID_P, WHEEL_LEFT_PID_I, WHEEL_LEFT_PID_D, WHEEL_LEFT_PID_MAX_I)),
 	  wheel_right_pid_(PidController(WHEEL_RIGHT_PID_P, WHEEL_RIGHT_PID_I, WHEEL_RIGHT_PID_D, WHEEL_RIGHT_PID_MAX_I)),
 	  wheel_back_pid_(PidController(WHEEL_BACK_PID_P, WHEEL_BACK_PID_I, WHEEL_BACK_PID_D, WHEEL_BACK_PID_MAX_I))
@@ -200,6 +203,9 @@ void MotorController::tickMotorSpeeds(){
 
 void MotorController::startRotation(){
 	current_rotation_rad_ = 0.0;
+	wheel_left_rotation_count_ = 0;
+	wheel_right_rotation_count_ = 0;
+	wheel_back_rotation_count_ = 0;
 	// A new/changed rotation target means whatever the wheel velocity PIDs
 	// accumulated chasing the previous target (or previous drive mode) is
 	// stale — don't let it carry into this one.
@@ -208,16 +214,35 @@ void MotorController::startRotation(){
 	wheel_back_pid_.reset();
 }
 void MotorController::updateRotationTracking(){
-	// current_wheel_velocities_ is set by tickMotorSpeeds() (must run first
-	// this tick — see MrKrabs::motorStepControl) from each MotorDriver's
-	// getSpeed(), which is already smoothed by that driver's internal
-	// VELOCITY_BUFFER_SIZE-sample moving average. Integrating that filtered
-	// per-wheel velocity is much less quantization-noisy tick-to-tick than
-	// diffing raw encoder counts directly. wheelToEuclidean's omega term
-	// averages all three wheels via the same kiwi-drive kinematics used
-	// elsewhere (omega = (w_left+w_right+w_back)/(3R)).
-	double omega = wheelToEuclidean(current_wheel_velocities_).omega;
-	current_rotation_rad_ += omega * MOTOR_CONTROL_LOOP_PERIOD;
+	// Accumulate exact signed encoder pulses since startRotation() instead of
+	// integrating (filtered) velocity every tick. getCurrentDeltaCount() is
+	// this tick's raw, unsmoothed pulse delta (must run after
+	// tickMotorSpeeds() — see MrKrabs::motorStepControl); the encoder itself
+	// is single-phase/unsigned, so getIntendedDirection() supplies the sign.
+	// Summing exact integers and converting to angle only when read means no
+	// per-tick floating-point rounding/smoothing error compounds over a long
+	// rotation, unlike repeatedly adding velocity*dt.
+	wheel_left_rotation_count_  += static_cast<int64_t>(wheel_left_motor_->getCurrentDeltaCount())  * wheel_left_motor_->getIntendedDirection();
+	wheel_right_rotation_count_ += static_cast<int64_t>(wheel_right_motor_->getCurrentDeltaCount()) * wheel_right_motor_->getIntendedDirection();
+	wheel_back_rotation_count_  += static_cast<int64_t>(wheel_back_motor_->getCurrentDeltaCount())  * wheel_back_motor_->getIntendedDirection();
+
+	// During a pure in-place rotation (vx=vy=0, the only way this is ever
+	// driven — see startRotation/orientation_controller_), every wheel's
+	// surface distance should equal R*angle individually, so each wheel
+	// gives an independent angle estimate. Take the largest-magnitude one
+	// rather than averaging all three: a slipping wheel reads low, and
+	// averaging it in would drag the estimate down, making rotation look
+	// smaller than it really is and risking overshoot before
+	// reachedTarget() catches up.
+	double angle_left  = (wheel_left_rotation_count_  * ENCODER_RESOLUTION_DISTANCE_M) / WHEEL_DISTANCE_FROM_CENTER_M;
+	double angle_right = (wheel_right_rotation_count_ * ENCODER_RESOLUTION_DISTANCE_M) / WHEEL_DISTANCE_FROM_CENTER_M;
+	double angle_back  = (wheel_back_rotation_count_  * ENCODER_RESOLUTION_DISTANCE_M) / WHEEL_DISTANCE_FROM_CENTER_M;
+
+	double angle = angle_left;
+	if (std::abs(angle_right) > std::abs(angle)) angle = angle_right;
+	if (std::abs(angle_back)  > std::abs(angle)) angle = angle_back;
+
+	current_rotation_rad_ = angle;
 }
 
 double MotorController::getElapsedRotation() const{
