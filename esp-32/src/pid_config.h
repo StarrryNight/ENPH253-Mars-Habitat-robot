@@ -46,6 +46,6 @@ static constexpr double ORIENTATION_PID_MAX_I = 1;
 // Line-following lateral correction PID (LineFollower). Error from the
 // photoresistor array (SMALL_ERROR_VALUE / BIG_ERROR_VALUE units).
 static constexpr double LINE_PID_P = 1;
-static constexpr double LINE_PID_I = 0.3;
+static constexpr double LINE_PID_I = 0.0;
 static constexpr double LINE_PID_D = 0;
-static constexpr double LINE_PID_MAX_I = 1;
+static constexpr double LINE_PID_MAX_I = 0;
