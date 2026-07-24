@@ -3,6 +3,7 @@
 #include "servo.h"
 #include "servo_controller.h"
 #include "pins.h"
+#include "arm.h"
 
 struct ArmPose{
 	double base_pitch_servo_degrees;
@@ -16,6 +17,10 @@ class Arm
 
 public:
 
+	static constexpr double WRIST_CENTER = 120;
+	static constexpr double WRIST_PLACE = 35;
+	static constexpr double CLAW_OPEN = 50;
+	static constexpr double CLAW_CLOSE = 0;
 	Arm();
 
 	// Binds the SCServo bus to Serial2 and drives the arm to its home pose.
@@ -34,5 +39,6 @@ private:
 	Servo claw_servo_;
 
 	ArmPose current_pose_;
+
 
 };

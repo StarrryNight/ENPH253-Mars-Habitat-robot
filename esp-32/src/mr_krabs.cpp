@@ -9,16 +9,31 @@
 namespace {
 // Arm-only bench test (see arm_test_pose_index_ in mr_krabs.h). base_pitch
 // clamped to [0,70] deg from vertical, elbow_pitch to [23,70] deg down from
-// horizontal — see STSServo's SERVO_1_*/SERVO_2_* calibration in servo.h.
+// horizontal — see STSServo's SERVO_1_*/SERVO_2_* calibration in servo.h
+// yaw 120 center, 40 rock
+	//release on rock {0, 23, 35, 0},
 constexpr ArmPose kArmTestPoses[] = {
-	{0, 50, 0, 10},
-	{30, 50, 0, 10},
-	{70, 20, 0, 10},
-	{70, 40, 0, 10},
-	{45, 30, 0, 10},
+	//0 for cloe
+	//50 for oepn 
+
+	{45, 25, 120, 50},
+	{45, 70, 120, 50},
+	{60, 25, 120, 50},
+	{60, 25, 120, 5},
+	{40, 40, 120, 5},
+	{-5, 50, 120, 5},
+	{-5, 20, 120, 5},
+//	{50, 25, 30, 65},
+//	{50, 25, 0, 10},
+	
 };
 constexpr size_t kArmTestPoseCount = sizeof(kArmTestPoses) / sizeof(kArmTestPoses[0]);
-constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
+constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 1200000; // 2 s per pose
+
+// Flip to true to re-enable the arm-only bench test loop below. Left in
+// place (not deleted) for future bench testing, but off now that the real
+// AI-driven sequence is what should be moving the arm.
+constexpr bool kRunArmBenchTest = false;
 }
 
 MrKrabs::MrKrabs() :
@@ -243,8 +258,10 @@ void MrKrabs::stepControl()
 		last_state_print_us_ = now;
 	}
 
+	updateMetalDetectorLed(ai_->metalDetected(), now);
+
 	if (now < action_settle_until_us_){
-		motor_controller_->setVelocity({0, 0, 0});
+		motor_controller_->driveOpenLoop({0, 0, 0});
 		if (debug_print_now_){
 			Serial.printf("[MrKrabs] settling, %.0f ms left\n", (action_settle_until_us_ - now) / 1000.0);
 		}
@@ -275,7 +292,20 @@ void MrKrabs::stepControl()
 	// Arm-only bench test (AI/rotation dispatch disabled — see
 	// arm_test_pose_index_ in mr_krabs.h for why). Cycles through
 	// kArmTestPoses on a timer, independent of the drivetrain.
-	motor_controller_->setVelocity({0, 0, 0});
+	// Currently disabled (see kRunArmBenchTest) so it doesn't fight with the
+	// real AI-driven sequence.
+	if (kRunArmBenchTest){
+		motor_controller_->driveOpenLoop({0, 0, 0});
+		if (now >= arm_test_pose_until_us_){
+			const ArmPose &pose = kArmTestPoses[arm_test_pose_index_];
+			arm_->setPose(pose);
+			Serial.printf("[ArmTest] pose %u/%u: base=%.0f elbow=%.0f\n, claw = %.0f\n",
+				(unsigned)arm_test_pose_index_ + 1, (unsigned)kArmTestPoseCount,
+				pose.base_pitch_servo_degrees,pose.elbow_pitch_servo_degrees ,pose.claw_servo_degrees);
+			arm_test_pose_index_ = (arm_test_pose_index_ + 1) % kArmTestPoseCount;
+			arm_test_pose_until_us_ = now + ARM_TEST_POSE_PERIOD_US;
+		}
+	}
 
 	 ai_->tickAI();
 	
@@ -326,20 +356,22 @@ void MrKrabs::driveCurrentMode()
 			double correction = line_follower_->calculateCorrection();
 			double speed = FORWARD_SPEED * ai_->lineFollowingDirection();
 			motor_controller_->setVelocity({0, speed, -correction});
-			// Real odometry: encoder-measured translational speed (updated
-			// each tick by MotorController::tickMotorSpeeds(), called from
-			// motorStepControl), not the commanded speed above — so progress
-			// reflects actual distance traveled instead of assuming the
-			// wheels hit the target speed exactly (slip, stalls, PID lag).
-			RobotVelocity measured = motor_controller_->getCurrentRobotVelocity();
-			ai_->addProgress(std::hypot(measured.x, measured.y) * CONTROL_LOOP_PERIOD);
+			// Real odometry: diff of the encoder-count-based translation
+			// odometer (MotorController::updateTranslationTracking(), folded
+			// in each tick by motorStepControl) rather than integrating
+			// (filtered) velocity * dt — avoids compounding smoothing/
+			// rounding error over a long run, same reasoning as
+			// updateRotationTracking().
+			double total_translation_m = motor_controller_->getTotalTranslationM();
+			ai_->addProgress(total_translation_m - last_total_translation_m_);
+			last_total_translation_m_ = total_translation_m;
 			break;
 		}
 		case AI::DriveMode::APPLYING_SEQUENCE: {
 			double curr_position = motor_controller_->getElapsedRotation();
 			if (orientation_controller_.reachedTarget(curr_position)){
 				//Serial.print("reached target");
-				motor_controller_->setVelocity({0,0,0});
+				motor_controller_->driveOpenLoop({0,0,0});
 				orientation_controller_.reset();
 				if (ai_->onRotationReached()){
 					action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
@@ -360,14 +392,47 @@ void MrKrabs::driveCurrentMode()
 			motor_controller_->setVelocity({0, 0, search_omega_rad_s_});
 			break;
 		case AI::DriveMode::IDLE:
-			motor_controller_->setVelocity({0,0,0});
+			motor_controller_->driveOpenLoop({0,0,0});
 			break;
+	}
+}
+
+// Blinks the DevKitM-1's onboard addressable RGB LED (GPIO48) red while
+// metal is detected, off otherwise. RGB_BUILTIN/neopixelWrite come from the
+// arduino-esp32 core itself (no NeoPixel library needed) — plain
+// digitalWrite() can't drive a WS2812, hence the dedicated call.
+namespace {
+	constexpr uint64_t METAL_LED_BLINK_PERIOD_US = 200000; // 200 ms
+}
+
+void MrKrabs::updateMetalDetectorLed(bool metal_detected, uint64_t now)
+{
+	if (!metal_detected){
+		if (metal_led_on_){
+			neopixelWrite(RGB_BUILTIN, 0, 0, 0);
+			metal_led_on_ = false;
+		}
+		return;
+	}
+
+	if (now - metal_led_last_toggle_us_ >= METAL_LED_BLINK_PERIOD_US){
+		metal_led_on_ = !metal_led_on_;
+		neopixelWrite(RGB_BUILTIN, metal_led_on_ ? 255 : 0, 0, 0);
+		metal_led_last_toggle_us_ = now;
 	}
 }
 
 void MrKrabs::motorStepControl(){
 	motor_controller_->tickMotorSpeeds();
 	motor_controller_->updateRotationTracking();
+	// Only fold ticks into the translation odometer while actually
+	// line-following — rotating in place / applying arm poses shouldn't
+	// count toward progress at all (see startRotation(), which zeros the
+	// odometer on the way out of LINE_FOLLOWING so it starts clean each time
+	// recording resumes).
+	if (drive_mode_ == AI::DriveMode::LINE_FOLLOWING){
+		motor_controller_->updateTranslationTracking();
+	}
 	motor_controller_->applyVelocity();
 }
 
@@ -384,6 +449,11 @@ void MrKrabs::startRotation(double target_angle)
 	drive_mode_ = AI::DriveMode::APPLYING_SEQUENCE;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 	motor_controller_->startRotation();
+	// Leaving LINE_FOLLOWING for the rotation/arm-pose part of a checkpoint —
+	// zero the translation odometer so it starts clean at 0 once we're back
+	// to line-following, instead of carrying forward whatever it read here.
+	motor_controller_->resetTranslationTracking();
+	last_total_translation_m_ = 0.0;
 	orientation_controller_.startRotation(target_angle);
 	// A zero-degree pose ("stay facing this way") isn't an actual turn —
 	// leave last_rotation_sign_ reflecting whichever way we last really

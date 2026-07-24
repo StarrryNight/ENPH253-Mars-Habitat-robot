@@ -106,6 +106,24 @@ public:
 	// without perturbing the accumulation.
 	double getElapsedRotation() const;
 
+	// Folds this tick's per-wheel encoder deltas into the running translation
+	// odometer (total_translation_m_), the same exact-integer-count approach
+	// updateRotationTracking() uses for heading — see that comment for why
+	// this beats integrating (filtered) velocity. Must run after
+	// tickMotorSpeeds() each tick (see MrKrabs::motorStepControl).
+	void updateTranslationTracking();
+
+	// Monotonic total path length (m) traveled since construction/last reset,
+	// computed from raw encoder deltas (see updateTranslationTracking()), not
+	// integrated velocity. Callers diff successive reads to get incremental
+	// distance — see MrKrabs::driveCurrentMode.
+	double getTotalTranslationM() const;
+
+	// Zeros the translation odometer. Called when leaving LINE_FOLLOWING for
+	// a rotation/arm-pose sequence, so it starts fresh at 0 the next time
+	// line-following resumes instead of carrying forward stale distance.
+	void resetTranslationTracking();
+
 	RobotVelocity getCurrentRobotVelocity();
 private:
 
@@ -148,6 +166,9 @@ private:
 	int64_t wheel_left_rotation_count_;
 	int64_t wheel_right_rotation_count_;
 	int64_t wheel_back_rotation_count_;
+
+	// Monotonic path length (m) accumulated by updateTranslationTracking().
+	double total_translation_m_ = 0.0;
 	// Distance from robot center to each wheel contact point (m). Measured
 	// on hardware as 10 cm — was previously 0.3 (3x too large), which made
 	// current_rotation_rad_ (∝ 1/R) systematically underestimate true
@@ -156,4 +177,12 @@ private:
 	static constexpr double WHEEL_DISTANCE_FROM_CENTER_M = 0.1087;
 
 	RobotVelocity current_robot_velocity_;
+
+	// True while driveOpenLoop() is the active source of truth for wheel PWM.
+	// applyVelocity() is called unconditionally every 10ms by an independent
+	// timer (see MrKrabs::motorStepControl) — without this flag it would
+	// keep re-driving the wheels from the stale current_target_velocity_ via
+	// PID and undo whatever driveOpenLoop() just wrote directly. setVelocity()
+	// clears it to hand control back to the closed-loop PID path.
+	bool open_loop_active_ = false;
 };

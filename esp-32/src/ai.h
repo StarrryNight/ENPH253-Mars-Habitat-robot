@@ -42,6 +42,11 @@ class AI {
 		// just written (so the caller knows to start a settle delay).
 		bool onRotationReached();
 
+		// Raw MetalDetector reading (interrupt-driven, see metal_detector.cpp) —
+		// exposed for MrKrabs's debug print, independent of METAL_DETECTING's
+		// own gating in tickMetalDetecting().
+		bool metalDetected();
+
 		RobotState currentState() const;
 		// How many times state has been entered (the current state included,
 		// counting from 1). Used by per-state handlers to index checkpoint/

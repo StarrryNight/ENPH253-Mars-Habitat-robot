@@ -29,9 +29,14 @@ struct ArmPoseSequence {
 const ArmPoseSequence kPickupRockSequence = {
 	0.0, // grab from wherever METAL_DETECTING left off, no extra rotation
 	{
-		{45, 30, 0, 0},  // lower arm, claw open
-		{45, 30, 0, 90}, // close claw around rock
-		{90, 90, 0, 90}, // lift, holding rock
+		{40, 55, Arm::WRIST_CENTER, Arm::CLAW_OPEN},
+		{45, 45, Arm::WRIST_CENTER, Arm::CLAW_OPEN},
+		{45, 45, Arm::WRIST_CENTER, Arm::CLAW_CLOSE},
+		{45, 20, Arm::WRIST_CENTER, Arm::CLAW_CLOSE},
+		{-5, 20, Arm::WRIST_CENTER, Arm::CLAW_CLOSE},
+		{-5, 20, Arm::WRIST_PLACE, Arm::CLAW_CLOSE},
+		{-5, 20, Arm::WRIST_PLACE, Arm::CLAW_OPEN},
+		{-5, 25, 120, 55}, // reset position
 	}
 };
 

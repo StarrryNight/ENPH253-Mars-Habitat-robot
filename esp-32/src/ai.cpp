@@ -21,12 +21,10 @@ namespace {
 		// First entry shortened to 0.15 for bench testing the rock-finding
 		// sequence (line-follow -> stop -> METAL_DETECTING -> reacquire)
 		// without needing the full field run.
-		{0.40, {-45.0, {{30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
-		{0.55,  {45.0,{ {30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
-		{0.45,  {-45.0, {{30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
-		{0.5,  {-30.0,{ {30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
-		{2.5,  {55.0, {{30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
-		{3.0,  {-30.0,{ {30, 50, 0, 10}, {70, 20, 0, 10}, {70, 40, 0, 10}, {45, 30, 0, 10}, {0, 30, 0, 50}}}},
+		{0.5, {-47.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
+		{0.5, {48.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
+		{0.4, {-45.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
+		{0.25, {-45.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
 	}};
 
 	// Distance (m) into LINE_FOLLOWING's Nth visit at which the habitat is
@@ -131,10 +129,11 @@ RobotState AI::tickFindingRock(){
 }
 
 RobotState AI::tickMetalDetecting(){
+	// Time trial: always pick up regardless of metal detector reading.
 	if (!sequence_runner_.complete()){
 		return RobotState::METAL_DETECTING;
 	}
-	return metal_detector_.getMetalDetectorState() ? RobotState::PICKUP_ROCK : nextRockOrDone();
+	return RobotState::PICKUP_ROCK;
 }
 
 RobotState AI::tickPickupRock(){
@@ -204,6 +203,10 @@ bool AI::onRotationReached(){
 		return false;
 	}
 	return sequence_runner_.onRotationReached(*arm_);
+}
+
+bool AI::metalDetected(){
+	return metal_detector_.getMetalDetectorState();
 }
 
 RobotState AI::currentState() const{

@@ -29,7 +29,7 @@ static constexpr double OPEN_LOOP_TEST_OMEGA_RAD_S = 2.0;
 // Non-blocking settle delay (µs) held between the three drive actions
 // (line-following, rotating, applying an arm pose) so each has time to
 // physically settle before the next begins. See MrKrabs::stepControl.
-static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1000000; // 1 s
+static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1200000; // 1.5 s
 
 // Teleoperation (manual numpad/o/p control over USB serial, bypassing the
 // RPi/AI). See MrKrabs::handleTeleopChar. Numpad 7/8/9/4/6/1/2/3 drive the 8
@@ -127,6 +127,11 @@ private:
 	// telling AI to apply the arm pose.
 	void driveCurrentMode();
 
+	// Blinks the onboard RGB LED red while metal_detected is true, off
+	// otherwise. now is esp_timer_get_time(), passed in rather than read
+	// again so it matches the rest of stepControl()'s timing this tick.
+	void updateMetalDetectorLed(bool metal_detected, uint64_t now);
+
 	// Which drive-mechanism action the loop is currently executing. AI decides
 	// which one is wanted (AI::desiredDriveMode()); rotating is not tracked
 	// separately — it's just the drivetrain's role while APPLYING_SEQUENCE, on
@@ -157,6 +162,11 @@ private:
 	// re-issues it when AI's target actually changes.
 	double last_commanded_rotation_degrees_;
 
+	// Last MotorController::getTotalTranslationM() reading, so
+	// driveCurrentMode() can add just this tick's incremental distance to
+	// AI's progress instead of re-adding the whole odometer total.
+	double last_total_translation_m_ = 0.0;
+
 	// Sign (+1/-1) of the last nonzero angle passed to startRotation().
 	// Zero-degree targets (an unrotated pose in a sequence) leave this
 	// unchanged, so it always reflects the most recent actual turn.
@@ -181,6 +191,12 @@ private:
 	// and read by driveCurrentMode() so its per-mode debug print fires on the
 	// same tick as the general one, without re-checking the clock.
 	bool debug_print_now_;
+
+	// State for updateMetalDetectorLed()'s blink: whether the onboard RGB LED
+	// is currently lit, and the esp_timer_get_time() timestamp it last
+	// toggled at.
+	bool metal_led_on_ = false;
+	uint64_t metal_led_last_toggle_us_ = 0;
 
 	// Held in optionals so the global MrKrabs object is safe to construct before
 	// Arduino init. setup() emplaces them once hardware is ready.

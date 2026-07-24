@@ -40,12 +40,17 @@ void MotorController::setup()
 void MotorController::setVelocity(RobotVelocity target_velocity)
 {
 	current_target_velocity_ = target_velocity;
+	open_loop_active_ = false;
 }
 
 
 void MotorController::applyVelocity()
 {
 	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return;
+	// While driveOpenLoop() is active, it's already writing PWM directly each
+	// tick — running the PID here too would immediately clobber that with a
+	// stale current_target_velocity_ (see open_loop_active_).
+	if (open_loop_active_) return;
 
 	double delta_t = MOTOR_CONTROL_LOOP_PERIOD;
 
@@ -91,6 +96,7 @@ void MotorController::driveOpenLoop(RobotVelocity v)
 {
 	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return;
 
+	open_loop_active_ = true;
 	WheelVelocities target = euclideanToWheel(v);
 	wheel_left_motor_->set_velocity(target.wheel_left  * VELOCITY_TO_PWM);
 	wheel_right_motor_->set_velocity(target.wheel_right * VELOCITY_TO_PWM);
@@ -247,6 +253,29 @@ void MotorController::updateRotationTracking(){
 
 double MotorController::getElapsedRotation() const{
 	return current_rotation_rad_;
+}
+
+void MotorController::updateTranslationTracking(){
+	// Exact per-tick wheel-surface distance deltas (signed by intended
+	// direction), not smoothed velocity — same rationale as
+	// updateRotationTracking(). wheelToEuclidean is a linear map, so feeding
+	// it distance deltas instead of velocities yields (dx, dy) displacement
+	// for this tick instead of (vx, vy).
+	WheelVelocities wheel_deltas_m{
+		static_cast<double>(static_cast<int64_t>(wheel_left_motor_->getCurrentDeltaCount())  * wheel_left_motor_->getIntendedDirection())  * ENCODER_RESOLUTION_DISTANCE_M,
+		static_cast<double>(static_cast<int64_t>(wheel_right_motor_->getCurrentDeltaCount()) * wheel_right_motor_->getIntendedDirection()) * ENCODER_RESOLUTION_DISTANCE_M,
+		static_cast<double>(static_cast<int64_t>(wheel_back_motor_->getCurrentDeltaCount())  * wheel_back_motor_->getIntendedDirection())  * ENCODER_RESOLUTION_DISTANCE_M,
+	};
+	RobotVelocity delta = wheelToEuclidean(wheel_deltas_m);
+	total_translation_m_ += std::hypot(delta.x, delta.y);
+}
+
+double MotorController::getTotalTranslationM() const{
+	return total_translation_m_;
+}
+
+void MotorController::resetTranslationTracking(){
+	total_translation_m_ = 0.0;
 }
 
 RobotVelocity MotorController::getCurrentRobotVelocity(){

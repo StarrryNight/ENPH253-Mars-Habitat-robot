@@ -23,7 +23,13 @@ void Servo::setPulseUs(int pulse_us)
 	// Clamp the input pulse width to safely stay within bounds
 	if (pulse_us < min_pulse_us_) pulse_us = min_pulse_us_;
 	if (pulse_us > max_pulse_us_) pulse_us = max_pulse_us_;
+
+	// No-op if this is the same pulse we already commanded — avoids
+	// resending identical PWM (and re-triggering servo jitter) every cycle.
+	if (has_written_ && pulse_us == pulse_us_) return;
+
 	pulse_us_ = pulse_us;
+	has_written_ = true;
 
 	// Calculate the correct duty cycle value based on a 12-bit resolution (0-4095 range).
 	// A 50Hz signal has a total period duration of 20,000 microseconds.
