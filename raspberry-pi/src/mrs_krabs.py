@@ -42,4 +42,4 @@ while True:
         )
         _last_heartbeat = now
 
-    time.sleep(0.05)  # 2 Hz
+    time.sleep(0.05)  # 20 Hz — irrelevant right now, capture() itself is the bottleneck (see [cv timing] log)

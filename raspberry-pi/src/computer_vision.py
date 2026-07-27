@@ -113,14 +113,18 @@ class ComputerVision:
         """Run NCNN inference on a BGR frame. Returns (x1, y1, x2, y2, conf,
         class_id) boxes in original-frame pixel coordinates, already filtered
         by confidence threshold and NMS."""
+        t0 = time.perf_counter()
         padded, scale, pad_x, pad_y = _letterbox(frame, CV_IMGSZ)
 
         blob = cv2.cvtColor(padded, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
         blob = np.ascontiguousarray(blob.transpose(2, 0, 1))  # HWC -> CHW
+        t1 = time.perf_counter()
 
         ex = self.net.create_extractor()
         ex.input("in0", ncnn.Mat(blob))
         _, out0 = ex.extract("out0")
+        t2 = time.perf_counter()
+        print(f"[cv timing] preprocess={1000*(t1-t0):.0f}ms ncnn={1000*(t2-t1):.0f}ms")
         pred = np.array(out0)  # (4 + num_classes, num_anchors)
         if pred.shape[0] == 4 + len(CLASS_NAMES):
             pred = pred.T  # -> (num_anchors, 4 + num_classes)
