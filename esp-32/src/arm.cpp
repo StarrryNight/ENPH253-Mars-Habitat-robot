@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "arm.h"
 #include "pins.h"
+#include <math.h>
 
 
 Arm::Arm()
@@ -33,4 +34,19 @@ void Arm::setPose(ArmPose pose)
 	bus_servo_.setAngle(pose.base_pitch_servo_degrees, pose.elbow_pitch_servo_degrees);
 }
 
+void Arm::setPoseXY(ArmCoordinate pose)
+{
+	current_poseXY_ = pose;
+	Arm::setPose(Arm::coordinateToDegrees(pose));
+}
 
+ArmPose Arm::coordinateToDegrees(ArmCoordinate pose) 
+{
+	using namespace math;
+	double q2 = -arccos((pow(pose.x_pos, 2) + pow(pose.y_pos, 2) - pow(UPPERARM_LENGTH, 2) - pow(FOREARM_LENGTH, 2))/(2*UPPERARM_LENGTH*FOREARM_LENGTH));
+	double q1 = arctan(pose.y_pos/pose.x_pos) + arctan(FOREARM_LENGTH*sin(q2)/(UPPERARM_LENGTH + FOREARM_LENGTH*cos(q2)));
+
+	double base_pitch_servo_degrees = 90 - q1;
+	double elbow_pitch_servo_degrees = -(q1-q2);
+	return {base_pitch_servo_degrees, elbow_pitch_servo_degrees, pose.wrist_yaw_servo_degrees, pose.claw_servo_degrees};
+}
