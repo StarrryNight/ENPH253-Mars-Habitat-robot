@@ -4,10 +4,12 @@ import time
 
 import serial
 from computer_vision import ComputerVision
-from config import UART_PORT, UART_BAUD
+from config import UART_BAUD, UART_PORT
 from proto import robot_messages_pb2 as proto
 
-sys.stdout.reconfigure(line_buffering=True)  # keep prints live when stdout isn't a tty (ssh/systemd/log redirect)
+sys.stdout.reconfigure(
+    line_buffering=True
+)  # keep prints live when stdout isn't a tty (ssh/systemd/log redirect)
 
 CAPTURE_DIR = os.path.join(os.path.dirname(__file__), "..", "captures")
 os.makedirs(CAPTURE_DIR, exist_ok=True)
@@ -35,7 +37,9 @@ while True:
 
     now = time.monotonic()
     if now - _last_heartbeat >= 2.0:
-        print(f"[mrs_krabs] alive, {len(cv.teletubby_sensor.detected)} teletubby(s) found so far")
+        print(
+            f"[mrs_krabs] alive, {len(cv.teletubby_sensor.detected)} teletubby(s) found so far"
+        )
         _last_heartbeat = now
 
-    time.sleep(0.5)  # 2 Hz
+    time.sleep(0.05)  # 2 Hz
