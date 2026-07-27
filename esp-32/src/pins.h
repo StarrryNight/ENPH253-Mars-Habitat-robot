@@ -45,3 +45,8 @@ static constexpr int METAL_DETECTOR_PIN = 10;
 
 // Go
 static constexpr int GO_PIN = 11;
+
+
+// OLED display (I2C)
+static constexpr int OLED_SDA = 1;
+static constexpr int OLED_SCK = 2;

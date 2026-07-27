@@ -64,11 +64,13 @@ void MrKrabs::setup()
 	motor_controller_->setup();
 	arm_.emplace();
 	ai_.emplace();
+	display_.emplace();
 
 	// ====================Set up firmware---------------------- //
 	arm_->begin();
 	ai_->setArm(&*arm_);
 	ai_->setLineFollower(&*line_follower_);
+	display_->begin();
 
 	// arm_.emplace() (above) already ran Arm's constructor, which begins
 	// Serial2 for the SCServo bus — safe to bind test_servo_ to it now.
@@ -190,6 +192,9 @@ void MrKrabs::handleCommand(const Command &cmd)
 {
 	if (cmd.teletubby_detected) {
 		Serial.println("[MrKrabs] Teletubby detected!");
+		display_->showTeletubbyFace();
+	} else {
+		display_->showAngryFace();
 	}
 }
 

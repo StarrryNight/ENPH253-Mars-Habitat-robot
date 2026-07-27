@@ -57,6 +57,17 @@ const ArmPoseSequence kHabitatPlaceSequence = {
 		{0, 90, 0, 0},   // retract, arm home
 	}
 };
+const ArmPoseSequence kTeletubbySequence = {
+	0,
+	{
+		{40, 55, 160, Arm::CLAW_OPEN},
+		{40, 55, 80, Arm::CLAW_OPEN},
+		{40, 55, 160, Arm::CLAW_OPEN},
+		{40, 55, 80, Arm::CLAW_OPEN},
+		{40, 55, 160, Arm::CLAW_OPEN},
+		{40, 55, 80, Arm::CLAW_OPEN},
+	}
+};
 
 // Looks up the ArmPoseSequence to run when entering state. Returns nullptr
 // for states with no fixed arm sequence — the line-following states, DONE,

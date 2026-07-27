@@ -6,6 +6,7 @@
 #include "motor_controller.h"
 #include "arm.h"
 #include "ai.h"
+#include "oled.h"
 #include "pins.h"
 #include <SCServo.h>
 #include "proto_gen/robot_messages.pb.h"
@@ -107,8 +108,8 @@ private:
 	void handleProtoByte(uint8_t b);
 
 	// Called once a Command has been fully received and nanopb-decoded.
-	// Currently just logs on teletubby_detected=true; wire up real behavior
-	// (e.g. flashing the Teletubby light) here.
+	// Draws a face on the OLED: happy (Display::showTeletubbyFace) when
+	// teletubby_detected=true, angry (Display::showAngryFace) otherwise.
 	void handleCommand(const Command &cmd);
 
 	enum TeleopKey {
@@ -204,6 +205,7 @@ private:
 	std::optional<MotorController> motor_controller_;
 	std::optional<Arm> arm_;
 	std::optional<AI> ai_;
+	std::optional<Display> display_;
 
 	// OrientationController has no hardware deps in its constructor — safe as direct member.
 	OrientationController orientation_controller_;

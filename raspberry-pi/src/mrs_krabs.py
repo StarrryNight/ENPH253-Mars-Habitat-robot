@@ -34,6 +34,8 @@ while True:
     if detection is not None:
         print(f"[mrs_krabs] found {detection.label} (conf={detection.confidence:.2f})")
         send_command(True)
+    else:
+        send_command(False)
 
     now = time.monotonic()
     if now - _last_heartbeat >= 2.0:
