@@ -4,6 +4,12 @@
 enum class RobotState {
 	FINDING_ROCK,
 	METAL_DETECTING,
+	// Entered from METAL_DETECTING when the RPi reports a Teletubby instead
+	// of (or in addition to) a metal hit — see AI::tickMetalDetecting/
+	// AI::notifyTeletubbyDetected. Runs kTeletubbySequence (robot_poses.h),
+	// then falls back to PICKUP_ROCK if metal was also detected, otherwise
+	// nextRockOrDone() — see AI::tickTeletubbying.
+	TELETUBBYING,
 	PICKUP_ROCK,
 	LINE_FOLLOWING,
 	HABITAT_PICKUP,
@@ -18,13 +24,14 @@ enum class RobotState {
 	DONE,
 };
 
-static constexpr size_t kNumRobotStates = 9;
+static constexpr size_t kNumRobotStates = 10;
 
 // Debug/serial-print helper — not used by any control-flow logic.
 inline const char* robotStateName(RobotState s) {
 	switch (s) {
 		case RobotState::FINDING_ROCK: return "FINDING_ROCK";
 		case RobotState::METAL_DETECTING: return "METAL_DETECTING";
+		case RobotState::TELETUBBYING: return "TELETUBBYING";
 		case RobotState::PICKUP_ROCK: return "PICKUP_ROCK";
 		case RobotState::LINE_FOLLOWING: return "LINE_FOLLOWING";
 		case RobotState::HABITAT_PICKUP: return "HABITAT_PICKUP";

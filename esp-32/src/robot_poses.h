@@ -86,6 +86,7 @@ const ArmPoseSequence kTeletubbySequence = {
 // AI::desiredDriveMode.
 inline const ArmPoseSequence* sequenceForState(RobotState state) {
 	switch (state) {
+		case RobotState::TELETUBBYING: return &kTeletubbySequence;
 		case RobotState::PICKUP_ROCK: return &kPickupRockSequence;
 		case RobotState::HABITAT_PICKUP: return &kHabitatPickupSequence;
 		case RobotState::HABITAT_PLACE: return &kHabitatPlaceSequence;

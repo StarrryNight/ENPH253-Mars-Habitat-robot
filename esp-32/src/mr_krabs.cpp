@@ -193,6 +193,7 @@ void MrKrabs::handleCommand(const Command &cmd)
 	if (cmd.teletubby_detected) {
 		Serial.println("[MrKrabs] Teletubby detected!");
 		display_->showTeletubbyFace();
+		ai_->notifyTeletubbyDetected();
 	} else {
 		display_->showAngryFace();
 	}

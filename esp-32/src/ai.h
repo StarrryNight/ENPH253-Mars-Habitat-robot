@@ -29,6 +29,15 @@ class AI {
 		void setArm(Arm* arm);
 		void setLineFollower(LineFollower* line_follower);
 
+		// Called by MrKrabs when the RPi reports a Teletubby (Command::
+		// teletubby_detected). Only takes effect while current_state_ is
+		// METAL_DETECTING — see tickMetalDetecting; ignored otherwise so a
+		// stray/late detection can't queue up a TELETUBBYING entry later.
+		// Also ignored once TELETUBBYING has already run kMaxTeletubbies
+		// times — the RPi has no memory of which teletubbies it already
+		// reported (see computer_vision.py), so the cap lives here instead.
+		void notifyTeletubbyDetected();
+
 		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE };
 		// What the drivetrain should currently be doing, derived from current_state_.
 		DriveMode desiredDriveMode() const;
@@ -70,6 +79,7 @@ class AI {
 
 		RobotState tickFindingRock();
 		RobotState tickMetalDetecting();
+		RobotState tickTeletubbying();
 		RobotState tickPickupRock();
 		RobotState tickLineFollowing();
 		RobotState tickHabitatPickup();
@@ -84,6 +94,9 @@ class AI {
 		SequenceRunner sequence_runner_;
 
 		RobotState current_state_;
+		// Set by notifyTeletubbyDetected(), consumed and cleared by
+		// tickMetalDetecting() on its next tick.
+		bool teletubby_detected_ = false;
 		std::array<int, kNumRobotStates> state_visit_count_{};
 		// Distance (m) traveled since the current state was entered.
 		double current_state_progress_m_;

@@ -7,6 +7,8 @@
 namespace {
 	constexpr int kNumRocks = 6;
 	constexpr int kNumHabitatCycles = 2;
+	// Only 2 teletubbies exist on the field — see AI::notifyTeletubbyDetected.
+	constexpr int kMaxTeletubbies = 2;
 
 	// Per-rock: distance (m) into FINDING_ROCK's Nth visit at which rock N's
 	// checkpoint is reached, the one-time rotation to face the scan
@@ -64,6 +66,12 @@ void AI::addProgress(double delta_m){
 	current_state_progress_m_ += delta_m;
 }
 
+void AI::notifyTeletubbyDetected(){
+	if (current_state_ == RobotState::METAL_DETECTING && visits(RobotState::TELETUBBYING) < kMaxTeletubbies){
+		teletubby_detected_ = true;
+	}
+}
+
 void AI::transitionTo(RobotState next){
 	Serial.printf("[AI] %s -> %s\n", robotStateName(current_state_), robotStateName(next));
 	current_state_ = next;
@@ -94,6 +102,7 @@ RobotState AI::tickCurrentState(){
 		case RobotState::REACQUIRING_LINE: return tickReacquiringLine();
 		case RobotState::FINDING_ROCK: return tickFindingRock();
 		case RobotState::METAL_DETECTING: return tickMetalDetecting();
+		case RobotState::TELETUBBYING: return tickTeletubbying();
 		case RobotState::PICKUP_ROCK: return tickPickupRock();
 		case RobotState::LINE_FOLLOWING: return tickLineFollowing();
 		case RobotState::HABITAT_PICKUP: return tickHabitatPickup();
@@ -137,8 +146,24 @@ RobotState AI::tickMetalDetecting(){
 	if (metal_detector_.getMetalDetectorState()){
 		return RobotState::PICKUP_ROCK;
 	}
+	if (teletubby_detected_){
+		teletubby_detected_ = false;
+		return RobotState::TELETUBBYING;
+	}
 	if (!sequence_runner_.complete()){
 		return RobotState::METAL_DETECTING;
+	}
+	return nextRockOrDone();
+}
+
+RobotState AI::tickTeletubbying(){
+	if (!sequence_runner_.complete()){
+		return RobotState::TELETUBBYING;
+	}
+	// Metal may have been detected while the wave was playing — prefer
+	// picking up the rock over moving on, same priority as tickMetalDetecting.
+	if (metal_detector_.getMetalDetectorState()){
+		return RobotState::PICKUP_ROCK;
 	}
 	return nextRockOrDone();
 }
