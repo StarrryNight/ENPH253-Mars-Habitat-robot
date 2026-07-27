@@ -19,6 +19,11 @@ public:
 
 	double targetRotationDegrees() const;
 
+	// This sequence's pose_settle_us (see robot_poses.h) — how long the
+	// caller should hold still after onRotationReached() applies a pose
+	// before applying the next. 0 if start() was never called.
+	uint64_t poseSettleUs() const;
+
 	// Applies the current pose to the arm and advances to the next one.
 	// Returns true iff a pose was actually written (caller should start a
 	// settle delay); false if the sequence is already complete.

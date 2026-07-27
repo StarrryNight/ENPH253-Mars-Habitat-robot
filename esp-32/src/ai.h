@@ -41,6 +41,10 @@ class AI {
 		// heading. Delegates to sequence_runner_; returns true iff a pose was
 		// just written (so the caller knows to start a settle delay).
 		bool onRotationReached();
+		// This sequence's per-pose settle delay (see ArmPoseSequence::pose_settle_us
+		// in robot_poses.h). Delegates to sequence_runner_; valid immediately
+		// after onRotationReached() returns true.
+		uint64_t sequencePoseSettleUs() const;
 
 		// Raw MetalDetector reading (interrupt-driven, see metal_detector.cpp) —
 		// exposed for MrKrabs's debug print, independent of METAL_DETECTING's

@@ -212,6 +212,10 @@ bool AI::onRotationReached(){
 	return sequence_runner_.onRotationReached(*arm_);
 }
 
+uint64_t AI::sequencePoseSettleUs() const{
+	return sequence_runner_.poseSettleUs();
+}
+
 bool AI::metalDetected(){
 	return metal_detector_.getMetalDetectorState();
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <vector>
 #include "arm.h"
 #include "robot_state.h"
@@ -15,6 +16,13 @@
 struct ArmPoseSequence {
 	double rotation_degrees;
 	std::vector<ArmPose> poses;
+	// How long to hold/settle after each pose in this sequence is applied,
+	// before the next one is written (see MrKrabs::driveCurrentMode's
+	// APPLYING_SEQUENCE case). Defaults to the same 2.5 s used everywhere
+	// else (ACTION_TRANSITION_DELAY_US in mr_krabs.h); sequences that don't
+	// need poses to fully settle (e.g. a fast wave/dance) can override this
+	// to move through their poses quicker.
+	uint64_t pose_settle_us = 2500000;
 };
 
 // Placeholder poses — need real tuning against the named poses in CLAUDE.md
@@ -57,6 +65,8 @@ const ArmPoseSequence kHabitatPlaceSequence = {
 		{0, 90, 0, 0},   // retract, arm home
 	}
 };
+// Faster settle (0.4 s vs. the 2.5 s default) — this is a wave/dance, not a
+// precise grab, so poses can be strung together quickly.
 const ArmPoseSequence kTeletubbySequence = {
 	0,
 	{
@@ -66,7 +76,8 @@ const ArmPoseSequence kTeletubbySequence = {
 		{40, 55, 80, Arm::CLAW_OPEN},
 		{40, 55, 160, Arm::CLAW_OPEN},
 		{40, 55, 80, Arm::CLAW_OPEN},
-	}
+	},
+	700000,
 };
 
 // Looks up the ArmPoseSequence to run when entering state. Returns nullptr

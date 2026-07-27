@@ -14,6 +14,11 @@ double SequenceRunner::targetRotationDegrees() const {
 	return sequence_->rotation_degrees;
 }
 
+uint64_t SequenceRunner::poseSettleUs() const {
+	if (sequence_ == nullptr) return 0;
+	return sequence_->pose_settle_us;
+}
+
 bool SequenceRunner::onRotationReached(Arm& arm) {
 	if (complete()) return false;
 	arm.setPose(sequence_->poses[index_]);

@@ -379,7 +379,7 @@ void MrKrabs::driveCurrentMode()
 				motor_controller_->driveOpenLoop({0,0,0});
 				orientation_controller_.reset();
 				if (ai_->onRotationReached()){
-					action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+					action_settle_until_us_ = esp_timer_get_time() + ai_->sequencePoseSettleUs();
 				}
 			}
 			else{
