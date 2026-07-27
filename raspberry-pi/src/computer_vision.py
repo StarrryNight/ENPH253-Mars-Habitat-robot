@@ -85,7 +85,7 @@ class ComputerVision:
             raise RuntimeError(f"Could not open camera {camera_index}")
 
         self.net = ncnn.Net()
-        self.net.opt.num_threads = os.cpu_count()
+        self.net.opt.num_threads = max(1, os.cpu_count() - 1)  # leave a core free for UART/OS so inference doesn't starve everything else
         self.net.load_param(os.path.join(MODEL_PATH, "model.ncnn.param"))
         self.net.load_model(os.path.join(MODEL_PATH, "model.ncnn.bin"))
 

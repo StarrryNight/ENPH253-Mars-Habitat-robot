@@ -1,6 +1,9 @@
+import sys
 import time
 
 import serial
+
+sys.stdout.reconfigure(line_buffering=True)  # keep prints live when stdout isn't a tty (ssh/systemd/log redirect)
 from computer_vision import ComputerVision
 from config import UART_PORT, UART_BAUD
 from proto import robot_messages_pb2 as proto
