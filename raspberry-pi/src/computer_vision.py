@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 from dataclasses import dataclass
 
@@ -92,6 +93,22 @@ class ComputerVision:
 
         self.teletubby_sensor = TeletubbySensor()
 
+        # The camera driver buffers frames internally regardless of CAP_PROP_BUFFERSIZE,
+        # so reading only when we run inference hands back a stale queued frame. A
+        # background thread drains the camera continuously; capture() just grabs
+        # whatever's freshest.
+        self._latest_frame: np.ndarray | None = None
+        self._frame_lock = threading.Lock()
+        self._reader_thread = threading.Thread(target=self._read_loop, daemon=True)
+        self._reader_thread.start()
+
+    def _read_loop(self):
+        while True:
+            ok, frame = self.cap.read()
+            if ok:
+                with self._frame_lock:
+                    self._latest_frame = frame
+
     def _infer(self, frame: np.ndarray) -> list[tuple[float, float, float, float, float, int]]:
         """Run NCNN inference on a BGR frame. Returns (x1, y1, x2, y2, conf,
         class_id) boxes in original-frame pixel coordinates, already filtered
@@ -141,8 +158,9 @@ class ComputerVision:
 
         If save_dir is given, the raw frame is written there as a timestamped
         JPEG before inference runs."""
-        ok, frame = self.cap.read()
-        if not ok:
+        with self._frame_lock:
+            frame = self._latest_frame
+        if frame is None:
             return None
 
         if save_dir is not None:

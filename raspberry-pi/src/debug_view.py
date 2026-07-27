@@ -10,8 +10,9 @@ cv_ = ComputerVision()
 
 print("[debug_view] press q to quit")
 while True:
-    ok, frame = cv_.cap.read()
-    if not ok:
+    with cv_._frame_lock:
+        frame = cv_._latest_frame
+    if frame is None:
         continue
 
     annotated = frame.copy()
