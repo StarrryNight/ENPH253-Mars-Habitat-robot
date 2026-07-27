@@ -28,7 +28,7 @@ constexpr ArmPose kArmTestPoses[] = {
 	
 };
 constexpr size_t kArmTestPoseCount = sizeof(kArmTestPoses) / sizeof(kArmTestPoses[0]);
-constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 1200000; // 2 s per pose
+constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
 
 // Flip to true to re-enable the arm-only bench test loop below. Left in
 // place (not deleted) for future bench testing, but off now that the real

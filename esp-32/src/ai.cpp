@@ -21,6 +21,7 @@ namespace {
 		// First entry shortened to 0.15 for bench testing the rock-finding
 		// sequence (line-follow -> stop -> METAL_DETECTING -> reacquire)
 		// without needing the full field run.
+		{0, {0.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
 		{0.5, {-47.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
 		{0.5, {48.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
 		{0.4, {-45.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
@@ -129,11 +130,17 @@ RobotState AI::tickFindingRock(){
 }
 
 RobotState AI::tickMetalDetecting(){
-	// Time trial: always pick up regardless of metal detector reading.
+	// Checked every tick regardless of sequence completion — the metal
+	// detector flag auto-clears itself after ~1s (see MetalDetector), so a
+	// hit mid-sweep would be missed if this only looked once the whole
+	// (multi-second, settle-delay-heavy) scan sequence finished.
+	if (metal_detector_.getMetalDetectorState()){
+		return RobotState::PICKUP_ROCK;
+	}
 	if (!sequence_runner_.complete()){
 		return RobotState::METAL_DETECTING;
 	}
-	return RobotState::PICKUP_ROCK;
+	return nextRockOrDone();
 }
 
 RobotState AI::tickPickupRock(){
