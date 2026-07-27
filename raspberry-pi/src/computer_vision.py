@@ -171,6 +171,9 @@ class ComputerVision:
             cv2.imwrite(os.path.join(save_dir, f"{time.time():.3f}.jpg"), frame)
 
         detections = self._infer(frame)
+        if any(CLASS_NAMES[d[5]] == "rock" for d in detections):
+            print("[cv] rock detected")
+
         teletubby_dets = [d for d in detections if CLASS_NAMES[d[5]] in TELETUBBY_LABELS]
         if not teletubby_dets:
             return None
@@ -178,13 +181,22 @@ class ComputerVision:
         x1, y1, x2, y2, conf, class_id = max(teletubby_dets, key=lambda d: d[4])
         label = CLASS_NAMES[class_id]
 
+        # Letterbox reversal can push boxes slightly outside the frame (rounding,
+        # or a detection clipped at the edge) — clamp before slicing/pixel math.
+        x1 = max(0, min(int(x1), self.frame_width))
+        x2 = max(0, min(int(x2), self.frame_width))
+        y1 = max(0, min(int(y1), self.frame_height))
+        y2 = max(0, min(int(y2), self.frame_height))
+
         cx = int((x1 + x2) / 2)
         cy = int((y1 + y2) / 2)
 
         bearing_deg = ((cx - self.frame_width / 2) / self.frame_width) * HFOV_DEG
 
-        bbox = (int(x1), int(y1), int(x2 - x1), int(y2 - y1))
-        is_new = self.teletubby_sensor.record(frame, bbox)
+        is_new = False
+        if x2 > x1 and y2 > y1:
+            bbox = (x1, y1, x2 - x1, y2 - y1)
+            is_new = self.teletubby_sensor.record(frame, bbox)
 
         return Detection(
             confidence=conf,
