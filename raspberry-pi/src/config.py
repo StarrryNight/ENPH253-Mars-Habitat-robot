@@ -13,7 +13,7 @@ MODEL_PATH = os.path.expanduser(
 )  # directory containing .param and .bin files
 CV_CONF = 0.04
 CV_IOU = 0.7
-CV_IMGSZ = 640
+CV_IMGSZ = 320
 HFOV_DEG = 60.0  # TODO: measure actual camera horizontal FOV
 TELETUBBY_LABELS = {"laa-laa", "Tinky winky", "Dipsy", "po"}
-CLASS_NAMES = ["laa-laa", "Tinky winky", "Dipsy", "po"]  # index order per best_ncnn_model/metadata.yaml
+CLASS_NAMES = ["laa-laa", "Tinky winky", "Dipsy", "po", "rock"]  # index order per best_ncnn_model/metadata.yaml
