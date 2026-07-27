@@ -48,5 +48,5 @@ ArmPose Arm::coordinateToDegrees(ArmCoordinate pose)
 
 	double base_pitch_servo_degrees = 90 - q1;
 	double elbow_pitch_servo_degrees = -(q1-q2);
-	return new ArmPose({base_pitch_servo_degrees, elbow_pitch_servo_degrees, pose.wrist_yaw_servo_degrees, pose.claw_servo_degrees});
+	return {base_pitch_servo_degrees, elbow_pitch_servo_degrees, pose.wrist_yaw_servo_degrees, pose.claw_servo_degrees};
 }
