@@ -1,12 +1,16 @@
+import os
 import sys
 import time
 
 import serial
-
-sys.stdout.reconfigure(line_buffering=True)  # keep prints live when stdout isn't a tty (ssh/systemd/log redirect)
 from computer_vision import ComputerVision
 from config import UART_PORT, UART_BAUD
 from proto import robot_messages_pb2 as proto
+
+sys.stdout.reconfigure(line_buffering=True)  # keep prints live when stdout isn't a tty (ssh/systemd/log redirect)
+
+CAPTURE_DIR = os.path.join(os.path.dirname(__file__), "..", "captures")
+os.makedirs(CAPTURE_DIR, exist_ok=True)
 
 uart = serial.Serial(UART_PORT, UART_BAUD)
 cv = ComputerVision()
@@ -24,7 +28,7 @@ def send_command(teletubby_detected: bool):
 print("[mrs_krabs] running")
 _last_heartbeat = time.monotonic()
 while True:
-    detection = cv.capture()
+    detection = cv.capture(save_dir=CAPTURE_DIR)
     if detection is not None:
         print(f"[mrs_krabs] found {detection.label} (conf={detection.confidence:.2f})")
         send_command(True)
@@ -34,4 +38,4 @@ while True:
         print(f"[mrs_krabs] alive, {len(cv.teletubby_sensor.detected)} teletubby(s) found so far")
         _last_heartbeat = now
 
-    time.sleep(0.05)  # 20 Hz
+    time.sleep(0.5)  # 2 Hz

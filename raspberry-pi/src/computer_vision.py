@@ -1,4 +1,5 @@
 import os
+import time
 from dataclasses import dataclass
 
 import cv2
@@ -133,13 +134,19 @@ class ComputerVision:
             results.append((x1, y1, x2, y2, float(confs[i]), int(class_ids[i])))
         return results
 
-    def capture(self) -> Detection | None:
+    def capture(self, save_dir: str | None = None) -> Detection | None:
         """Grab a frame, run local NCNN inference, return the highest-confidence
         teletubby detection or None. Sets is_new_teletubby=True only when the
-        detection is a colour not seen before."""
+        detection is a colour not seen before.
+
+        If save_dir is given, the raw frame is written there as a timestamped
+        JPEG before inference runs."""
         ok, frame = self.cap.read()
         if not ok:
             return None
+
+        if save_dir is not None:
+            cv2.imwrite(os.path.join(save_dir, f"{time.time():.3f}.jpg"), frame)
 
         detections = self._infer(frame)
         teletubby_dets = [d for d in detections if CLASS_NAMES[d[5]] in TELETUBBY_LABELS]
