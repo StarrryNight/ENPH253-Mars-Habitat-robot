@@ -50,3 +50,7 @@ static constexpr int GO_PIN = 11;
 // OLED display (I2C)
 static constexpr int OLED_SDA = 1;
 static constexpr int OLED_SCK = 2;
+
+// SONAR
+static constexpr int SONAR_TRIG;
+static constexpr int SONAR_ECHO;
