@@ -21,14 +21,14 @@ constexpr ArmCoordinate kArmTestPoses[] = {
 	//50 for oepn
 
 	{0.3, 0.025, 120, 50, 500, 500},
-	{0.30, -0.055, 120, 50, 300, 1000},
+	{0.30, -0.055, 120, 50, 250, 2500},
 	{0.30, -0.055, 120, 0, 500, 500},
 	{0.24, 0.060, 120, 0, 500, 500},
 	{0.24, 0.060, Arm::WRIST_PLACE, 0, 500, 500},
 	{0.24, 0.060, Arm::WRIST_PLACE, 50, 500, 500},
 };
 constexpr size_t kArmTestPoseCount = sizeof(kArmTestPoses) / sizeof(kArmTestPoses[0]);
-constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
+constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 1000000; // 2 s per pose
 
 // Flip to true to re-enable the arm-only bench test loop below. Left in
 // place (not deleted) for future bench testing, but off now that the real
@@ -65,12 +65,14 @@ void MrKrabs::setup()
 	arm_.emplace();
 	ai_.emplace();
 	display_.emplace();
+	sonar_.emplace();
 
 	// ====================Set up firmware---------------------- //
 	arm_->begin();
 	ai_->setArm(&*arm_);
 	ai_->setLineFollower(&*line_follower_);
 	display_->begin();
+	sonar_->begin();
 
 	// arm_.emplace() (above) already ran Arm's constructor, which begins
 	// Serial2 for the SCServo bus — safe to bind test_servo_ to it now.
@@ -273,28 +275,6 @@ void MrKrabs::stepControl()
 		}
 		return;
 	}
-	// Throttled to STATE_PRINT_PERIOD_US (500ms), not run every 10ms tick:
-	// each ReadPos/Ping is a full blocking Serial2 round-trip, and four of
-	// them every tick was saturating the half-duplex bus and the USB serial
-	// output badly enough to garble the printed text itself.
-	if (debug_print_now_){
-		int16_t pos_1 = test_servo_.ReadPos(/*ID=*/1);
-		int16_t pos_2 = test_servo_.ReadPos(/*ID=*/2);
-		// Ping is a much simpler transaction than ReadPos (no data payload) —
-		// returns the responding ID on success, -1 on no/garbled reply.
-		int ping_1 = test_servo_.Ping(1);
-		int ping_2 = test_servo_.Ping(2);
-		Serial.print("Servo 1 Position: ");
-		Serial.print(pos_1);
-		Serial.print(" (ping=");
-		Serial.print(ping_1);
-		Serial.print(")  Servo 2 Position: ");
-		Serial.print(pos_2);
-		Serial.print(" (ping=");
-		Serial.print(ping_2);
-		Serial.println(")");
-	}
-
 	// Arm-only bench test (AI/rotation dispatch disabled — see
 	// arm_test_pose_index_ in mr_krabs.h for why). Cycles through
 	// kArmTestPoses on a timer, independent of the drivetrain.
@@ -303,7 +283,24 @@ void MrKrabs::stepControl()
 	if (kRunArmBenchTest){
 		motor_controller_->driveOpenLoop({0, 0, 0});
 		if (now >= arm_test_pose_until_us_){
-			const ArmCoordinate &pose = kArmTestPoses[arm_test_pose_index_];
+			ArmCoordinate pose = kArmTestPoses[arm_test_pose_index_];
+			// Bench test override: drive x_pos off the live sonar reading
+			// (cm -> m) instead of the pose table's fixed value, only for
+			// the reach/grab poses (index 2 and 3) — the rest of the
+			// sequence moves to fixed positions regardless of where the
+			// rock was. +170.54mm corrects for the sonar's mounting offset
+			// from the arm's coordinate origin (back shoulder joint).
+			// Query fresh on pose 2 (rock still clearly in view); pose 3
+			// (closing the claw around it) reuses that same reading instead
+			// of re-querying, since the claw/rock can occlude or shift the
+			// sonar's return by then.
+			static double cached_sonar_x = 0.0;
+			if ((arm_test_pose_index_+1)%kArmTestPoseCount == 2){
+				cached_sonar_x = sonar_->queryDistance() / 100.0 + 0.16054;
+				pose.x_pos = cached_sonar_x;
+			} else if ((arm_test_pose_index_+1)%kArmTestPoseCount == 3){
+				pose.x_pos = cached_sonar_x;
+			}
 			arm_->setPoseXY(pose);
 			Serial.printf("[ArmTest] pose %u/%u: x=%.2f y=%.2f claw=%.0f base_speed=%.0f elbow_speed=%.0f\n",
 				(unsigned)arm_test_pose_index_ + 1, (unsigned)kArmTestPoseCount,

@@ -52,5 +52,6 @@ static constexpr int OLED_SDA = 1;
 static constexpr int OLED_SCK = 2;
 
 // SONAR
-static constexpr int SONAR_TRIG;
-static constexpr int SONAR_ECHO;
+// TODO: placeholder GPIOs, not yet confirmed against wiring — update once known.
+static constexpr int SONAR_TRIG = 41;
+static constexpr int SONAR_ECHO = 42;

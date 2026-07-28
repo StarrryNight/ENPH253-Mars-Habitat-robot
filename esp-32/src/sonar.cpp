@@ -8,11 +8,16 @@ Sonar::Sonar() : sonar(SONAR_TRIG, SONAR_ECHO, MAX_DISTANCE)
 
 }
 
+void Sonar::begin()
+{
+    // NewPing configures trig/echo pin modes in its constructor; nothing
+    // else to do here. Kept for parity with the other components' emplace-
+    // then-begin() pattern (see MrKrabs::setup()).
+}
+
 double Sonar::queryDistance()
 {
-    unsigned int distance = sonar.ping_cm();
-    if (distance > 30 || distance < 5) {
-        distance = 0;
-    }
+	float distance = (float)sonar.ping() / US_ROUNDTRIP_CM;
+	Serial.printf("sonar_distance: %.2f \n", distance);
     return distance;
 }

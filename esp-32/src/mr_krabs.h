@@ -7,6 +7,7 @@
 #include "arm.h"
 #include "ai.h"
 #include "oled.h"
+#include "sonar.h"
 #include "pins.h"
 #include <SCServo.h>
 #include "proto_gen/robot_messages.pb.h"
@@ -206,6 +207,7 @@ private:
 	std::optional<Arm> arm_;
 	std::optional<AI> ai_;
 	std::optional<Display> display_;
+	std::optional<Sonar> sonar_;
 
 	// OrientationController has no hardware deps in its constructor — safe as direct member.
 	OrientationController orientation_controller_;

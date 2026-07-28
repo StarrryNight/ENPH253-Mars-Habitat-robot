@@ -1,3 +1,4 @@
+#pragma once
 #include "pins.h"
 #include <Arduino.h>
 #include <NewPing.h>
@@ -14,4 +15,4 @@ class Sonar
     private:
         NewPing sonar;
 
-}
+};

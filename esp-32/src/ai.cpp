@@ -74,7 +74,7 @@ void AI::notifyTeletubbyDetected(){
 }
 
 void AI::transitionTo(RobotState next){
-	Serial.printf("[AI] %s -> %s\n", robotStateName(current_state_), robotStateName(next));
+	//Serial.printf("[AI] %s -> %s\n", robotStateName(current_state_), robotStateName(next));
 	current_state_ = next;
 	state_visit_count_[idx(next)]++;
 	current_state_progress_m_ = 0;
