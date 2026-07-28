@@ -10,7 +10,6 @@ enum class RobotState {
 	// then falls back to PICKUP_ROCK if metal was also detected, otherwise
 	// nextRockOrDone() — see AI::tickTeletubbying.
 	TELETUBBYING,
-	SCANNING_ROCK,
 	PICKUP_ROCK,
 	LINE_FOLLOWING,
 	HABITAT_PICKUP,
@@ -33,7 +32,6 @@ inline const char* robotStateName(RobotState s) {
 		case RobotState::FINDING_ROCK: return "FINDING_ROCK";
 		case RobotState::METAL_DETECTING: return "METAL_DETECTING";
 		case RobotState::TELETUBBYING: return "TELETUBBYING";
-		case RobotState::SCANNING_ROCK: return "SCANNING_ROCK";
 		case RobotState::PICKUP_ROCK: return "PICKUP_ROCK";
 		case RobotState::LINE_FOLLOWING: return "LINE_FOLLOWING";
 		case RobotState::HABITAT_PICKUP: return "HABITAT_PICKUP";

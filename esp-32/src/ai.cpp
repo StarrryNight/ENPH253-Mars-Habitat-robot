@@ -104,7 +104,6 @@ RobotState AI::tickCurrentState(){
 		case RobotState::FINDING_ROCK: return tickFindingRock();
 		case RobotState::METAL_DETECTING: return tickMetalDetecting();
 		case RobotState::TELETUBBYING: return tickTeletubbying();
-		case RobotState::SCANNING_ROCK: return tickScanningRock();
 		case RobotState::PICKUP_ROCK: return tickPickupRock();
 		case RobotState::LINE_FOLLOWING: return tickLineFollowing();
 		case RobotState::HABITAT_PICKUP: return tickHabitatPickup();
@@ -158,13 +157,6 @@ RobotState AI::tickMetalDetecting(){
 	return nextRockOrDone();
 }
 
-RobotState AI::tickScanningRock(){
-	unsigned int distance = Sonar::queryDistance();
-	if (distance == 0) {
-		return RobotState::SCANNING_ROCK;
-	}
-	return RobotState::METAL_DETECTING;
-}
 
 RobotState AI::tickTeletubbying(){
 	if (!sequence_runner_.complete()){
