@@ -93,7 +93,7 @@ STSServo::STSServo(int pin):servo_1_current_angle_(0),servo_2_current_angle_(0),
 	bus_servo_.EnableTorque(1, 1);
 	bus_servo_.EnableTorque(2, 1);
 };
-void STSServo::setAngle(double servo_1_angle, double servo_2_angle){
+void STSServo::setAngle(double servo_1_angle, double servo_2_angle, int servo_1_speed, int servo_2_speed){
 	// Reject anything outside the measured calibration range instead of
 	// silently clamping — an out-of-range request is a caller bug worth
 	// noticing, not something to quietly reinterpret.
@@ -105,8 +105,8 @@ void STSServo::setAngle(double servo_1_angle, double servo_2_angle){
 	int servo_2_pos = ServoPositionConversion(servo_2_angle, SERVO_2_MIN_DEG, SERVO_2_MAX_DEG, SERVO_2_MIN_RAW, SERVO_2_MAX_RAW);
 	// Speed is an unsigned magnitude in position mode — the servo works out
 	// direction itself from current vs. goal position.
-	bus_servo_.WritePosEx(/*ID=*/1, /*Position=*/servo_1_pos, /*Speed=*/SERVO_SPEED, /*ACC=*/50);
-	bus_servo_.WritePosEx(/*ID=*/2, /*Position=*/servo_2_pos, /*Speed=*/SERVO_SPEED, /*ACC=*/50);
+	bus_servo_.WritePosEx(/*ID=*/1, /*Position=*/servo_1_pos, /*Speed=*/servo_1_speed, /*ACC=*/50);
+	bus_servo_.WritePosEx(/*ID=*/2, /*Position=*/servo_2_pos, /*Speed=*/servo_2_speed, /*ACC=*/50);
 	servo_1_current_angle_ = servo_1_pos;
 	servo_2_current_angle_ = servo_2_pos;
 }

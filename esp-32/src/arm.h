@@ -10,6 +10,12 @@ struct ArmPose{
 	double elbow_pitch_servo_degrees;
 	double wrist_yaw_servo_degrees;
 	double claw_servo_degrees;
+	// Bus servo (STSServo) speeds for this pose — omit to fall back to
+	// DEFAULT_SPEED, so existing 4-field {a,b,c,d} pose literals still compile.
+	double base_pitch_servo_speed = DEFAULT_SPEED;
+	double elbow_pitch_servo_speed = DEFAULT_SPEED;
+
+	static constexpr double DEFAULT_SPEED = 500;
 };
 
 /*
@@ -21,6 +27,10 @@ struct ArmCoordinate{
 	double y_pos;
 	double wrist_yaw_servo_degrees;
 	double claw_servo_degrees;
+	// Mirrors ArmPose's speed fields — coordinateToDegrees() forwards these
+	// through so a caller can request a fast/slow move for a given target.
+	double base_pitch_servo_speed = ArmPose::DEFAULT_SPEED;
+	double elbow_pitch_servo_speed = ArmPose::DEFAULT_SPEED;
 };
 
 class Arm
@@ -29,7 +39,7 @@ class Arm
 public:
 
 	static constexpr double WRIST_CENTER = 120;
-	static constexpr double WRIST_PLACE = 35;
+	static constexpr double WRIST_PLACE = 15;
 	static constexpr double CLAW_OPEN = 50;
 	static constexpr double CLAW_CLOSE = 0;
 	static constexpr double UPPERARM_LENGTH = 0.2;

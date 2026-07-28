@@ -23,7 +23,7 @@ namespace {
 		// First entry shortened to 0.15 for bench testing the rock-finding
 		// sequence (line-follow -> stop -> METAL_DETECTING -> reacquire)
 		// without needing the full field run.
-		{0, {0.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
+		{0.1111, {0.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
 		{0.5, {-47.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
 		{0.5, {48.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},
 		{0.4, {-45.0, 	{{50, 20, Arm::WRIST_CENTER, Arm::CLAW_OPEN},{20, 50, Arm::WRIST_CENTER, Arm::CLAW_OPEN}}}},

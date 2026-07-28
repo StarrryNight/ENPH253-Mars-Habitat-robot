@@ -12,20 +12,20 @@ namespace {
 // horizontal — see STSServo's SERVO_1_*/SERVO_2_* calibration in servo.h
 // yaw 120 center, 40 rock
 	//release on rock {0, 23, 35, 0},
-constexpr ArmPose kArmTestPoses[] = {
+	//
+	//
+	//RANGE FOR COORDIANTE S YSTEM
+	//0.25 minimum
+constexpr ArmCoordinate kArmTestPoses[] = {
 	//0 for cloe
-	//50 for oepn 
+	//50 for oepn
 
-	{45, 25, 120, 50},
-	{45, 70, 120, 50},
-	{60, 25, 120, 50},
-	{60, 25, 120, 5},
-	{40, 40, 120, 5},
-	{-5, 50, 120, 5},
-	{-5, 20, 120, 5},
-//	{50, 25, 30, 65},
-//	{50, 25, 0, 10},
-	
+	{0.3, 0.025, 120, 50, 500, 500},
+	{0.30, -0.055, 120, 50, 300, 1000},
+	{0.30, -0.055, 120, 0, 500, 500},
+	{0.24, 0.060, 120, 0, 500, 500},
+	{0.24, 0.060, Arm::WRIST_PLACE, 0, 500, 500},
+	{0.24, 0.060, Arm::WRIST_PLACE, 50, 500, 500},
 };
 constexpr size_t kArmTestPoseCount = sizeof(kArmTestPoses) / sizeof(kArmTestPoses[0]);
 constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
@@ -33,7 +33,7 @@ constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
 // Flip to true to re-enable the arm-only bench test loop below. Left in
 // place (not deleted) for future bench testing, but off now that the real
 // AI-driven sequence is what should be moving the arm.
-constexpr bool kRunArmBenchTest = false;
+constexpr bool kRunArmBenchTest = true;
 }
 
 MrKrabs::MrKrabs() :
@@ -303,11 +303,11 @@ void MrKrabs::stepControl()
 	if (kRunArmBenchTest){
 		motor_controller_->driveOpenLoop({0, 0, 0});
 		if (now >= arm_test_pose_until_us_){
-			const ArmPose &pose = kArmTestPoses[arm_test_pose_index_];
-			arm_->setPose(pose);
-			Serial.printf("[ArmTest] pose %u/%u: base=%.0f elbow=%.0f\n, claw = %.0f\n",
+			const ArmCoordinate &pose = kArmTestPoses[arm_test_pose_index_];
+			arm_->setPoseXY(pose);
+			Serial.printf("[ArmTest] pose %u/%u: x=%.2f y=%.2f claw=%.0f base_speed=%.0f elbow_speed=%.0f\n",
 				(unsigned)arm_test_pose_index_ + 1, (unsigned)kArmTestPoseCount,
-				pose.base_pitch_servo_degrees,pose.elbow_pitch_servo_degrees ,pose.claw_servo_degrees);
+				pose.x_pos, pose.y_pos, pose.claw_servo_degrees, pose.base_pitch_servo_speed, pose.elbow_pitch_servo_speed);
 			arm_test_pose_index_ = (arm_test_pose_index_ + 1) % kArmTestPoseCount;
 			arm_test_pose_until_us_ = now + ARM_TEST_POSE_PERIOD_US;
 		}
