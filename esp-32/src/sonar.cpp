@@ -8,7 +8,7 @@ Sonar::Sonar() : sonar(SONAR_TRIG, SONAR_ECHO, MAX_DISTANCE)
 
 }
 
-Sonar::queryDistance()
+double Sonar::queryDistance()
 {
     unsigned int distance = sonar.ping_cm();
     if (distance > 30 || distance < 5) {
