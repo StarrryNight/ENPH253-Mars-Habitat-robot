@@ -49,8 +49,8 @@ class STSServo
 	// vertical. Raw direction runs opposite the degree axis here — 0 deg is
 	// raw 1000, 70 deg is raw 100 (confirmed on hardware: commanding 70 was
 	// landing at the physical 0 deg position and vice versa).
-	static constexpr double SERVO_1_MIN_DEG = -10.0;   // raw 1000
-	static constexpr double SERVO_1_MAX_DEG = 70.0;  // raw 100
+	static constexpr double SERVO_1_MIN_DEG = -2.0;   // raw 1000
+	static constexpr double SERVO_1_MAX_DEG = 74.0;  // raw 100
 	static constexpr int SERVO_1_MIN_RAW = 1100;
 	static constexpr int SERVO_1_MAX_RAW = 1850;
 

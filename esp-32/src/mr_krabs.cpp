@@ -20,15 +20,16 @@ constexpr ArmCoordinate kArmTestPoses[] = {
 	//0 for cloe
 	//50 for oepn
 
-	{0.3, 0.025, 120, 50, 500, 500},
-	{0.30, -0.055, 120, 50, 250, 2500},
+	{0.3, -0.03, 120, 50, 500, 500},
+	{0.30, 0.03, 120, 50, 500, 500},
+	{0.30, -0.06, 120, 50, 250, 500},
 	{0.30, -0.055, 120, 0, 500, 500},
 	{0.24, 0.060, 120, 0, 500, 500},
 	{0.24, 0.060, Arm::WRIST_PLACE, 0, 500, 500},
 	{0.24, 0.060, Arm::WRIST_PLACE, 50, 500, 500},
 };
 constexpr size_t kArmTestPoseCount = sizeof(kArmTestPoses) / sizeof(kArmTestPoses[0]);
-constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 1000000; // 2 s per pose
+constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
 
 // Flip to true to re-enable the arm-only bench test loop below. Left in
 // place (not deleted) for future bench testing, but off now that the real
@@ -295,10 +296,12 @@ void MrKrabs::stepControl()
 			// of re-querying, since the claw/rock can occlude or shift the
 			// sonar's return by then.
 			static double cached_sonar_x = 0.0;
-			if ((arm_test_pose_index_+1)%kArmTestPoseCount == 2){
-				cached_sonar_x = sonar_->queryDistance() / 100.0 + 0.16054;
-				pose.x_pos = cached_sonar_x;
-			} else if ((arm_test_pose_index_+1)%kArmTestPoseCount == 3){
+			if ((arm_test_pose_index_+1)%kArmTestPoseCount == 1){
+				cached_sonar_x = sonar_->queryDistance() / 100.0 + 0.18054;
+				pose.x_pos = cached_sonar_x+0.08;
+			} else if ( (arm_test_pose_index_+1)%kArmTestPoseCount == 2){
+				pose.x_pos = cached_sonar_x-0.02;
+			}	else if ((arm_test_pose_index_+1)%kArmTestPoseCount == 3 || (arm_test_pose_index_+1)%kArmTestPoseCount == 4){
 				pose.x_pos = cached_sonar_x;
 			}
 			arm_->setPoseXY(pose);

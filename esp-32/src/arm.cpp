@@ -21,7 +21,7 @@ void Arm::begin()
 	// Single-wire half-duplex UART: rx and tx are the same physical pin.
 	// Always reset to the home pose on startup, regardless of whatever
 	// current_pose_ might otherwise hold.
-	setPose({-5, 30, 120, 55});
+	setPose({0, 35, 120, 55});
 }
 
 
