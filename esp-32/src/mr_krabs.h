@@ -85,6 +85,15 @@ public:
 	// RobotState::ROTATING_TIL_ROCK).
 	void startRotatingTilRock();
 
+	// Enters reverse-180 mode. Same two-phase turn as
+	// startSearchingForLine() (fixed initial angle, then reactive spin until
+	// the line is reacquired), but the direction is forced clockwise rather
+	// than derived from last_rotation_sign_, and the fixed leg is
+	// REVERSE_180_INITIAL_TURN_DEG — so the total sweep lands ~180° from
+	// where it started regardless of which way the robot last turned.
+	// See RobotState::REVERSE_180.
+	void startReverse180();
+
 	// Enters habitat-search mode. Strafes at HABITAT_STRAFE_SPEED, direction
 	// given by AI::habitatFindDirection(), until AI's state transitions away
 	// (see RobotState::HABITAT_FIND).
@@ -97,10 +106,10 @@ public:
 	// preceded it (same reasoning as startRotation()'s reset).
 	void startBackingUp();
 
-	// Enters habitat-hold-and-move mode. First rotates a fixed 180° in
-	// place (direction continuing last_rotation_sign_), then strafes at
-	// HABITAT_STRAFE_SPEED opposite AI::habitatFindDirection() until AI's
-	// state transitions away (see RobotState::HABITAT_HOLD_AND_MOVE).
+	// Enters habitat-hold-and-move mode. Strafes at HABITAT_STRAFE_SPEED,
+	// opposite AI::habitatFindDirection() (no rotation happens beforehand —
+	// HABITAT_POST_PICKUP_BACKUP's straight backward leg runs first instead),
+	// until AI's state transitions away (see RobotState::HABITAT_HOLD_AND_MOVE).
 	void startHoldingAndMoving();
 
 private:
@@ -208,12 +217,6 @@ private:
 	// startSearchingForLine() is called.
 	bool line_search_initial_turn_done_ = false;
 
-	// True once HOLDING_AND_MOVING's fixed 180° turn (see
-	// startHoldingAndMoving/driveCurrentMode) has reached its target and the
-	// strafe-back-onto-the-line phase has taken over. Reset to false each
-	// time startHoldingAndMoving() is called.
-	bool habitat_hold_rotation_done_ = false;
-
 	// Angular velocity (rad/s, signed) driven during ROTATING_TIL_ROCK,
 	// latched by startRotatingTilRock() from AI::rockSearchOmegaRadS().
 	double rock_search_omega_rad_s_ = 0.0;
@@ -268,7 +271,19 @@ private:
 	size_t arm_test_pose_index_;
 	uint64_t arm_test_pose_until_us_;
 
-	static constexpr double HABITAT_STRAFE_SPEED = 0.15;
-	static constexpr double HABITAT_BACKUP_SPEED = 0.15;
+	static constexpr double HABITAT_STRAFE_SPEED = 0.23;
+	// Deliberately slow: the backup legs are only 3-10 cm, and the encoder
+	// resolves 9.69 mm/tick (see ENCODER_RESOLUTION_DISTANCE_M), so a short
+	// leg is only a handful of ticks. Nothing decelerates before
+	// stopImmediate(), so whatever the robot coasts after the distance check
+	// trips lands directly on top of the target — and coast energy goes as
+	// v². Keep this low enough that the coast stays small next to the
+	// shortest leg (kHabitatPostPickupBackupDistanceM et al. in ai.cpp).
+	static constexpr double HABITAT_BACKUP_SPEED = 0.12;
+
+	// Extra settle delay (µs) held after HOLDING_AND_MOVING's strafe-back-
+	// onto-the-line phase finishes, before LINE_FOLLOWING_REVERSE starts
+	// driving forward — see handleDriveTransition(). Tune empirically.
+	static constexpr uint64_t HABITAT_HOLD_LINE_SETTLE_US = 1500000; // 0.5 s
 
 };

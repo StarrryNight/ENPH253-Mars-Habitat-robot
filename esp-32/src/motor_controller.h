@@ -106,17 +106,18 @@ public:
 	// without perturbing the accumulation.
 	double getElapsedRotation() const;
 
-	// Folds this tick's per-wheel encoder deltas into the running translation
-	// odometer (total_translation_m_), the same exact-integer-count approach
-	// updateRotationTracking() uses for heading — see that comment for why
-	// this beats integrating (filtered) velocity. Must run after
+	// Folds this tick's measured (filtered) robot velocity into the running
+	// translation odometer (total_translation_m_) via velocity * dt —
+	// unlike updateRotationTracking()'s exact-encoder-count approach for
+	// heading, this integrates getCurrentRobotVelocity() instead, since the
+	// exact-count approach proved less reliable in practice. Must run after
 	// tickMotorSpeeds() each tick (see MrKrabs::motorStepControl).
 	void updateTranslationTracking();
 
 	// Monotonic total path length (m) traveled since construction/last reset,
-	// computed from raw encoder deltas (see updateTranslationTracking()), not
-	// integrated velocity. Callers diff successive reads to get incremental
-	// distance — see MrKrabs::driveCurrentMode.
+	// integrated from measured velocity (see updateTranslationTracking()).
+	// Callers diff successive reads to get incremental distance — see
+	// MrKrabs::driveCurrentMode.
 	double getTotalTranslationM() const;
 
 	// Zeros the translation odometer. Called when leaving LINE_FOLLOWING for

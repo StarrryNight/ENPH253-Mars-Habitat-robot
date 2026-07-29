@@ -43,7 +43,17 @@ namespace {
 	// Distance (m) driven straight backward on the HABITAT_BACKUP leg, to
 	// clear the habitat wall HABITAT_FIND's sonar just read close-range
 	// before HABITAT_PICKUP's arm sequence runs.
-	constexpr double kHabitatBackupDistanceM = 0.1;
+	constexpr double kHabitatBackupDistanceM = 0.09;
+
+	// Distance (m) driven straight backward on the HABITAT_APPROACH_BACKUP
+	// leg, before HABITAT_FIND starts its sonar-based strafe search — clears
+	// the wall the robot just line-followed up to.
+	constexpr double kHabitatApproachBackupDistanceM = 0.03;
+
+	// Distance (m) driven straight backward on the HABITAT_POST_PICKUP_BACKUP
+	// leg, after HABITAT_PICKUP's arm sequence completes — clears the
+	// habitat before HABITAT_HOLD_AND_MOVE strafes back onto the line.
+	constexpr double kHabitatPostPickupBackupDistanceM = 0.10;
 
 	// Sonar range (cm) that counts as "found the rock" — see
 	// AI::tickRotatingTilRock. Placeholder pending hardware tuning.
@@ -108,10 +118,6 @@ void AI::setLineSearchInitialTurnDone(bool done){
 	line_search_initial_turn_done_ = done;
 }
 
-void AI::setHabitatHoldRotationDone(bool done){
-	habitat_hold_rotation_done_ = done;
-}
-
 void AI::notifyTeletubbyDetected(){
 	if (current_state_ == RobotState::METAL_DETECTING && visits(RobotState::TELETUBBYING) < kMaxTeletubbies){
 		teletubby_detected_ = true;
@@ -150,6 +156,7 @@ void AI::tickAI(){
 RobotState AI::tickCurrentState(){
 	switch (current_state_){
 		case RobotState::REACQUIRING_LINE: return tickReacquiringLine();
+		case RobotState::REVERSE_180: return tickReverse180();
 		case RobotState::FINDING_ROCK: return tickFindingRock();
 		case RobotState::ROTATING_TIL_ROCK: return tickRotatingTilRock();
 		case RobotState::METAL_DETECTING: return tickMetalDetecting();
@@ -159,8 +166,10 @@ RobotState AI::tickCurrentState(){
 		case RobotState::HABITAT_PICKUP: return tickHabitatPickup();
 		case RobotState::LINE_FOLLOWING_REVERSE: return tickLineFollowingReverse();
 		case RobotState::HABITAT_PLACE: return tickHabitatPlace();
+		case RobotState::HABITAT_APPROACH_BACKUP: return tickHabitatApproachBackup();
 		case RobotState::HABITAT_FIND: return tickHabitatFind();
 		case RobotState::HABITAT_BACKUP: return tickHabitatBackup();
+		case RobotState::HABITAT_POST_PICKUP_BACKUP: return tickHabitatPostPickupBackup();
 		case RobotState::HABITAT_HOLD_AND_MOVE: return tickHabitatHoldAndMove();
 		case RobotState::DONE: return RobotState::DONE;
 	}
@@ -179,6 +188,20 @@ RobotState AI::tickReacquiringLine(){
 	}
 	if (!line_follower_ || !line_follower_->bothMidSensorsOnLine()){
 		return RobotState::REACQUIRING_LINE;
+	}
+	return post_reacquire_state_;
+}
+
+RobotState AI::tickReverse180(){
+	// Same two-phase completion as tickReacquiringLine — hold off on the
+	// line sensors until the fixed initial turn has cleared the line, then
+	// spin until they reacquire it. The forced-clockwise direction and the
+	// smaller initial angle are set by MrKrabs::startReverse180().
+	if (!line_search_initial_turn_done_){
+		return RobotState::REVERSE_180;
+	}
+	if (!line_follower_ || !line_follower_->bothMidSensorsOnLine()){
+		return RobotState::REVERSE_180;
 	}
 	return post_reacquire_state_;
 }
@@ -260,9 +283,15 @@ RobotState AI::tickPickupRock(){
 
 RobotState AI::tickLineFollowing(){
 	if (line_follower_ && line_follower_->bothSideSensorsOnLine()){
-		return RobotState::HABITAT_FIND;
+		return RobotState::HABITAT_APPROACH_BACKUP;
 	}
 	return RobotState::LINE_FOLLOWING;
+}
+
+RobotState AI::tickHabitatApproachBackup(){
+	return current_state_progress_m_ >= kHabitatApproachBackupDistanceM
+		? RobotState::HABITAT_FIND
+		: RobotState::HABITAT_APPROACH_BACKUP;
 }
 
 RobotState AI::tickHabitatFind(){
@@ -296,29 +325,38 @@ RobotState AI::tickHabitatPickup(){
 		return RobotState::HABITAT_PICKUP;
 	}
 	post_line_reverse_state_ = RobotState::HABITAT_PLACE;
-	return RobotState::HABITAT_HOLD_AND_MOVE;
+	return RobotState::HABITAT_POST_PICKUP_BACKUP;
+}
+
+RobotState AI::tickHabitatPostPickupBackup(){
+	return current_state_progress_m_ >= kHabitatPostPickupBackupDistanceM
+		? RobotState::HABITAT_HOLD_AND_MOVE
+		: RobotState::HABITAT_POST_PICKUP_BACKUP;
 }
 
 RobotState AI::tickHabitatHoldAndMove(){
-	// Ignore the line sensors until the fixed 180° turn has actually
-	// completed — same reasoning as tickReacquiringLine's initial-turn gate.
-	if (!habitat_hold_rotation_done_){
-		return RobotState::HABITAT_HOLD_AND_MOVE;
-	}
 	if (!line_follower_ || !line_follower_->bothMidSensorsOnLine()){
 		return RobotState::HABITAT_HOLD_AND_MOVE;
 	}
-	return RobotState::LINE_FOLLOWING_REVERSE;
+	// Back on the line, but still facing the habitat we just picked up from —
+	// reverse ~180° before driving the LINE_FOLLOWING_REVERSE leg toward the
+	// place spot.
+	post_reacquire_state_ = RobotState::LINE_FOLLOWING_REVERSE;
+	return RobotState::REVERSE_180;
 }
 
 RobotState AI::tickLineFollowingReverse(){
 	// The post-pickup leg (heading to HABITAT_PLACE) drives until the right
-	// sensor crosses the habitat place marker, rather than a fixed distance.
+	// sensor crosses the habitat place marker, then reacquires the line (45°
+	// turn + reactive spin, see tickReacquiringLine) before actually handing
+	// off to HABITAT_PLACE — triggering the arm sequence the instant the
+	// sensor fires leaves the robot facing the wrong way to place.
 	if (post_line_reverse_state_ == RobotState::HABITAT_PLACE){
 		if (!line_follower_ || !line_follower_->rightSensorOnLine()){
 			return RobotState::LINE_FOLLOWING_REVERSE;
 		}
-		return RobotState::HABITAT_PLACE;
+		post_reacquire_state_ = RobotState::HABITAT_PLACE;
+		return RobotState::REACQUIRING_LINE;
 	}
 	return current_state_progress_m_ >= kLineFollowingReverseDistanceM
 		? post_line_reverse_state_
@@ -343,13 +381,17 @@ AI::DriveMode AI::desiredDriveMode() const{
 	if (current_state_ == RobotState::REACQUIRING_LINE){
 		return DriveMode::SEARCHING_FOR_LINE;
 	}
+	if (current_state_ == RobotState::REVERSE_180){
+		return DriveMode::REVERSE_180;
+	}
 	if (current_state_ == RobotState::ROTATING_TIL_ROCK){
 		return DriveMode::ROTATING_TIL_ROCK;
 	}
 	if (current_state_ == RobotState::HABITAT_FIND){
 		return DriveMode::STRAFING_TIL_HABITAT;
 	}
-	if (current_state_ == RobotState::HABITAT_BACKUP){
+	if (current_state_ == RobotState::HABITAT_BACKUP || current_state_ == RobotState::HABITAT_APPROACH_BACKUP ||
+	    current_state_ == RobotState::HABITAT_POST_PICKUP_BACKUP){
 		return DriveMode::BACKING_UP;
 	}
 	if (current_state_ == RobotState::HABITAT_HOLD_AND_MOVE){

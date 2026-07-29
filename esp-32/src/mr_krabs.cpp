@@ -280,7 +280,7 @@ void MrKrabs::stepControl()
 	updateMetalDetectorLed(ai_->metalDetected(), now);
 
 	if (now < action_settle_until_us_){
-		motor_controller_->driveOpenLoop({0, 0, 0});
+		motor_controller_->stopImmediate();
 		if (debug_print_now_){
 			Serial.printf("[MrKrabs] settling, %.0f ms left\n", (action_settle_until_us_ - now) / 1000.0);
 		}
@@ -292,7 +292,7 @@ void MrKrabs::stepControl()
 	// Currently disabled (see kRunArmBenchTest) so it doesn't fight with the
 	// real AI-driven sequence.
 	if (kRunArmBenchTest){
-		motor_controller_->driveOpenLoop({0, 0, 0});
+		motor_controller_->stopImmediate();
 		if (now >= arm_test_pose_until_us_){
 			ArmCoordinate pose = kArmTestPoses[arm_test_pose_index_];
 			// Bench test override: drive x_pos off the live sonar reading
@@ -344,6 +344,12 @@ bool MrKrabs::handleDriveTransition()
 		Serial.printf("[MrKrabs] drive_mode %d -> %d (state=%s, target_deg=%.1f)\n",
 			static_cast<int>(drive_mode_), static_cast<int>(desired),
 			robotStateName(ai_->currentState()), ai_->targetRotationDegrees());
+		// Detected before the switch below overwrites drive_mode_ — extends
+		// the settle delay startLineFollowing() sets, so the rock/arm has
+		// extra time to stop swinging after the strafe-back-onto-the-line
+		// before LINE_FOLLOWING_REVERSE starts driving forward.
+		bool leaving_hold_and_move = (drive_mode_ == AI::DriveMode::HOLDING_AND_MOVING &&
+			desired == AI::DriveMode::LINE_FOLLOWING);
 		switch (desired){
 			case AI::DriveMode::LINE_FOLLOWING: startLineFollowing(); break;
 			case AI::DriveMode::APPLYING_SEQUENCE: startRotation(ai_->targetRotationDegrees() * DEG_TO_RAD); break;
@@ -353,6 +359,10 @@ bool MrKrabs::handleDriveTransition()
 			case AI::DriveMode::STRAFING_TIL_HABITAT: startStrafingTilHabitat(); break;
 			case AI::DriveMode::BACKING_UP: startBackingUp(); break;
 			case AI::DriveMode::HOLDING_AND_MOVING: startHoldingAndMoving(); break;
+			case AI::DriveMode::REVERSE_180: startReverse180(); break;
+		}
+		if (leaving_hold_and_move){
+			action_settle_until_us_ = esp_timer_get_time() + HABITAT_HOLD_LINE_SETTLE_US;
 		}
 		last_commanded_rotation_degrees_ = ai_->targetRotationDegrees();
 		return true;
@@ -391,7 +401,7 @@ void MrKrabs::driveCurrentMode()
 			double curr_position = motor_controller_->getElapsedRotation();
 			if (orientation_controller_.reachedTarget(curr_position)){
 				//Serial.print("reached target");
-				motor_controller_->driveOpenLoop({0,0,0});
+				motor_controller_->stopImmediate();
 				orientation_controller_.reset();
 				if (ai_->onRotationReached()){
 					action_settle_until_us_ = esp_timer_get_time() + ai_->sequencePoseSettleUs();
@@ -403,9 +413,12 @@ void MrKrabs::driveCurrentMode()
 			}
 			break;
 		}
+		// Identical drive behavior — the two modes differ only in the
+		// direction/initial angle latched by their start*() functions.
+		case AI::DriveMode::REVERSE_180:
 		case AI::DriveMode::SEARCHING_FOR_LINE: {
 			if (!line_search_initial_turn_done_){
-				// Fixed 45° turn first, same direction as the reactive spin
+				// Fixed initial turn first, same direction as the reactive spin
 				// below — without this, a state that left the robot already
 				// facing/sitting on the line (e.g. HABITAT_PICKUP/PLACE,
 				// which no longer rotate) could have bothMidSensorsOnLine()
@@ -413,7 +426,7 @@ void MrKrabs::driveCurrentMode()
 				// actual rotation.
 				double curr_position = motor_controller_->getElapsedRotation();
 				if (orientation_controller_.reachedTarget(curr_position)){
-					motor_controller_->driveOpenLoop({0,0,0});
+					motor_controller_->stopImmediate();
 					orientation_controller_.reset();
 					line_search_initial_turn_done_ = true;
 					ai_->setLineSearchInitialTurnDone(true);
@@ -432,7 +445,7 @@ void MrKrabs::driveCurrentMode()
 			break;
 		}
 		case AI::DriveMode::IDLE:
-			motor_controller_->driveOpenLoop({0,0,0});
+			motor_controller_->stopImmediate();
 			break;
 		case AI::DriveMode::ROTATING_TIL_ROCK:
 			// AI::tickRotatingTilRock() (called via ai_->tickAI() earlier this
@@ -460,25 +473,16 @@ void MrKrabs::driveCurrentMode()
 			last_total_translation_m_ = total_translation_m;
 			break;
 		}
-		case AI::DriveMode::HOLDING_AND_MOVING: {
-			if (!habitat_hold_rotation_done_){
-				double curr_position = motor_controller_->getElapsedRotation();
-				if (orientation_controller_.reachedTarget(curr_position)){
-					motor_controller_->driveOpenLoop({0,0,0});
-					orientation_controller_.reset();
-					habitat_hold_rotation_done_ = true;
-					ai_->setHabitatHoldRotationDone(true);
-				} else {
-					double correction = orientation_controller_.calculateCorrection(curr_position);
-					motor_controller_->setVelocity({0,0, correction});
-				}
-				break;
-			}
-			// Turn's done: strafe back onto the line, opposite the direction
+		case AI::DriveMode::HOLDING_AND_MOVING:
+			// AI::tickHabitatHoldAndMove() (called via ai_->tickAI() earlier
+			// this tick) already checked the line sensors and will transition
+			// the state once both mids are on the line — this just keeps
+			// strafing until then. No rotation happens beforehand anymore
+			// (HABITAT_POST_PICKUP_BACKUP's straight backward leg runs
+			// first instead), so this strafes opposite the direction
 			// HABITAT_FIND strafed to reach this slot.
 			motor_controller_->setVelocity({-HABITAT_STRAFE_SPEED * ai_->habitatFindDirection(), 0, 0});
 			break;
-		}
 	}
 }
 
@@ -510,14 +514,13 @@ void MrKrabs::updateMetalDetectorLed(bool metal_detected, uint64_t now)
 void MrKrabs::motorStepControl(){
 	motor_controller_->tickMotorSpeeds();
 	motor_controller_->updateRotationTracking();
-	// Only fold ticks into the translation odometer while actually
-	// line-following — rotating in place / applying arm poses shouldn't
-	// count toward progress at all (see startRotation(), which zeros the
-	// odometer on the way out of LINE_FOLLOWING so it starts clean each time
-	// recording resumes).
-	if (drive_mode_ == AI::DriveMode::LINE_FOLLOWING){
-		motor_controller_->updateTranslationTracking();
-	}
+	// Runs unconditionally every tick, like updateRotationTracking() —
+	// BACKING_UP's distance-based completion (see AI::tickHabitatBackup)
+	// needs the odometer moving too, not just LINE_FOLLOWING. Whichever
+	// drive mode actually consumes progress resets the odometer on entry
+	// (startRotation(), startBackingUp()), so accumulation during modes that
+	// don't care doesn't leak into a later distance check.
+	motor_controller_->updateTranslationTracking();
 	motor_controller_->applyVelocity();
 }
 
@@ -530,7 +533,7 @@ void MrKrabs::startLineFollowing()
 void MrKrabs::startRotation(double target_angle)
 {
 	Serial.printf("[MrKrabs] startRotation(%.3f rad = %.1f deg)\n", target_angle, target_angle * RAD_TO_DEG);
-	motor_controller_->driveOpenLoop({0,0,0});
+	motor_controller_->stopImmediate();
 	drive_mode_ = AI::DriveMode::APPLYING_SEQUENCE;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 	motor_controller_->startRotation();
@@ -550,7 +553,7 @@ void MrKrabs::startRotation(double target_angle)
 
 void MrKrabs::startIdle()
 {
-	motor_controller_->driveOpenLoop({0,0,0});
+	motor_controller_->stopImmediate();
 	drive_mode_ = AI::DriveMode::IDLE;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 }
@@ -560,14 +563,9 @@ void MrKrabs::startIdle()
 // continuous spin — see startSearchingForLine/driveCurrentMode.
 static constexpr double LINE_SEARCH_INITIAL_TURN_DEG = 45.0;
 
-// Fixed turn (deg) driveCurrentMode() rotates through in HOLDING_AND_MOVING
-// before falling back to the strafe-back-onto-the-line phase — see
-// startHoldingAndMoving/driveCurrentMode.
-static constexpr double HABITAT_HOLD_ROTATION_DEG = 180.0;
-
 void MrKrabs::startSearchingForLine()
 {
-	motor_controller_->driveOpenLoop({0,0,0});
+	motor_controller_->stopImmediate();
 	drive_mode_ = AI::DriveMode::SEARCHING_FOR_LINE;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 	motor_controller_->startRotation();
@@ -584,9 +582,32 @@ void MrKrabs::startSearchingForLine()
 		last_rotation_sign_, search_omega_rad_s_);
 }
 
+// Fixed initial turn (deg) for REVERSE_180's first phase. Smaller than
+// LINE_SEARCH_INITIAL_TURN_DEG — it only has to carry the mid sensors clear
+// of the line, since the reactive spin that follows covers the remaining
+// ~150° until the line is reacquired on the far side.
+static constexpr double REVERSE_180_INITIAL_TURN_DEG = 30.0;
+
+void MrKrabs::startReverse180()
+{
+	motor_controller_->stopImmediate();
+	drive_mode_ = AI::DriveMode::REVERSE_180;
+	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	motor_controller_->startRotation();
+	// Forced clockwise (negative omega — omega is CCW-positive, see
+	// MotorController's RobotVelocity) rather than reversing whichever way we
+	// last turned, so the reversal direction is deterministic.
+	search_omega_rad_s_ = -LINE_SEARCH_OMEGA_RAD_S;
+	line_search_initial_turn_done_ = false;
+	ai_->setLineSearchInitialTurnDone(false);
+	orientation_controller_.startRotation(-REVERSE_180_INITIAL_TURN_DEG * DEG_TO_RAD);
+	last_rotation_sign_ = -1.0;
+	Serial.printf("[MrKrabs] startReverse180, omega=%.2f\n", search_omega_rad_s_);
+}
+
 void MrKrabs::startRotatingTilRock()
 {
-	motor_controller_->driveOpenLoop({0,0,0});
+	motor_controller_->stopImmediate();
 	drive_mode_ = AI::DriveMode::ROTATING_TIL_ROCK;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 	// Not using orientation_controller_ here (no fixed target — this spins
@@ -614,17 +635,9 @@ void MrKrabs::startStrafingTilHabitat()
 
 void MrKrabs::startHoldingAndMoving()
 {
-	motor_controller_->driveOpenLoop({0,0,0});
 	drive_mode_ = AI::DriveMode::HOLDING_AND_MOVING;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
-	motor_controller_->startRotation();
-	habitat_hold_rotation_done_ = false;
-	ai_->setHabitatHoldRotationDone(false);
-	// Direction doesn't affect the final heading for a fixed 180° turn —
-	// keep spinning the same way as the last real rotation.
-	double rotation_rad = last_rotation_sign_ * (HABITAT_HOLD_ROTATION_DEG * DEG_TO_RAD);
-	orientation_controller_.startRotation(rotation_rad);
-	Serial.printf("[MrKrabs] startHoldingAndMoving, rotation_sign=%.0f\n", last_rotation_sign_);
+	Serial.printf("[MrKrabs] startHoldingAndMoving, direction=%d\n", -ai_->habitatFindDirection());
 }
 
 void MrKrabs::startBackingUp()

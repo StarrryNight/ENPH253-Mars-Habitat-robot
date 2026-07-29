@@ -271,18 +271,13 @@ double MotorController::getElapsedRotation() const{
 }
 
 void MotorController::updateTranslationTracking(){
-	// Exact per-tick wheel-surface distance deltas (signed by intended
-	// direction), not smoothed velocity — same rationale as
-	// updateRotationTracking(). wheelToEuclidean is a linear map, so feeding
-	// it distance deltas instead of velocities yields (dx, dy) displacement
-	// for this tick instead of (vx, vy).
-	WheelVelocities wheel_deltas_m{
-		static_cast<double>(static_cast<int64_t>(wheel_left_motor_->getCurrentDeltaCount())  * wheel_left_motor_->getIntendedDirection())  * ENCODER_RESOLUTION_DISTANCE_M,
-		static_cast<double>(static_cast<int64_t>(wheel_right_motor_->getCurrentDeltaCount()) * wheel_right_motor_->getIntendedDirection()) * ENCODER_RESOLUTION_DISTANCE_M,
-		static_cast<double>(static_cast<int64_t>(wheel_back_motor_->getCurrentDeltaCount())  * wheel_back_motor_->getIntendedDirection())  * ENCODER_RESOLUTION_DISTANCE_M,
-	};
-	RobotVelocity delta = wheelToEuclidean(wheel_deltas_m);
-	total_translation_m_ += std::hypot(delta.x, delta.y);
+	// Integrates the measured (filtered) robot velocity each tick instead of
+	// accumulating exact encoder-count deltas — the exact-count approach
+	// proved less reliable in practice, so this trades back some
+	// long-run compounding error for steadier per-tick readings. Must run
+	// after tickMotorSpeeds() (see its header comment), which is what keeps
+	// current_robot_velocity_ fresh for this tick.
+	total_translation_m_ += std::hypot(current_robot_velocity_.x, current_robot_velocity_.y) * MOTOR_CONTROL_LOOP_PERIOD;
 }
 
 double MotorController::getTotalTranslationM() const{
