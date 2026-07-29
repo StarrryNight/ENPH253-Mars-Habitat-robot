@@ -271,7 +271,7 @@ private:
 	size_t arm_test_pose_index_;
 	uint64_t arm_test_pose_until_us_;
 
-	static constexpr double HABITAT_STRAFE_SPEED = 0.23;
+	static constexpr double HABITAT_STRAFE_SPEED = 0.13;
 	// Deliberately slow: the backup legs are only 3-10 cm, and the encoder
 	// resolves 9.69 mm/tick (see ENCODER_RESOLUTION_DISTANCE_M), so a short
 	// leg is only a handful of ticks. Nothing decelerates before
@@ -279,7 +279,7 @@ private:
 	// trips lands directly on top of the target — and coast energy goes as
 	// v². Keep this low enough that the coast stays small next to the
 	// shortest leg (kHabitatPostPickupBackupDistanceM et al. in ai.cpp).
-	static constexpr double HABITAT_BACKUP_SPEED = 0.12;
+	static constexpr double HABITAT_BACKUP_SPEED = 0.10;
 
 	// Extra settle delay (µs) held after HOLDING_AND_MOVING's strafe-back-
 	// onto-the-line phase finishes, before LINE_FOLLOWING_REVERSE starts

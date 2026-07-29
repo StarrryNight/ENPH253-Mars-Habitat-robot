@@ -125,7 +125,7 @@ int MotorDriver::speedToDutyCycle(int speed){
 	if (abs_speed < MOTOR_SPEED_DEADZONE){
 		return 0;
 	}
-	return std::clamp(abs_speed+40, 0, 255);
+	return std::clamp(abs_speed+60, 0, 255);
 }
 double MotorDriver::getCurrentTargetSpeed()
 {

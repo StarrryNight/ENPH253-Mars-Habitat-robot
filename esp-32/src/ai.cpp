@@ -48,7 +48,7 @@ namespace {
 	// Distance (m) driven straight backward on the HABITAT_APPROACH_BACKUP
 	// leg, before HABITAT_FIND starts its sonar-based strafe search — clears
 	// the wall the robot just line-followed up to.
-	constexpr double kHabitatApproachBackupDistanceM = 0.03;
+	constexpr double kHabitatApproachBackupDistanceM = 0.02;
 
 	// Distance (m) driven straight backward on the HABITAT_POST_PICKUP_BACKUP
 	// leg, after HABITAT_PICKUP's arm sequence completes — clears the
@@ -304,7 +304,6 @@ RobotState AI::tickHabitatFind(){
 		return RobotState::HABITAT_FIND;
 	}
 	else if (saw_habitat_ && (d>HABITAT_DEPTH_THRESHOLD)){
-		saw_habitat_=false;
 		habitat_found_num_+=1;
 		if(habitat_found_num_==2){
 			current_habitat_find_direction_=-1;
