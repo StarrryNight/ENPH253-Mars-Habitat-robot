@@ -29,14 +29,14 @@ static constexpr double WHEEL_BACK_PID_MAX_I = 2;
 // Converts a wheel velocity (m/s) into a PWM duty magnitude for
 // MotorDriver::set_velocity (which expects commanded PWM, not m/s — see
 // MOTOR_SPEED_DEADZONE). Placeholder — tune against real wheel speed on hardware.
-static constexpr int VELOCITY_TO_PWM = 350;
+static constexpr int VELOCITY_TO_PWM = 400;
 
 // Back-wheel-specific feedforward override — see WHEEL_BACK_PID_* above for
 // why this wheel needs more PWM per unit commanded velocity than the front
 // two. Used in place of VELOCITY_TO_PWM for the back wheel only, so the PID
 // trim has less steady-state error to make up to begin with. Starting point
 // (30% over VELOCITY_TO_PWM) — tune against real back-wheel speed on hardware.
-static constexpr int WHEEL_BACK_VELOCITY_TO_PWM = 350;
+static constexpr int WHEEL_BACK_VELOCITY_TO_PWM = 400;
 // Orientation (rotate-to-angle) PID (OrientationController). Error in radians.
 static constexpr double ORIENTATION_PID_P = FORWARD_SPEED*4;
 static constexpr double ORIENTATION_PID_I = 0;

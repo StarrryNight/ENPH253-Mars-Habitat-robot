@@ -23,11 +23,10 @@ namespace {
 		double rotation_degrees;
 	};
 	constexpr std::array<RockCheckpoint, kNumRocks> kRockCheckpoints = {{
-		{0.0, 1.0},
-		{0.5, -47.0},
-		{0.5, 48.0},
-		{0.4, -45.0},
-		{0.25, -45.0},
+		{0.27, -47.0},
+		{0.41, 48.0},
+		{0.20, -45.0},
+		{0.42, -45.0},
 	}};
 
 	// Distance (m) into LINE_FOLLOWING's Nth visit at which the habitat is
@@ -50,7 +49,7 @@ namespace {
 	// Same magnitude as LINE_SEARCH_OMEGA_RAD_S (mr_krabs.h) — kept as a
 	// separate constant since rock-search and line-search are independent
 	// bench-tuning knobs.
-	constexpr double kRockSearchOmegaRadS = 1.2;
+	constexpr double kRockSearchOmegaRadS = 1.3;
 	// Minimum time (us) the sonar must stay continuously in range before
 	// ROTATING_TIL_ROCK commits to "found the rock". Without this, a single
 	// spurious close-range reading (ultrasonic noise/reflections are common
@@ -58,7 +57,7 @@ namespace {
 	// the very first tick after the entry settle delay — before
 	// MrKrabs::driveCurrentMode() ever issues a single rotate command, so
 	// the robot appears to sit still in ROTATING_TIL_ROCK.
-	constexpr uint64_t kRockSonarConfirmDelayUs = 30000; // 0.1 s
+	constexpr uint64_t kRockSonarConfirmDelayUs = 25000; // 0.1 s
 }
 
 AI::AI():
@@ -68,7 +67,7 @@ AI::AI():
 	// habitat pickup/place cycle in isolation, instead of the real
 	// FINDING_ROCK entry point. Flip back to RobotState::FINDING_ROCK to
 	// restore the real competition flow.
-	current_state_(RobotState::HABITAT_PICKUP),
+	current_state_(RobotState::FINDING_ROCK),
 	current_state_progress_m_(0),
 	post_reacquire_state_(RobotState::LINE_FOLLOWING)
 {
