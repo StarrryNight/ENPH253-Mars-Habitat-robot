@@ -32,10 +32,21 @@ enum class RobotState {
 	// the robot facing off the line. See AI::tickReacquiringLine.
 	REACQUIRING_LINE,
 	HABITAT_FIND,
+	// Drives straight backward a fixed distance (kHabitatBackupDistanceM)
+	// after HABITAT_FIND locates the slot, before HABITAT_PICKUP runs its arm
+	// sequence — clears the habitat wall the sonar just read close-range.
+	// See AI::tickHabitatBackup.
+	HABITAT_BACKUP,
+	// Entered once HABITAT_PICKUP's arm sequence completes. Rotates 180°
+	// the same way REACQUIRING_LINE does (fixed 45° turn, then reactive
+	// continuous spin), but simultaneously strafes opposite the direction
+	// HABITAT_FIND strafed to reach this slot, undoing that lateral offset
+	// while it turns back toward the line. See AI::tickHabitatHoldAndMove.
+	HABITAT_HOLD_AND_MOVE,
 	DONE,
 };
 
-static constexpr size_t kNumRobotStates = 12;
+static constexpr size_t kNumRobotStates = 14;
 
 // Debug/serial-print helper — not used by any control-flow logic.
 inline const char* robotStateName(RobotState s) {
@@ -51,6 +62,8 @@ inline const char* robotStateName(RobotState s) {
 		case RobotState::HABITAT_PLACE: return "HABITAT_PLACE";
 		case RobotState::REACQUIRING_LINE: return "REACQUIRING_LINE";
 		case RobotState::HABITAT_FIND: return "HABITAT_FIND";
+		case RobotState::HABITAT_BACKUP: return "HABITAT_BACKUP";
+		case RobotState::HABITAT_HOLD_AND_MOVE: return "HABITAT_HOLD_AND_MOVE";
 		case RobotState::DONE: return "DONE";
 	}
 	return "?";

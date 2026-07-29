@@ -351,6 +351,8 @@ bool MrKrabs::handleDriveTransition()
 			case AI::DriveMode::IDLE: startIdle(); break;
 			case AI::DriveMode::ROTATING_TIL_ROCK: startRotatingTilRock(); break;
 			case AI::DriveMode::STRAFING_TIL_HABITAT: startStrafingTilHabitat(); break;
+			case AI::DriveMode::BACKING_UP: startBackingUp(); break;
+			case AI::DriveMode::HOLDING_AND_MOVING: startHoldingAndMoving(); break;
 		}
 		last_commanded_rotation_degrees_ = ai_->targetRotationDegrees();
 		return true;
@@ -448,6 +450,35 @@ void MrKrabs::driveCurrentMode()
 			// tickHabitatFind() flips once the second habitat slot is found.
 			motor_controller_->setVelocity({HABITAT_STRAFE_SPEED * ai_->habitatFindDirection(), 0, 0});
 			break;
+		case AI::DriveMode::BACKING_UP: {
+			// AI::tickHabitatBackup() (called via ai_->tickAI() earlier this
+			// tick) tracks the distance leg itself off addProgress() below and
+			// will transition the state once it's done.
+			motor_controller_->setVelocity({0, -HABITAT_BACKUP_SPEED, 0});
+			double total_translation_m = motor_controller_->getTotalTranslationM();
+			ai_->addProgress(total_translation_m - last_total_translation_m_);
+			last_total_translation_m_ = total_translation_m;
+			break;
+		}
+		case AI::DriveMode::HOLDING_AND_MOVING: {
+			if (!habitat_hold_rotation_done_){
+				double curr_position = motor_controller_->getElapsedRotation();
+				if (orientation_controller_.reachedTarget(curr_position)){
+					motor_controller_->driveOpenLoop({0,0,0});
+					orientation_controller_.reset();
+					habitat_hold_rotation_done_ = true;
+					ai_->setHabitatHoldRotationDone(true);
+				} else {
+					double correction = orientation_controller_.calculateCorrection(curr_position);
+					motor_controller_->setVelocity({0,0, correction});
+				}
+				break;
+			}
+			// Turn's done: strafe back onto the line, opposite the direction
+			// HABITAT_FIND strafed to reach this slot.
+			motor_controller_->setVelocity({-HABITAT_STRAFE_SPEED * ai_->habitatFindDirection(), 0, 0});
+			break;
+		}
 	}
 }
 
@@ -529,6 +560,11 @@ void MrKrabs::startIdle()
 // continuous spin — see startSearchingForLine/driveCurrentMode.
 static constexpr double LINE_SEARCH_INITIAL_TURN_DEG = 45.0;
 
+// Fixed turn (deg) driveCurrentMode() rotates through in HOLDING_AND_MOVING
+// before falling back to the strafe-back-onto-the-line phase — see
+// startHoldingAndMoving/driveCurrentMode.
+static constexpr double HABITAT_HOLD_ROTATION_DEG = 180.0;
+
 void MrKrabs::startSearchingForLine()
 {
 	motor_controller_->driveOpenLoop({0,0,0});
@@ -574,6 +610,33 @@ void MrKrabs::startStrafingTilHabitat()
 	drive_mode_ = AI::DriveMode::STRAFING_TIL_HABITAT;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 	Serial.printf("[MrKrabs] startStrafingTilHabitat, direction=%d\n", ai_->habitatFindDirection());
+}
+
+void MrKrabs::startHoldingAndMoving()
+{
+	motor_controller_->driveOpenLoop({0,0,0});
+	drive_mode_ = AI::DriveMode::HOLDING_AND_MOVING;
+	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	motor_controller_->startRotation();
+	habitat_hold_rotation_done_ = false;
+	ai_->setHabitatHoldRotationDone(false);
+	// Direction doesn't affect the final heading for a fixed 180° turn —
+	// keep spinning the same way as the last real rotation.
+	double rotation_rad = last_rotation_sign_ * (HABITAT_HOLD_ROTATION_DEG * DEG_TO_RAD);
+	orientation_controller_.startRotation(rotation_rad);
+	Serial.printf("[MrKrabs] startHoldingAndMoving, rotation_sign=%.0f\n", last_rotation_sign_);
+}
+
+void MrKrabs::startBackingUp()
+{
+	drive_mode_ = AI::DriveMode::BACKING_UP;
+	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	// Zero the translation odometer so the distance-based completion in
+	// AI::tickHabitatBackup isn't inflated by whatever drive mode (e.g.
+	// STRAFING_TIL_HABITAT) preceded this — same reasoning as startRotation().
+	motor_controller_->resetTranslationTracking();
+	last_total_translation_m_ = 0.0;
+	Serial.printf("[MrKrabs] startBackingUp\n");
 }
 
 MrKrabs mr_krabs_;

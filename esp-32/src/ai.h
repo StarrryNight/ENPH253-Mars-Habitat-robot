@@ -37,6 +37,13 @@ class AI {
 		// before the intended fixed amount, cutting the turn short.
 		void setLineSearchInitialTurnDone(bool done);
 
+		// Pushed by MrKrabs::driveCurrentMode's HOLDING_AND_MOVING case: false
+		// while the fixed 180° turn is still in progress, true once it's
+		// reached and the strafe-back-onto-the-line phase has taken over.
+		// tickHabitatHoldAndMove() ignores the line sensors until this is
+		// true, same reasoning as setLineSearchInitialTurnDone().
+		void setHabitatHoldRotationDone(bool done);
+
 		void setArm(Arm* arm);
 		void setLineFollower(LineFollower* line_follower);
 		void setSonar(Sonar* sonar);
@@ -50,7 +57,7 @@ class AI {
 		// reported (see computer_vision.py), so the cap lives here instead.
 		void notifyTeletubbyDetected();
 
-		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK , STRAFING_TIL_HABITAT};
+		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK , STRAFING_TIL_HABITAT, BACKING_UP, HOLDING_AND_MOVING};
 		// What the drivetrain should currently be doing, derived from current_state_.
 		DriveMode desiredDriveMode() const;
 		// +1 while driving forward, -1 during LINE_FOLLOWING_REVERSE.
@@ -106,6 +113,8 @@ class AI {
 		RobotState tickLineFollowingReverse();
 		RobotState tickHabitatPlace();
 		RobotState tickHabitatFind();
+		RobotState tickHabitatBackup();
+		RobotState tickHabitatHoldAndMove();
 
 		static constexpr size_t idx(RobotState s) { return static_cast<size_t>(s); }
 
@@ -148,6 +157,8 @@ class AI {
 		RobotState post_line_reverse_state_ = RobotState::HABITAT_PLACE;
 		// See setLineSearchInitialTurnDone().
 		bool line_search_initial_turn_done_ = false;
+		// See setHabitatHoldRotationDone().
+		bool habitat_hold_rotation_done_ = false;
 
 
 		//If seen habitat yet, if seen, we start capturing once sonar detects >15
@@ -157,7 +168,7 @@ class AI {
 		int habitat_found_num_ = 0;
 		int current_habitat_find_direction_ = 1;
 
-		static constexpr double HABITAT_DEPTH_THRESHOLD = 15;
-		static constexpr double HABITAT_SIDE_THRESHOLD = 5;
+		static constexpr double HABITAT_DEPTH_THRESHOLD = 13;
+		static constexpr double HABITAT_SIDE_THRESHOLD = 7;
 
 };

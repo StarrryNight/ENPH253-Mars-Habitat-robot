@@ -90,6 +90,19 @@ public:
 	// (see RobotState::HABITAT_FIND).
 	void startStrafingTilHabitat();
 
+	// Enters habitat-backup mode. Drives straight backward at
+	// HABITAT_BACKUP_SPEED until AI's distance leg completes (see
+	// RobotState::HABITAT_BACKUP). Resets the translation odometer on entry
+	// so the distance-based completion isn't inflated by whatever drive mode
+	// preceded it (same reasoning as startRotation()'s reset).
+	void startBackingUp();
+
+	// Enters habitat-hold-and-move mode. First rotates a fixed 180° in
+	// place (direction continuing last_rotation_sign_), then strafes at
+	// HABITAT_STRAFE_SPEED opposite AI::habitatFindDirection() until AI's
+	// state transitions away (see RobotState::HABITAT_HOLD_AND_MOVE).
+	void startHoldingAndMoving();
+
 private:
 	// Called every CONTROL_LOOP_PERIOD_US by the esp_timer.
 	void stepControl();
@@ -195,6 +208,12 @@ private:
 	// startSearchingForLine() is called.
 	bool line_search_initial_turn_done_ = false;
 
+	// True once HOLDING_AND_MOVING's fixed 180° turn (see
+	// startHoldingAndMoving/driveCurrentMode) has reached its target and the
+	// strafe-back-onto-the-line phase has taken over. Reset to false each
+	// time startHoldingAndMoving() is called.
+	bool habitat_hold_rotation_done_ = false;
+
 	// Angular velocity (rad/s, signed) driven during ROTATING_TIL_ROCK,
 	// latched by startRotatingTilRock() from AI::rockSearchOmegaRadS().
 	double rock_search_omega_rad_s_ = 0.0;
@@ -250,5 +269,6 @@ private:
 	uint64_t arm_test_pose_until_us_;
 
 	static constexpr double HABITAT_STRAFE_SPEED = 0.15;
+	static constexpr double HABITAT_BACKUP_SPEED = 0.15;
 
 };

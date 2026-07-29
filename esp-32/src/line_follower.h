@@ -34,6 +34,17 @@ public:
 	// the robot back onto the line.
 	bool bothMidSensorsOnLine();
 
+	// True once both outer (left, right) sensors detect the line — the line
+	// crossing the habitat marker's perpendicular strip triggers both side
+	// sensors at once. Used by AI::tickLineFollowing to hand off to
+	// RobotState::HABITAT_FIND.
+	bool bothSideSensorsOnLine();
+
+	// True once the right sensor alone detects the line — the habitat place
+	// marker triggers just this one. Used by AI::tickLineFollowingReverse to
+	// hand off to RobotState::HABITAT_PLACE.
+	bool rightSensorOnLine();
+
 private:
 	// Returns binarised sensor readings (1 = on line, 0 = off line)
 	// ordered as {left, mid-left, mid-right, right}.
