@@ -33,3 +33,34 @@ private:
 	const ArmPoseSequence* sequence_ = nullptr;
 	size_t index_ = 0;
 };
+
+// Same rotate-once/apply-each cadence as SequenceRunner, but for
+// RockXYSequence (robot_poses.h): poses are ArmCoordinate (XY), applied via
+// Arm::setPoseXY, and any pose with x_is_sonar_relative=true has its x_pos
+// resolved as an offset from a runtime sonar reading rather than an absolute
+// position. Used for METAL_DETECTING/PICKUP_ROCK — see AI::onRotationReached.
+class XySequenceRunner {
+public:
+	void start(const RockXYSequence& sequence, double sonar_x_origin_m);
+
+	// True once every pose in the sequence has been applied (or start() was
+	// never called).
+	bool complete() const;
+
+	// How many poses have been applied so far (0 if start() was never
+	// called). Lets callers gate a RobotState transition on a specific pose
+	// having actually been written — see AI::tickBackingUpRock.
+	size_t currentIndex() const;
+
+	uint64_t poseSettleUs() const;
+
+	// Resolves the current pose's x (offset + cached sonar origin, or the
+	// pose's own x_pos if not sonar-relative), applies it to the arm, and
+	// advances to the next one. Returns true iff a pose was actually written.
+	bool onRotationReached(Arm& arm);
+
+private:
+	const RockXYSequence* sequence_ = nullptr;
+	size_t index_ = 0;
+	double sonar_x_origin_m_ = 0.0;
+};

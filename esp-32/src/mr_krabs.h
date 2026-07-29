@@ -80,6 +80,11 @@ public:
 	// away (see RobotState::REACQUIRING_LINE).
 	void startSearchingForLine();
 
+	// Enters rock-search mode. Rotates at a fixed omega, direction given by
+	// AI::rockSearchOmegaRadS(), until AI's state transitions away (see
+	// RobotState::ROTATING_TIL_ROCK).
+	void startRotatingTilRock();
+
 private:
 	// Called every CONTROL_LOOP_PERIOD_US by the esp_timer.
 	void stepControl();
@@ -178,6 +183,10 @@ private:
 	// Angular velocity (rad/s, signed) driven during SEARCHING_FOR_LINE,
 	// latched by startSearchingForLine() from last_rotation_sign_.
 	double search_omega_rad_s_;
+
+	// Angular velocity (rad/s, signed) driven during ROTATING_TIL_ROCK,
+	// latched by startRotatingTilRock() from AI::rockSearchOmegaRadS().
+	double rock_search_omega_rad_s_ = 0.0;
 
 	// Non-blocking settle-delay deadline (esp_timer_get_time() timestamp).
 	// While esp_timer_get_time() < this, stepControl() holds still instead of

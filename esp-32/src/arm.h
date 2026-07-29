@@ -31,6 +31,10 @@ struct ArmCoordinate{
 	// through so a caller can request a fast/slow move for a given target.
 	double base_pitch_servo_speed = ArmPose::DEFAULT_SPEED;
 	double elbow_pitch_servo_speed = ArmPose::DEFAULT_SPEED;
+	// When true, x_pos above is an offset (m) added to a runtime sonar
+	// reading rather than an absolute position — see XySequenceRunner
+	// (sequence_runner.h) and AI::kPickupRockXYSequence.
+	bool x_is_sonar_relative = false;
 };
 
 class Arm

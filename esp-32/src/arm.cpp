@@ -42,17 +42,12 @@ void Arm::setPoseXY(ArmCoordinate pose)
 
 ArmPose Arm::coordinateToDegrees(ArmCoordinate pose)
 {
-	Serial.printf("xypo:  %f.2, ypose:  %f.2, \n",pose.x_pos, pose.y_pos);
 	pose.x_pos -= 92.73/1000;
 	pose.y_pos += 72.5/1000;
 	double q2 = -acos((pow(pose.x_pos, 2) + pow(pose.y_pos, 2) - pow(UPPERARM_LENGTH, 2) - pow(FOREARM_LENGTH, 2))/(2*UPPERARM_LENGTH*FOREARM_LENGTH));
 	double q1 = atan(pose.y_pos/ pose.x_pos) + atan(FOREARM_LENGTH*sin(-q2)/( UPPERARM_LENGTH + FOREARM_LENGTH*cos(-q2)));
-	Serial.printf("q1:  %f.2, q2:  %f.2, \n",q1* RAD_TO_DEG
-, q2* RAD_TO_DEG
-);
 
 	double base_pitch_servo_degrees = 90 - q1 * RAD_TO_DEG;
 	double elbow_pitch_servo_degrees = -(q1+q2) * RAD_TO_DEG;
-	Serial.printf("%f.2, %f.2, \n",base_pitch_servo_degrees, elbow_pitch_servo_degrees);
 	return {base_pitch_servo_degrees, elbow_pitch_servo_degrees, pose.wrist_yaw_servo_degrees, pose.claw_servo_degrees, pose.base_pitch_servo_speed, pose.elbow_pitch_servo_speed};
 }

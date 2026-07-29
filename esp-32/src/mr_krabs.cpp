@@ -20,20 +20,27 @@ constexpr ArmCoordinate kArmTestPoses[] = {
 	//0 for cloe
 	//50 for oepn
 
-	{0.3, -0.03, 120, 50, 500, 500},
+	//{0.3, -0.03, 120, 50, 500, 500},
+	//{0.30, 0.03, 120, 50, 500, 500},
+	//{0.30, -0.06, 120, 50, 250, 500},
+	//{0.30, -0.06, 120, 0, 500, 500},
+	//{0.24, 0.060, 120, 0, 500, 500},
+	//{0.24, 0.060, Arm::WRIST_PLACE, 0, 500, 500},
 	{0.30, 0.03, 120, 50, 500, 500},
-	{0.30, -0.06, 120, 50, 250, 500},
-	{0.30, -0.055, 120, 0, 500, 500},
-	{0.24, 0.060, 120, 0, 500, 500},
-	{0.24, 0.060, Arm::WRIST_PLACE, 0, 500, 500},
-	{0.24, 0.060, Arm::WRIST_PLACE, 50, 500, 500},
+	{0.31, -0.05, 120, 50, 250, 500},
+	{0.36, -0.05, 120, 50, 250, 500},
+	{0.24, 0.06, 120, 0, 250, 500},
+	{0.36, -0.05, 120, 0, 250, 500},
+	{0.31, -0.05, 120, 50, 250, 500},
+	{0.28, -0.05, 120, 50, 250, 500},
 };
 constexpr size_t kArmTestPoseCount = sizeof(kArmTestPoses) / sizeof(kArmTestPoses[0]);
 constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
 
 // Flip to true to re-enable the arm-only bench test loop below. Left in
 // place (not deleted) for future bench testing, but off now that the real
-// AI-driven sequence is what should be moving the arm.
+// AI-driven sequence (ROTATING_TIL_ROCK -> METAL_DETECTING -> PICKUP_ROCK,
+// see ai.cpp) is what should be moving the arm.
 constexpr bool kRunArmBenchTest = true;
 }
 
@@ -72,6 +79,7 @@ void MrKrabs::setup()
 	arm_->begin();
 	ai_->setArm(&*arm_);
 	ai_->setLineFollower(&*line_follower_);
+	ai_->setSonar(&*sonar_);
 	display_->begin();
 	sonar_->begin();
 
@@ -296,14 +304,14 @@ void MrKrabs::stepControl()
 			// of re-querying, since the claw/rock can occlude or shift the
 			// sonar's return by then.
 			static double cached_sonar_x = 0.0;
-			if ((arm_test_pose_index_+1)%kArmTestPoseCount == 1){
-				cached_sonar_x = sonar_->queryDistance() / 100.0 + 0.18054;
-				pose.x_pos = cached_sonar_x+0.08;
-			} else if ( (arm_test_pose_index_+1)%kArmTestPoseCount == 2){
-				pose.x_pos = cached_sonar_x-0.02;
-			}	else if ((arm_test_pose_index_+1)%kArmTestPoseCount == 3 || (arm_test_pose_index_+1)%kArmTestPoseCount == 4){
-				pose.x_pos = cached_sonar_x;
-			}
+			//if ((arm_test_pose_index_+1)%kArmTestPoseCount == 1){
+			//	cached_sonar_x = sonar_->queryDistance() / 100.0 + 0.18054;
+			//	pose.x_pos = cached_sonar_x+0.08;
+			//} else if ( (arm_test_pose_index_+1)%kArmTestPoseCount == 2){
+			//	pose.x_pos = cached_sonar_x-0.02;
+			//}	else if ((arm_test_pose_index_+1)%kArmTestPoseCount == 3 || (arm_test_pose_index_+1)%kArmTestPoseCount == 4){
+			//	pose.x_pos = cached_sonar_x;
+			//}
 			arm_->setPoseXY(pose);
 			Serial.printf("[ArmTest] pose %u/%u: x=%.2f y=%.2f claw=%.0f base_speed=%.0f elbow_speed=%.0f\n",
 				(unsigned)arm_test_pose_index_ + 1, (unsigned)kArmTestPoseCount,
@@ -313,18 +321,18 @@ void MrKrabs::stepControl()
 		}
 	}
 
-	 ai_->tickAI();
+	 //ai_->tickAI();
 	
-	 if (debug_print_now_){
-	 	Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
-	 		robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
-	 }
+	 //if (debug_print_now_){
+	 //	Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
+	 //		robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
+	 //}
 	
-	 if (handleDriveTransition()){
-	 	return;
-	 }
+	 //if (handleDriveTransition()){
+	 //	return;
+	 //}
 	
-	 driveCurrentMode();
+	 //driveCurrentMode();
 }
 
 bool MrKrabs::handleDriveTransition()
@@ -339,6 +347,7 @@ bool MrKrabs::handleDriveTransition()
 			case AI::DriveMode::APPLYING_SEQUENCE: startRotation(ai_->targetRotationDegrees() * DEG_TO_RAD); break;
 			case AI::DriveMode::SEARCHING_FOR_LINE: startSearchingForLine(); break;
 			case AI::DriveMode::IDLE: startIdle(); break;
+			case AI::DriveMode::ROTATING_TIL_ROCK: startRotatingTilRock(); break;
 		}
 		last_commanded_rotation_degrees_ = ai_->targetRotationDegrees();
 		return true;
@@ -399,6 +408,14 @@ void MrKrabs::driveCurrentMode()
 			break;
 		case AI::DriveMode::IDLE:
 			motor_controller_->driveOpenLoop({0,0,0});
+			break;
+		case AI::DriveMode::ROTATING_TIL_ROCK:
+			// AI::tickRotatingTilRock() (called via ai_->tickAI() earlier this
+			// tick) already checked the sonar and will transition the state
+			// once a rock is found — this just keeps spinning until then.
+			// Direction (rock_search_omega_rad_s_) was latched by
+			// startRotatingTilRock() from AI::rockSearchOmegaRadS().
+			motor_controller_->setVelocity({0, 0, rock_search_omega_rad_s_});
 			break;
 	}
 }
@@ -489,6 +506,27 @@ void MrKrabs::startSearchingForLine()
 	search_omega_rad_s_ = -last_rotation_sign_ * LINE_SEARCH_OMEGA_RAD_S;
 	Serial.printf("[MrKrabs] startSearchingForLine, last_rotation_sign=%.0f omega=%.2f\n",
 		last_rotation_sign_, search_omega_rad_s_);
+}
+
+void MrKrabs::startRotatingTilRock()
+{
+	motor_controller_->driveOpenLoop({0,0,0});
+	drive_mode_ = AI::DriveMode::ROTATING_TIL_ROCK;
+	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	// Not using orientation_controller_ here (no fixed target — this spins
+	// until AI transitions the state), but still worth clearing the wheel
+	// PIDs' stale integral from whatever drive mode preceded this.
+	motor_controller_->startRotation();
+	rock_search_omega_rad_s_ = ai_->rockSearchOmegaRadS();
+	// startRotation(target_angle) is the only other place last_rotation_sign_
+	// gets set, and ROTATING_TIL_ROCK doesn't go through it (this is a
+	// continuous open-loop spin, not a rotate-to-heading) — without this,
+	// startSearchingForLine()'s "-last_rotation_sign_" reverse-spin would be
+	// reversing whatever stale direction was left over from the last fixed-
+	// heading sequence rotation instead of the direction actually used to
+	// find this rock, sending REACQUIRING_LINE the wrong way.
+	last_rotation_sign_ = (rock_search_omega_rad_s_ > 0.0) ? 1.0 : -1.0;
+	Serial.printf("[MrKrabs] startRotatingTilRock, omega=%.2f\n", rock_search_omega_rad_s_);
 }
 
 MrKrabs mr_krabs_;

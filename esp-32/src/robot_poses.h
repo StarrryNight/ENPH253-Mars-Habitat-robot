@@ -34,18 +34,28 @@ struct ArmPoseSequence {
 // AI::transitionTo. This file only holds sequences that are the same
 // every time their state is entered.
 
-const ArmPoseSequence kPickupRockSequence = {
-	0.0, // grab from wherever METAL_DETECTING left off, no extra rotation
+// Runs during METAL_DETECTING (pose 0) and PICKUP_ROCK (poses 1-6). x_pos for
+// poses with x_is_sonar_relative=true is an offset (m) added to the sonar
+// reading cached by AI::tickRotatingTilRock, resolved at apply time by
+// XySequenceRunner (sequence_runner.h) — not an absolute position. Ported
+// verbatim from mr_krabs.cpp's kArmTestPoses bench test, including its
+// per-pose sonar offsets and servo speeds.
+struct RockXYSequence {
+	std::vector<ArmCoordinate> poses;
+	uint64_t pose_settle_us = 1500000;
+};
+
+const RockXYSequence kPickupRockXYSequence = {
 	{
-		{40, 55, Arm::WRIST_CENTER, Arm::CLAW_OPEN},
-		{45, 45, Arm::WRIST_CENTER, Arm::CLAW_OPEN},
-		{45, 45, Arm::WRIST_CENTER, Arm::CLAW_CLOSE},
-		{45, 20, Arm::WRIST_CENTER, Arm::CLAW_CLOSE},
-		{-5, 20, Arm::WRIST_CENTER, Arm::CLAW_CLOSE},
-		{-5, 20, Arm::WRIST_PLACE, Arm::CLAW_CLOSE},
-		{-5, 20, Arm::WRIST_PLACE, Arm::CLAW_OPEN},
-		{-5, 25, 120, 55}, // reset position
-	}
+		{0.08,  -0.03, 120, 50, 500, 500, true},   // [0] METAL_DETECTING: reach in, probe for metal
+		{-0.02,  0.05, 120, 50, 500, 500, true},   // [1] PICKUP_ROCK: retract slightly
+		{0.0,   -0.06, 120, 50, 250, 1000, true},   // [2] PICKUP_ROCK: position around rock, still open
+		{0.0,   -0.055,120,  0, 500, 500, true},   // [3] PICKUP_ROCK: close claw
+		{0.24,   0.060,120,  0, 500, 500, false},  // [4] PICKUP_ROCK: retract, claw closed
+		{0.24,   0.060,Arm::WRIST_PLACE, 0, 500, 500, false}, // [5] PICKUP_ROCK: rotate to place
+		{0.24,   0.060,Arm::WRIST_PLACE, 50,500, 500, false}, // [6] PICKUP_ROCK: release
+		{0.24,   0.060,120, 50,500, 500, false}, // [6] PICKUP_ROCK: release
+	},
 };
 
 const ArmPoseSequence kHabitatPickupSequence = {
@@ -82,12 +92,11 @@ const ArmPoseSequence kTeletubbySequence = {
 
 // Looks up the ArmPoseSequence to run when entering state. Returns nullptr
 // for states with no fixed arm sequence — the line-following states, DONE,
-// and METAL_DETECTING (which is per-rock; see AI::transitionTo) — see
-// AI::desiredDriveMode.
+// and METAL_DETECTING/PICKUP_ROCK (driven by kPickupRockXYSequence/
+// XySequenceRunner instead; see AI::transitionTo) — see AI::desiredDriveMode.
 inline const ArmPoseSequence* sequenceForState(RobotState state) {
 	switch (state) {
 		case RobotState::TELETUBBYING: return &kTeletubbySequence;
-		case RobotState::PICKUP_ROCK: return &kPickupRockSequence;
 		case RobotState::HABITAT_PICKUP: return &kHabitatPickupSequence;
 		case RobotState::HABITAT_PLACE: return &kHabitatPlaceSequence;
 		default: return nullptr;

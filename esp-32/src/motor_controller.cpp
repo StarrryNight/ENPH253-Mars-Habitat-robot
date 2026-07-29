@@ -90,6 +90,21 @@ int wheel_back_pwm = static_cast<int>(
 	wheel_left_motor_->set_velocity(wheel_left_pwm);
 	wheel_right_motor_->set_velocity(wheel_right_pwm);
 	wheel_back_motor_->set_velocity(wheel_back_pwm);
+
+	// Rate-limited (every 20 calls =~ 200ms at MOTOR_CONTROL_LOOP_PERIOD_US)
+	// diagnostic for tracking down commanded-but-not-moving wheels: shows
+	// whether the PWM actually being written is zero (a software/PID issue)
+	// or nonzero (points at wiring/H-bridge/motor instead). Remove once
+	// ROTATING_TIL_ROCK's drivetrain issue is root-caused.
+	static int debug_print_counter = 0;
+	if (++debug_print_counter >= 20){
+		debug_print_counter = 0;
+		Serial.printf("[MotorController] target(x=%.2f y=%.2f w=%.2f) wheel_target(L=%.3f R=%.3f B=%.3f) pwm(L=%d R=%d B=%d) actual(L=%.3f R=%.3f B=%.3f)\n",
+			current_target_velocity_.x, current_target_velocity_.y, current_target_velocity_.omega,
+			target_wheel_velocity.wheel_left, target_wheel_velocity.wheel_right, target_wheel_velocity.wheel_back,
+			wheel_left_pwm, wheel_right_pwm, wheel_back_pwm,
+			current_wheel_velocities_.wheel_left, current_wheel_velocities_.wheel_right, current_wheel_velocities_.wheel_back);
+	}
 }
 
 void MotorController::driveOpenLoop(RobotVelocity v)

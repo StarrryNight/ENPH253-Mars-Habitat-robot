@@ -7,6 +7,7 @@
 #include "robot_poses.h"
 #include "sequence_runner.h"
 #include "metal_detector.h"
+#include "sonar.h"
 
 // Drives the robot behavior state machine described in CLAUDE.md (rocks A-C,
 // habitat D). Each RobotState either drives forward with line-following
@@ -28,6 +29,7 @@ class AI {
 
 		void setArm(Arm* arm);
 		void setLineFollower(LineFollower* line_follower);
+		void setSonar(Sonar* sonar);
 
 		// Called by MrKrabs when the RPi reports a Teletubby (Command::
 		// teletubby_detected). Only takes effect while current_state_ is
@@ -38,11 +40,14 @@ class AI {
 		// reported (see computer_vision.py), so the cap lives here instead.
 		void notifyTeletubbyDetected();
 
-		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE };
+		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK };
 		// What the drivetrain should currently be doing, derived from current_state_.
 		DriveMode desiredDriveMode() const;
 		// +1 while driving forward, -1 during LINE_FOLLOWING_REVERSE.
 		double lineFollowingDirection() const;
+		// Valid while desiredDriveMode() == ROTATING_TIL_ROCK. Sign (+1/-1) of
+		// the current rock checkpoint's heading — see tickRotatingTilRock.
+		double rockSearchOmegaRadS() const;
 
 		// Valid while desiredDriveMode() == APPLYING_SEQUENCE. Delegates to sequence_runner_.
 		double targetRotationDegrees() const;
@@ -78,6 +83,7 @@ class AI {
 		RobotState tickReacquiringLine();
 
 		RobotState tickFindingRock();
+		RobotState tickRotatingTilRock();
 		RobotState tickMetalDetecting();
 		RobotState tickTeletubbying();
 		RobotState tickPickupRock();
@@ -91,12 +97,27 @@ class AI {
 		MetalDetector metal_detector_;
 		Arm* arm_;
 		LineFollower* line_follower_;
+		Sonar* sonar_ = nullptr;
 		SequenceRunner sequence_runner_;
+		XySequenceRunner xy_sequence_runner_;
 
 		RobotState current_state_;
 		// Set by notifyTeletubbyDetected(), consumed and cleared by
 		// tickMetalDetecting() on its next tick.
 		bool teletubby_detected_ = false;
+		// Sonar reading (m, mount-offset corrected) cached by
+		// tickRotatingTilRock() once a rock is found; the origin
+		// kPickupRockXYSequence's sonar-relative poses are offset from.
+		double cached_rock_sonar_x_m_ = 0.0;
+		// esp_timer_get_time() timestamp the sonar first entered the
+		// rock-detection range this ROTATING_TIL_ROCK visit, or 0 if not
+		// currently in range — see tickRotatingTilRock's debounce.
+		uint64_t rock_sonar_in_range_since_us_ = 0;
+		// Guards METAL_DETECTING's probe pose (kPickupRockXYSequence[0]) so it's
+		// applied exactly once and then held until metal is detected, instead
+		// of auto-advancing to the next pose every settle cycle. Reset by
+		// transitionTo() on entering METAL_DETECTING. See onRotationReached().
+		bool metal_probe_pose_applied_ = false;
 		std::array<int, kNumRobotStates> state_visit_count_{};
 		// Distance (m) traveled since the current state was entered.
 		double current_state_progress_m_;

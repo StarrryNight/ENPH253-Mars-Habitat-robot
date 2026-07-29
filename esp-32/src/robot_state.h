@@ -3,6 +3,11 @@
 
 enum class RobotState {
 	FINDING_ROCK,
+	// Rotates in place (fixed omega, direction from the current rock
+	// checkpoint's heading sign) until the sonar reads a distance in the
+	// rock-detection range, then caches that distance for the pickup XY
+	// sequence. See AI::tickRotatingTilRock.
+	ROTATING_TIL_ROCK,
 	METAL_DETECTING,
 	// Entered from METAL_DETECTING when the RPi reports a Teletubby instead
 	// of (or in addition to) a metal hit — see AI::tickMetalDetecting/
@@ -10,6 +15,9 @@ enum class RobotState {
 	// then falls back to PICKUP_ROCK if metal was also detected, otherwise
 	// nextRockOrDone() — see AI::tickTeletubbying.
 	TELETUBBYING,
+	// Runs kPickupRockXYSequence: arm retracts slightly (pose 1, right after
+	// METAL_DETECTING's probe pose 0), then closes the claw, retracts, and
+	// places the rock. See AI::tickPickupRock.
 	PICKUP_ROCK,
 	LINE_FOLLOWING,
 	HABITAT_PICKUP,
@@ -24,12 +32,13 @@ enum class RobotState {
 	DONE,
 };
 
-static constexpr size_t kNumRobotStates = 10;
+static constexpr size_t kNumRobotStates = 11;
 
 // Debug/serial-print helper — not used by any control-flow logic.
 inline const char* robotStateName(RobotState s) {
 	switch (s) {
 		case RobotState::FINDING_ROCK: return "FINDING_ROCK";
+		case RobotState::ROTATING_TIL_ROCK: return "ROTATING_TIL_ROCK";
 		case RobotState::METAL_DETECTING: return "METAL_DETECTING";
 		case RobotState::TELETUBBYING: return "TELETUBBYING";
 		case RobotState::PICKUP_ROCK: return "PICKUP_ROCK";
