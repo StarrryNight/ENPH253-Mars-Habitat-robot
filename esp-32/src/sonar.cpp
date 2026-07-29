@@ -18,5 +18,6 @@ void Sonar::begin()
 double Sonar::queryDistance()
 {
 	float distance = (float)sonar.ping() / US_ROUNDTRIP_CM;
+	Serial.printf("distacne = %.2f\n",distance);
     return distance;
 }

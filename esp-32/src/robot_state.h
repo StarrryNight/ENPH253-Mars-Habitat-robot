@@ -31,10 +31,11 @@ enum class RobotState {
 	// (or, for HABITAT_PICKUP/HABITAT_PLACE, not rotating at all) can leave
 	// the robot facing off the line. See AI::tickReacquiringLine.
 	REACQUIRING_LINE,
+	HABITAT_FIND,
 	DONE,
 };
 
-static constexpr size_t kNumRobotStates = 11;
+static constexpr size_t kNumRobotStates = 12;
 
 // Debug/serial-print helper — not used by any control-flow logic.
 inline const char* robotStateName(RobotState s) {
@@ -49,6 +50,7 @@ inline const char* robotStateName(RobotState s) {
 		case RobotState::LINE_FOLLOWING_REVERSE: return "LINE_FOLLOWING_REVERSE";
 		case RobotState::HABITAT_PLACE: return "HABITAT_PLACE";
 		case RobotState::REACQUIRING_LINE: return "REACQUIRING_LINE";
+		case RobotState::HABITAT_FIND: return "HABITAT_FIND";
 		case RobotState::DONE: return "DONE";
 	}
 	return "?";

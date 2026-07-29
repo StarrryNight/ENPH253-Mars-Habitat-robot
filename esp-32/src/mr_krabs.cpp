@@ -276,6 +276,7 @@ void MrKrabs::stepControl()
 		last_state_print_us_ = now;
 	}
 
+	sonar_->queryDistance();
 	updateMetalDetectorLed(ai_->metalDetected(), now);
 
 	if (now < action_settle_until_us_){
@@ -349,6 +350,7 @@ bool MrKrabs::handleDriveTransition()
 			case AI::DriveMode::SEARCHING_FOR_LINE: startSearchingForLine(); break;
 			case AI::DriveMode::IDLE: startIdle(); break;
 			case AI::DriveMode::ROTATING_TIL_ROCK: startRotatingTilRock(); break;
+			case AI::DriveMode::STRAFING_TIL_HABITAT: startStrafingTilHabitat(); break;
 		}
 		last_commanded_rotation_degrees_ = ai_->targetRotationDegrees();
 		return true;
@@ -437,6 +439,14 @@ void MrKrabs::driveCurrentMode()
 			// Direction (rock_search_omega_rad_s_) was latched by
 			// startRotatingTilRock() from AI::rockSearchOmegaRadS().
 			motor_controller_->setVelocity({0, 0, rock_search_omega_rad_s_});
+			break;
+		case AI::DriveMode::STRAFING_TIL_HABITAT:
+			// AI::tickHabitatFind() (called via ai_->tickAI() earlier this
+			// tick) already checked the sonar and will transition the state
+			// once the habitat is found — this just keeps strafing until then.
+			// Direction comes straight from AI::habitatFindDirection(), which
+			// tickHabitatFind() flips once the second habitat slot is found.
+			motor_controller_->setVelocity({HABITAT_STRAFE_SPEED * ai_->habitatFindDirection(), 0, 0});
 			break;
 	}
 }
@@ -557,6 +567,13 @@ void MrKrabs::startRotatingTilRock()
 	// find this rock, sending REACQUIRING_LINE the wrong way.
 	last_rotation_sign_ = (rock_search_omega_rad_s_ > 0.0) ? 1.0 : -1.0;
 	Serial.printf("[MrKrabs] startRotatingTilRock, omega=%.2f\n", rock_search_omega_rad_s_);
+}
+
+void MrKrabs::startStrafingTilHabitat()
+{
+	drive_mode_ = AI::DriveMode::STRAFING_TIL_HABITAT;
+	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	Serial.printf("[MrKrabs] startStrafingTilHabitat, direction=%d\n", ai_->habitatFindDirection());
 }
 
 MrKrabs mr_krabs_;

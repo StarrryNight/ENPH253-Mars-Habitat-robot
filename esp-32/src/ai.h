@@ -50,7 +50,7 @@ class AI {
 		// reported (see computer_vision.py), so the cap lives here instead.
 		void notifyTeletubbyDetected();
 
-		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK };
+		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK , STRAFING_TIL_HABITAT};
 		// What the drivetrain should currently be doing, derived from current_state_.
 		DriveMode desiredDriveMode() const;
 		// +1 while driving forward, -1 during LINE_FOLLOWING_REVERSE.
@@ -58,6 +58,10 @@ class AI {
 		// Valid while desiredDriveMode() == ROTATING_TIL_ROCK. Sign (+1/-1) of
 		// the current rock checkpoint's heading — see tickRotatingTilRock.
 		double rockSearchOmegaRadS() const;
+		// Valid while desiredDriveMode() == STRAFING_TIL_HABITAT. Sign (+1/-1)
+		// of the strafe direction — flipped by tickHabitatFind() once the
+		// second habitat slot has been found.
+		int habitatFindDirection() const;
 
 		// Valid while desiredDriveMode() == APPLYING_SEQUENCE. Delegates to sequence_runner_.
 		double targetRotationDegrees() const;
@@ -101,6 +105,7 @@ class AI {
 		RobotState tickHabitatPickup();
 		RobotState tickLineFollowingReverse();
 		RobotState tickHabitatPlace();
+		RobotState tickHabitatFind();
 
 		static constexpr size_t idx(RobotState s) { return static_cast<size_t>(s); }
 
@@ -143,4 +148,16 @@ class AI {
 		RobotState post_line_reverse_state_ = RobotState::HABITAT_PLACE;
 		// See setLineSearchInitialTurnDone().
 		bool line_search_initial_turn_done_ = false;
+
+
+		//If seen habitat yet, if seen, we start capturing once sonar detects >15
+		
+		bool saw_habitat_ = false;
+
+		int habitat_found_num_ = 0;
+		int current_habitat_find_direction_ = 1;
+
+		static constexpr double HABITAT_DEPTH_THRESHOLD = 15;
+		static constexpr double HABITAT_SIDE_THRESHOLD = 5;
+
 };

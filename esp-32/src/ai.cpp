@@ -1,5 +1,6 @@
 #include "ai.h"
 #include "HWCDC.h"
+#include "robot_state.h"
 #include "sonar.h"
 #include <Arduino.h>
 #include "esp_timer.h"
@@ -69,7 +70,8 @@ AI::AI():
 	// restore the real competition flow.
 	current_state_(RobotState::FINDING_ROCK),
 	current_state_progress_m_(0),
-	post_reacquire_state_(RobotState::LINE_FOLLOWING)
+	post_reacquire_state_(RobotState::LINE_FOLLOWING),
+	saw_habitat_()
 {
 	Serial.printf("[AI] constructed, initial state: %s\n", robotStateName(current_state_));
 	// Set the counter directly rather than routing through transitionTo(),
@@ -148,6 +150,7 @@ RobotState AI::tickCurrentState(){
 		case RobotState::HABITAT_PICKUP: return tickHabitatPickup();
 		case RobotState::LINE_FOLLOWING_REVERSE: return tickLineFollowingReverse();
 		case RobotState::HABITAT_PLACE: return tickHabitatPlace();
+		case RobotState::HABITAT_FIND: return tickHabitatFind();
 		case RobotState::DONE: return RobotState::DONE;
 	}
 	return current_state_;
@@ -251,6 +254,25 @@ RobotState AI::tickLineFollowing(){
 	return RobotState::LINE_FOLLOWING;
 }
 
+RobotState AI::tickHabitatFind(){
+	if (!sonar_){
+		return RobotState::HABITAT_FIND;
+	}
+	double d = sonar_->queryDistance();
+	if (d < HABITAT_SIDE_THRESHOLD){
+		saw_habitat_= true;
+		return RobotState::HABITAT_FIND;
+	}
+	else if (saw_habitat_ && (d>HABITAT_DEPTH_THRESHOLD)){
+		saw_habitat_=false;
+		habitat_found_num_+=1;
+		if(habitat_found_num_==2){
+			current_habitat_find_direction_=-1;
+		}
+		return RobotState::HABITAT_PICKUP;
+	}
+	return RobotState::HABITAT_FIND;
+}
 RobotState AI::tickHabitatPickup(){
 	if (!xy_sequence_runner_.complete()){
 		return RobotState::HABITAT_PICKUP;
@@ -286,6 +308,9 @@ AI::DriveMode AI::desiredDriveMode() const{
 	}
 	if (current_state_ == RobotState::ROTATING_TIL_ROCK){
 		return DriveMode::ROTATING_TIL_ROCK;
+	}
+	if (current_state_ == RobotState::HABITAT_FIND){
+		return DriveMode::STRAFING_TIL_HABITAT;
 	}
 	if (current_state_ == RobotState::METAL_DETECTING || current_state_ == RobotState::PICKUP_ROCK ||
 	    current_state_ == RobotState::HABITAT_PICKUP || current_state_ == RobotState::HABITAT_PLACE){
@@ -363,4 +388,8 @@ RobotState AI::currentState() const{
 
 int AI::visits(RobotState state) const{
 	return state_visit_count_[idx(state)];
+}
+
+int AI::habitatFindDirection() const{
+	return current_habitat_find_direction_;
 }

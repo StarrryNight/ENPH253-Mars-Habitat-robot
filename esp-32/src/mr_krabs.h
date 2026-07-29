@@ -85,6 +85,11 @@ public:
 	// RobotState::ROTATING_TIL_ROCK).
 	void startRotatingTilRock();
 
+	// Enters habitat-search mode. Strafes at HABITAT_STRAFE_SPEED, direction
+	// given by AI::habitatFindDirection(), until AI's state transitions away
+	// (see RobotState::HABITAT_FIND).
+	void startStrafingTilHabitat();
+
 private:
 	// Called every CONTROL_LOOP_PERIOD_US by the esp_timer.
 	void stepControl();
@@ -243,5 +248,7 @@ private:
 	// OrientationController::reachedTarget), which never fires without wheels.
 	size_t arm_test_pose_index_;
 	uint64_t arm_test_pose_until_us_;
+
+	static constexpr double HABITAT_STRAFE_SPEED = 0.15;
 
 };
