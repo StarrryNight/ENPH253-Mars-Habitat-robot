@@ -31,7 +31,7 @@ static constexpr double OPEN_LOOP_TEST_OMEGA_RAD_S = 2.0;
 // Non-blocking settle delay (µs) held between the three drive actions
 // (line-following, rotating, applying an arm pose) so each has time to
 // physically settle before the next begins. See MrKrabs::stepControl.
-static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 2500000; // 1.5 s
+static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1200000; // 1.5 s
 
 // Teleoperation (manual numpad/o/p control over USB serial, bypassing the
 // RPi/AI). See MrKrabs::handleTeleopChar. Numpad 7/8/9/4/6/1/2/3 drive the 8
@@ -183,6 +183,12 @@ private:
 	// Angular velocity (rad/s, signed) driven during SEARCHING_FOR_LINE,
 	// latched by startSearchingForLine() from last_rotation_sign_.
 	double search_omega_rad_s_;
+
+	// True once SEARCHING_FOR_LINE's fixed 45° initial turn (see
+	// startSearchingForLine/driveCurrentMode) has reached its target and the
+	// reactive continuous spin has taken over. Reset to false each time
+	// startSearchingForLine() is called.
+	bool line_search_initial_turn_done_ = false;
 
 	// Angular velocity (rad/s, signed) driven during ROTATING_TIL_ROCK,
 	// latched by startRotatingTilRock() from AI::rockSearchOmegaRadS().

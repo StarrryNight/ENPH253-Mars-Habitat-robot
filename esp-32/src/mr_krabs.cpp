@@ -29,6 +29,7 @@ constexpr ArmCoordinate kArmTestPoses[] = {
 	{0.30, 0.03, 120, 50, 500, 500},
 	{0.31, -0.05, 120, 50, 250, 500},
 	{0.36, -0.05, 120, 50, 250, 500},
+	{0.36, -0.05, 120, 0, 250, 500},
 	{0.24, 0.06, 120, 0, 250, 500},
 	{0.36, -0.05, 120, 0, 250, 500},
 	{0.31, -0.05, 120, 50, 250, 500},
@@ -41,7 +42,7 @@ constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
 // place (not deleted) for future bench testing, but off now that the real
 // AI-driven sequence (ROTATING_TIL_ROCK -> METAL_DETECTING -> PICKUP_ROCK,
 // see ai.cpp) is what should be moving the arm.
-constexpr bool kRunArmBenchTest = true;
+constexpr bool kRunArmBenchTest = false;
 }
 
 MrKrabs::MrKrabs() :
@@ -321,18 +322,18 @@ void MrKrabs::stepControl()
 		}
 	}
 
-	 //ai_->tickAI();
+	 ai_->tickAI();
 	
-	 //if (debug_print_now_){
-	 //	Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
-	 //		robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
-	 //}
+	 if (debug_print_now_){
+	 	Serial.printf("[MrKrabs] state=%s drive_mode=%d\n",
+	 		robotStateName(ai_->currentState()), static_cast<int>(drive_mode_));
+	 }
 	
-	 //if (handleDriveTransition()){
-	 //	return;
-	 //}
+	 if (handleDriveTransition()){
+	 	return;
+	 }
 	
-	 //driveCurrentMode();
+	 driveCurrentMode();
 }
 
 bool MrKrabs::handleDriveTransition()
@@ -398,7 +399,26 @@ void MrKrabs::driveCurrentMode()
 			}
 			break;
 		}
-		case AI::DriveMode::SEARCHING_FOR_LINE:
+		case AI::DriveMode::SEARCHING_FOR_LINE: {
+			if (!line_search_initial_turn_done_){
+				// Fixed 45° turn first, same direction as the reactive spin
+				// below — without this, a state that left the robot already
+				// facing/sitting on the line (e.g. HABITAT_PICKUP/PLACE,
+				// which no longer rotate) could have bothMidSensorsOnLine()
+				// read true immediately, ending REACQUIRING_LINE with zero
+				// actual rotation.
+				double curr_position = motor_controller_->getElapsedRotation();
+				if (orientation_controller_.reachedTarget(curr_position)){
+					motor_controller_->driveOpenLoop({0,0,0});
+					orientation_controller_.reset();
+					line_search_initial_turn_done_ = true;
+					ai_->setLineSearchInitialTurnDone(true);
+				} else {
+					double correction = orientation_controller_.calculateCorrection(curr_position);
+					motor_controller_->setVelocity({0,0, correction});
+					break;
+				}
+			}
 			// AI::tickReacquiringLine() (called via ai_->tickAI() earlier this
 			// tick) already checked the line sensors and will transition the
 			// state once found — this just keeps spinning until that happens.
@@ -406,6 +426,7 @@ void MrKrabs::driveCurrentMode()
 			// startSearchingForLine() as the reverse of the last rotation.
 			motor_controller_->setVelocity({0, 0, search_omega_rad_s_});
 			break;
+		}
 		case AI::DriveMode::IDLE:
 			motor_controller_->driveOpenLoop({0,0,0});
 			break;
@@ -493,17 +514,26 @@ void MrKrabs::startIdle()
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 }
 
+// Fixed initial turn (deg) driveCurrentMode() rotates through, in
+// search_omega_rad_s_'s direction, before falling back to the reactive
+// continuous spin — see startSearchingForLine/driveCurrentMode.
+static constexpr double LINE_SEARCH_INITIAL_TURN_DEG = 45.0;
+
 void MrKrabs::startSearchingForLine()
 {
 	motor_controller_->driveOpenLoop({0,0,0});
 	drive_mode_ = AI::DriveMode::SEARCHING_FOR_LINE;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
-	// Not using orientation_controller_ here (no fixed target — this spins
-	// until AI transitions the state), but still worth clearing the wheel
-	// PIDs' stale integral from whatever drive mode preceded this.
 	motor_controller_->startRotation();
 	// Sweep back the way we came: opposite sign of the last real rotation.
 	search_omega_rad_s_ = -last_rotation_sign_ * LINE_SEARCH_OMEGA_RAD_S;
+	// Fixed 45° turn first (same direction as search_omega_rad_s_), then
+	// driveCurrentMode() falls back to the reactive continuous spin — see
+	// its SEARCHING_FOR_LINE case.
+	line_search_initial_turn_done_ = false;
+	ai_->setLineSearchInitialTurnDone(false);
+	double initial_turn_rad = (search_omega_rad_s_ >= 0.0 ? 1.0 : -1.0) * (LINE_SEARCH_INITIAL_TURN_DEG * DEG_TO_RAD);
+	orientation_controller_.startRotation(initial_turn_rad);
 	Serial.printf("[MrKrabs] startSearchingForLine, last_rotation_sign=%.0f omega=%.2f\n",
 		last_rotation_sign_, search_omega_rad_s_);
 }

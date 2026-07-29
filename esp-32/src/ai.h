@@ -27,6 +27,16 @@ class AI {
 		// MrKrabs, not real encoder feedback — see MrKrabs::driveCurrentMode.
 		void addProgress(double delta_m);
 
+		// Pushed by MrKrabs::driveCurrentMode's SEARCHING_FOR_LINE case: false
+		// while the fixed initial turn is still in progress, true once it's
+		// reached its target and the reactive continuous spin has taken over.
+		// tickReacquiringLine() ignores the line sensors until this is true —
+		// otherwise a state that left the robot already sitting on the line
+		// (HABITAT_PICKUP/HABITAT_PLACE, which don't rotate) could see
+		// bothMidSensorsOnLine() read true a few degrees into the turn, long
+		// before the intended fixed amount, cutting the turn short.
+		void setLineSearchInitialTurnDone(bool done);
+
 		void setArm(Arm* arm);
 		void setLineFollower(LineFollower* line_follower);
 		void setSonar(Sonar* sonar);
@@ -125,4 +135,12 @@ class AI {
 		// found. Set by whichever tick*() function transitions into
 		// REACQUIRING_LINE (see nextRockOrDone, tickHabitatPickup, etc.).
 		RobotState post_reacquire_state_;
+		// Where tickLineFollowingReverse() should hand off once its distance
+		// leg completes — HABITAT_PLACE after the outbound (post-pickup) leg,
+		// HABITAT_PICKUP after the return (post-place) leg. Set by whichever
+		// tick*() function transitions into LINE_FOLLOWING_REVERSE via
+		// REACQUIRING_LINE.
+		RobotState post_line_reverse_state_ = RobotState::HABITAT_PLACE;
+		// See setLineSearchInitialTurnDone().
+		bool line_search_initial_turn_done_ = false;
 };

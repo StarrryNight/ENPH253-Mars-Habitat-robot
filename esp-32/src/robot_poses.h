@@ -34,18 +34,28 @@ struct ArmPoseSequence {
 // AI::transitionTo. This file only holds sequences that are the same
 // every time their state is entered.
 
+// Same rotate-once/apply-each-pose shape as ArmPoseSequence, but for
+// ArmCoordinate (XY) poses instead of ArmPose (degrees) — see
+// XySequenceRunner (sequence_runner.h). x_pos on a pose with
+// x_is_sonar_relative=true is an offset (m) added to a runtime sonar
+// reading rather than an absolute position (see kPickupRockXYSequence);
+// rotation_degrees is 0.0 for sequences that don't need to rotate (the
+// rock states are already facing the target after ROTATING_TIL_ROCK's
+// free-spin).
+struct ArmXYSequence {
+	double rotation_degrees = 0.0;
+	std::vector<ArmCoordinate> poses;
+	uint64_t pose_settle_us = 1300000;
+};
+
 // Runs during METAL_DETECTING (pose 0) and PICKUP_ROCK (poses 1-6). x_pos for
 // poses with x_is_sonar_relative=true is an offset (m) added to the sonar
 // reading cached by AI::tickRotatingTilRock, resolved at apply time by
 // XySequenceRunner (sequence_runner.h) — not an absolute position. Ported
 // verbatim from mr_krabs.cpp's kArmTestPoses bench test, including its
 // per-pose sonar offsets and servo speeds.
-struct RockXYSequence {
-	std::vector<ArmCoordinate> poses;
-	uint64_t pose_settle_us = 1500000;
-};
-
-const RockXYSequence kPickupRockXYSequence = {
+const ArmXYSequence kPickupRockXYSequence = {
+	0.0,
 	{
 		{0.08,  -0.03, 120, 50, 500, 500, true},   // [0] METAL_DETECTING: reach in, probe for metal
 		{-0.02,  0.05, 120, 50, 500, 500, true},   // [1] PICKUP_ROCK: retract slightly
@@ -56,25 +66,34 @@ const RockXYSequence kPickupRockXYSequence = {
 		{0.24,   0.060,Arm::WRIST_PLACE, 50,500, 500, false}, // [6] PICKUP_ROCK: release
 		{0.24,   0.060,120, 50,500, 500, false}, // [6] PICKUP_ROCK: release
 	},
+	1500000,
 };
 
-const ArmPoseSequence kHabitatPickupSequence = {
-	90.0,
+// No rotation — HABITAT_PICKUP/HABITAT_PLACE run in place at whatever
+// heading the robot's already at. The only rotation in the habitat
+// pickup/place loop is REACQUIRING_LINE's fixed-45°-then-continue turn
+// (see MrKrabs::startSearchingForLine/driveCurrentMode).
+const ArmXYSequence kHabitatPickupXYSequence = {
+	0.0,
 	{
-		{45, 60, 0, 0},  // reach toward habitat, claw open
-		{45, 60, 0, 90}, // grab, claw closed
-		{90, 90, 0, 90}, // retract, holding item
-	}
+		{0.30,  0.03, 120, 50, 500, 500},
+		{0.31, -0.05, 120, 50, 250, 500},
+		{0.36, -0.05, 120, 50, 250, 500},
+		{0.36, -0.05, 120,  0, 250, 500}, // close claw — grabbed
+		{0.24,  0.06, 120,  0, 250, 500}, // retract, holding item
+	},
 };
 
-const ArmPoseSequence kHabitatPlaceSequence = {
-	90.0,
+const ArmXYSequence kHabitatPlaceXYSequence = {
+	0.0,
 	{
-		{45, 60, 0, 90}, // reach into habitat, still holding
-		{45, 60, 0, 0},  // release, claw open
-		{0, 90, 0, 0},   // retract, arm home
-	}
+		{0.36, -0.05, 120,  0, 250, 500}, // reach in, still holding
+		{0.31, -0.05, 120, 50, 250, 500}, // open claw — release
+		{0.28, -0.05, 120, 50, 250, 500}, // pull back, open
+		{0.30,  0.03, 120, 50, 500, 500}, // retract to home
+	},
 };
+
 // Faster settle (0.4 s vs. the 2.5 s default) — this is a wave/dance, not a
 // precise grab, so poses can be strung together quickly.
 const ArmPoseSequence kTeletubbySequence = {
@@ -92,13 +111,12 @@ const ArmPoseSequence kTeletubbySequence = {
 
 // Looks up the ArmPoseSequence to run when entering state. Returns nullptr
 // for states with no fixed arm sequence — the line-following states, DONE,
-// and METAL_DETECTING/PICKUP_ROCK (driven by kPickupRockXYSequence/
-// XySequenceRunner instead; see AI::transitionTo) — see AI::desiredDriveMode.
+// and METAL_DETECTING/PICKUP_ROCK/HABITAT_PICKUP/HABITAT_PLACE (all driven by
+// ArmXYSequence/XySequenceRunner instead; see AI::transitionTo) — see
+// AI::desiredDriveMode.
 inline const ArmPoseSequence* sequenceForState(RobotState state) {
 	switch (state) {
 		case RobotState::TELETUBBYING: return &kTeletubbySequence;
-		case RobotState::HABITAT_PICKUP: return &kHabitatPickupSequence;
-		case RobotState::HABITAT_PLACE: return &kHabitatPlaceSequence;
 		default: return nullptr;
 	}
 }

@@ -26,7 +26,7 @@ bool SequenceRunner::onRotationReached(Arm& arm) {
 	return true;
 }
 
-void XySequenceRunner::start(const RockXYSequence& sequence, double sonar_x_origin_m) {
+void XySequenceRunner::start(const ArmXYSequence& sequence, double sonar_x_origin_m) {
 	sequence_ = &sequence;
 	index_ = 0;
 	sonar_x_origin_m_ = sonar_x_origin_m;
@@ -38,6 +38,11 @@ bool XySequenceRunner::complete() const {
 
 size_t XySequenceRunner::currentIndex() const {
 	return index_;
+}
+
+double XySequenceRunner::targetRotationDegrees() const {
+	if (sequence_ == nullptr) return 0.0;
+	return sequence_->rotation_degrees;
 }
 
 uint64_t XySequenceRunner::poseSettleUs() const {

@@ -36,8 +36,9 @@ namespace {
 		1.0, 1.0,
 	};
 
-	// Distance (m) to drive in reverse before HABITAT_PLACE.
-	constexpr double kLineFollowingReverseDistanceM = 1.0;
+	// Distance (m) driven on the LINE_FOLLOWING_REVERSE leg between the
+	// habitat pickup and place spots (in both directions).
+	constexpr double kLineFollowingReverseDistanceM = 0.5;
 
 	// Sonar range (cm) that counts as "found the rock" — see
 	// AI::tickRotatingTilRock. Placeholder pending hardware tuning.
@@ -63,15 +64,22 @@ namespace {
 AI::AI():
 	arm_(nullptr),
 	line_follower_(nullptr),
-	current_state_(RobotState::FINDING_ROCK),
+	// Bench-test override: start straight in HABITAT_PICKUP to loop the
+	// habitat pickup/place cycle in isolation, instead of the real
+	// FINDING_ROCK entry point. Flip back to RobotState::FINDING_ROCK to
+	// restore the real competition flow.
+	current_state_(RobotState::HABITAT_PICKUP),
 	current_state_progress_m_(0),
 	post_reacquire_state_(RobotState::LINE_FOLLOWING)
 {
 	Serial.printf("[AI] constructed, initial state: %s\n", robotStateName(current_state_));
 	// Set the counter directly rather than routing through transitionTo(),
-	// which would also print a self-transition. FINDING_ROCK has no arm
-	// sequence, so there's nothing to start on the sequence runner.
+	// which would also print a self-transition. Unlike FINDING_ROCK,
+	// HABITAT_PICKUP does have an arm sequence, so it must be started here
+	// explicitly — transitionTo() is the only other place that happens, and
+	// it's bypassed for this initial state.
 	state_visit_count_[idx(current_state_)] = 1;
+	xy_sequence_runner_.start(kHabitatPickupXYSequence, 0.0);
 }
 
 void AI::setArm(Arm* arm){
@@ -88,6 +96,10 @@ void AI::setSonar(Sonar* sonar){
 
 void AI::addProgress(double delta_m){
 	current_state_progress_m_ += delta_m;
+}
+
+void AI::setLineSearchInitialTurnDone(bool done){
+	line_search_initial_turn_done_ = done;
 }
 
 void AI::notifyTeletubbyDetected(){
@@ -109,6 +121,10 @@ void AI::transitionTo(RobotState next){
 		// wherever this left off.
 		xy_sequence_runner_.start(kPickupRockXYSequence, cached_rock_sonar_x_m_);
 		metal_probe_pose_applied_ = false;
+	} else if (next == RobotState::HABITAT_PICKUP){
+		xy_sequence_runner_.start(kHabitatPickupXYSequence, 0.0);
+	} else if (next == RobotState::HABITAT_PLACE){
+		xy_sequence_runner_.start(kHabitatPlaceXYSequence, 0.0);
 	} else if (const ArmPoseSequence* sequence = sequenceForState(next)){
 		sequence_runner_.start(*sequence);
 	}
@@ -139,6 +155,15 @@ RobotState AI::tickCurrentState(){
 }
 
 RobotState AI::tickReacquiringLine(){
+	// Ignore the line sensors until the fixed initial turn (see
+	// MrKrabs::startSearchingForLine/driveCurrentMode) has actually
+	// completed — otherwise a state that left the robot already sitting on
+	// the line (HABITAT_PICKUP/HABITAT_PLACE, which don't rotate) could see
+	// bothMidSensorsOnLine() read true a few degrees in, cutting the turn
+	// short before it ever reaches the intended amount.
+	if (!line_search_initial_turn_done_){
+		return RobotState::REACQUIRING_LINE;
+	}
 	if (!line_follower_ || !line_follower_->bothMidSensorsOnLine()){
 		return RobotState::REACQUIRING_LINE;
 	}
@@ -228,27 +253,28 @@ RobotState AI::tickLineFollowing(){
 }
 
 RobotState AI::tickHabitatPickup(){
-	if (!sequence_runner_.complete()){
+	if (!xy_sequence_runner_.complete()){
 		return RobotState::HABITAT_PICKUP;
 	}
 	post_reacquire_state_ = RobotState::LINE_FOLLOWING_REVERSE;
+	post_line_reverse_state_ = RobotState::HABITAT_PLACE;
 	return RobotState::REACQUIRING_LINE;
 }
 
 RobotState AI::tickLineFollowingReverse(){
 	return current_state_progress_m_ >= kLineFollowingReverseDistanceM
-		? RobotState::HABITAT_PLACE
+		? post_line_reverse_state_
 		: RobotState::LINE_FOLLOWING_REVERSE;
 }
 
 RobotState AI::tickHabitatPlace(){
-	if (!sequence_runner_.complete()){
+	if (!xy_sequence_runner_.complete()){
 		return RobotState::HABITAT_PLACE;
 	}
-	if (visits(RobotState::HABITAT_PLACE) >= kNumHabitatCycles){
-		return RobotState::DONE; // finished — no need to reacquire, robot goes IDLE
-	}
-	post_reacquire_state_ = RobotState::LINE_FOLLOWING;
+	// Bench-test loop: cycle HABITAT_PICKUP <-> HABITAT_PLACE forever
+	// instead of capping at kNumHabitatCycles and finishing.
+	post_reacquire_state_ = RobotState::LINE_FOLLOWING_REVERSE;
+	post_line_reverse_state_ = RobotState::HABITAT_PICKUP;
 	return RobotState::REACQUIRING_LINE;
 }
 
@@ -262,7 +288,8 @@ AI::DriveMode AI::desiredDriveMode() const{
 	if (current_state_ == RobotState::ROTATING_TIL_ROCK){
 		return DriveMode::ROTATING_TIL_ROCK;
 	}
-	if (current_state_ == RobotState::METAL_DETECTING || current_state_ == RobotState::PICKUP_ROCK){
+	if (current_state_ == RobotState::METAL_DETECTING || current_state_ == RobotState::PICKUP_ROCK ||
+	    current_state_ == RobotState::HABITAT_PICKUP || current_state_ == RobotState::HABITAT_PLACE){
 		// Driven by xy_sequence_runner_, not a fixed sequenceForState() entry
 		// (see transitionTo) — special-cased here the same way.
 		return DriveMode::APPLYING_SEQUENCE;
@@ -271,7 +298,11 @@ AI::DriveMode AI::desiredDriveMode() const{
 }
 
 double AI::lineFollowingDirection() const{
-	return current_state_ == RobotState::LINE_FOLLOWING_REVERSE ? -1.0 : 1.0;
+	// Always forward — the photoresistor array is front-mounted, so it can't
+	// lead while driving in reverse. LINE_FOLLOWING_REVERSE keeps its name
+	// (still a distinct RobotState/leg in the state machine) but no longer
+	// actually reverses.
+	return 1.0;
 }
 
 double AI::rockSearchOmegaRadS() const{
@@ -284,7 +315,10 @@ double AI::rockSearchOmegaRadS() const{
 
 double AI::targetRotationDegrees() const{
 	if (current_state_ == RobotState::METAL_DETECTING || current_state_ == RobotState::PICKUP_ROCK){
-		return 0.0; // xy_sequence_runner_'s poses never change heading
+		return 0.0; // the rock xy runner's poses never change heading
+	}
+	if (current_state_ == RobotState::HABITAT_PICKUP || current_state_ == RobotState::HABITAT_PLACE){
+		return xy_sequence_runner_.targetRotationDegrees();
 	}
 	return sequence_runner_.targetRotationDegrees();
 }
@@ -304,6 +338,8 @@ bool AI::onRotationReached(){
 			metal_probe_pose_applied_ = xy_sequence_runner_.onRotationReached(*arm_);
 			return metal_probe_pose_applied_;
 		case RobotState::PICKUP_ROCK:
+		case RobotState::HABITAT_PICKUP:
+		case RobotState::HABITAT_PLACE:
 			return xy_sequence_runner_.onRotationReached(*arm_);
 		default:
 			return sequence_runner_.onRotationReached(*arm_);
@@ -311,7 +347,8 @@ bool AI::onRotationReached(){
 }
 
 uint64_t AI::sequencePoseSettleUs() const{
-	if (current_state_ == RobotState::METAL_DETECTING || current_state_ == RobotState::PICKUP_ROCK){
+	if (current_state_ == RobotState::METAL_DETECTING || current_state_ == RobotState::PICKUP_ROCK ||
+	    current_state_ == RobotState::HABITAT_PICKUP || current_state_ == RobotState::HABITAT_PLACE){
 		return xy_sequence_runner_.poseSettleUs();
 	}
 	return sequence_runner_.poseSettleUs();
