@@ -184,7 +184,7 @@ class AI {
 		uint64_t square_up_entered_us_ = 0;
 
 		int habitat_found_num_ = 0;
-		int current_habitat_find_direction_ = 1;
+		int current_habitat_find_direction_ = -1;
 
 		// Sonar reading (cm) below which HABITAT_FIND counts itself as having
 		// reached the habitat — the only threshold it uses, now that the
