@@ -293,7 +293,7 @@ private:
 	// coasts. Direction comes from AI::squareUpOmegaSign().
 	static constexpr double SQUARE_UP_OMEGA_RAD_S = 0.4;
 
-	static constexpr double HABITAT_STRAFE_SPEED = 0.11;
+	static constexpr double HABITAT_STRAFE_SPEED = 0.18;
 	// Deliberately slow: the backup legs are only 3-10 cm, and the encoder
 	// resolves 9.69 mm/tick (see ENCODER_RESOLUTION_DISTANCE_M), so a short
 	// leg is only a handful of ticks. Nothing decelerates before

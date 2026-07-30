@@ -5,6 +5,23 @@ static constexpr int SERVO_MIN_PULSE_US = 500;
 static constexpr int SERVO_MAX_PULSE_US = 2500;
 static constexpr int SERVO_CENTER_PULSE_US = 1500;
 
+// Compile-time degrees -> pulse width, for passing a starting angle to the
+// Servo constructor (which takes microseconds, since that is what it writes).
+// Deliberately the same arithmetic as Servo::setAngleDeg, integer truncation
+// included, so a constructor-set angle and a later setAngleDeg() of the same
+// value land on exactly the same pulse rather than differing by a count.
+static constexpr int servoPulseUsForDeg(double deg)
+{
+	return SERVO_MIN_PULSE_US +
+	       static_cast<int>((SERVO_MAX_PULSE_US - SERVO_MIN_PULSE_US) * (deg / 180.0));
+}
+
+// Angle the claw is driven to by its constructor, i.e. the very first pulse it
+// ever sees — before Arm::begin() applies the home pose. Set apart from the
+// 1500 us centre default the wrist uses so the claw doesn't swing through
+// centre on power-up.
+static constexpr double CLAW_INITIAL_ANGLE_DEG = 100.0;
+
 class Servo
 {
 

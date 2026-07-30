@@ -62,22 +62,11 @@ class AI {
 		// of the strafe direction — flipped by tickHabitatFind() once the
 		// second habitat slot has been found.
 		int habitatFindDirection() const;
-		// Valid while desiredDriveMode() == SQUARING_UP: the signed angle (rad,
-		// +ve = CCW) the robot should rotate through to square onto the habitat
-		// strip. Computed by tickHabitatLineFollowing() from the distance the
-		// robot travelled between its two side sensors reaching the strip, not
-		// searched for — see RobotState::HABITAT_SQUARE_UP.
-		double squareUpTargetRad() const;
-		// Sign (+1 = CCW) of squareUpTargetRad(), for the drivetrain to pick a
-		// rotation direction.
+		// Valid while desiredDriveMode() == SQUARING_UP. Sign (+1 = CCW) of the
+		// in-place rotation that brings the not-yet-triggered side sensor onto
+		// the habitat strip, latched by tickHabitatLineFollowing() from whichever
+		// sensor fired first — see RobotState::HABITAT_SQUARE_UP.
 		double squareUpOmegaSign() const;
-
-		// Pushed by MrKrabs::driveCurrentMode's SQUARING_UP case once the
-		// measured rotation has covered squareUpTargetRad(). tickHabitatSquareUp()
-		// waits on this rather than on the line sensors: by the time the rotation
-		// starts, both side sensors are already on the strip (that's what ended
-		// the measurement), so they can't say when the turn is done.
-		void setSquareUpDone(bool done);
 
 		// Valid while desiredDriveMode() == APPLYING_SEQUENCE. Delegates to sequence_runner_.
 		double targetRotationDegrees() const;
@@ -187,28 +176,15 @@ class AI {
 		// machine actually ran, which is what we want: tickAI() is skipped during
 		// settle delays, and no travel happens then either.
 		int side_sensor_grace_ticks_ = 0;
-		// Sign (+1 = CCW) of the correction, latched from whichever side sensor
-		// reached the strip first — see tickHabitatLineFollowing.
+		// Rotation direction for HABITAT_SQUARE_UP (+1 = CCW), and the
+		// esp_timer_get_time() stamp that state was entered at, so the rotation
+		// can't spin forever if the second sensor never reads the strip. Both set
+		// on entering the state — see tickHabitatLineFollowing/tickHabitatSquareUp.
 		double square_up_omega_sign_ = 1.0;
-		// current_state_progress_m_ at the moment that first sensor triggered.
-		// Diffed against the reading when the second one triggers to get the
-		// travel the misalignment angle is computed from — progress is fed from
-		// the encoder-integrated odometer (MrKrabs::driveCurrentMode ->
-		// addProgress), so this is measured travel, not commanded.
-		double square_up_start_progress_m_ = 0.0;
-		// The correction itself (rad, signed), computed once both sensors have
-		// triggered and then executed open-loop-to-target by the drivetrain.
-		double square_up_target_rad_ = 0.0;
-		// Set by setSquareUpDone() once the drivetrain reports the rotation
-		// covered; cleared on entering the state.
-		bool square_up_done_ = false;
-		// esp_timer_get_time() stamp of HABITAT_SQUARE_UP's first tick, so the
-		// rotation can't run forever if it never reaches target. Started on that
-		// first tick rather than at the transition — see transitionTo.
 		uint64_t square_up_entered_us_ = 0;
 
 		int habitat_found_num_ = 0;
-		int current_habitat_find_direction_ = -1;
+		int current_habitat_find_direction_ = 1;
 
 		// Sonar reading (cm) below which HABITAT_FIND counts itself as having
 		// reached the habitat — the only threshold it uses, now that the

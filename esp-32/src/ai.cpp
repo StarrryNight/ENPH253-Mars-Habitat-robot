@@ -5,8 +5,6 @@
 #include <Arduino.h>
 #include "esp_timer.h"
 #include <array>
-#include <algorithm>
-#include <cmath>
 
 // Dummy tuning constants — placeholders pending real localization/testing,
 // same status as the arm pose numbers in robot_poses.h.
@@ -50,7 +48,7 @@ namespace {
 	// Distance (m) driven straight backward on the HABITAT_APPROACH_BACKUP
 	// leg, before HABITAT_FIND starts its sonar-based strafe search — clears
 	// the wall the robot just line-followed up to.
-	constexpr double kHabitatApproachBackupDistanceM = 0.015;
+	constexpr double kHabitatApproachBackupDistanceM = 0.01;
 
 	// Distance (m) driven straight backward on the HABITAT_POST_PICKUP_BACKUP
 	// leg, after HABITAT_PICKUP's arm sequence completes — clears the
@@ -77,32 +75,20 @@ namespace {
 	// the robot appears to sit still in ROTATING_TIL_ROCK.
 	constexpr uint64_t kRockSonarConfirmDelayUs = 20000; // 0.025 s
 
-	// How long, in control ticks, to keep driving waiting for the SECOND side
-	// sensor to reach the habitat strip after the first one does. The travel over
-	// that interval is what the skew angle is measured from, so this is not a
-	// tolerance (kSquareUpMinCorrectionRad is) — it is the measurement's upper
-	// range, and a skew that needs longer than this to develop is simply not
-	// measured at all: the window expires and the robot proceeds unsquared.
+	// Grace window, in control ticks, granted to the second side sensor after the
+	// first one reads the habitat strip. Only if it hasn't come on by then does
+	// the approach count as crooked and divert to HABITAT_SQUARE_UP; otherwise
+	// this is a square arrival and the robot carries on to
+	// HABITAT_APPROACH_BACKUP. Exists because "both at once" would otherwise mean
+	// "within one 10 ms tick", i.e. within 1 mm of travel at FORWARD_SPEED, which
+	// no real approach achieves — without a window the square-up would fire on
+	// essentially every run, including dead-straight ones.
 	//
-	// Largest skew this can measure:
-	//     asin(FORWARD_SPEED * ticks * CONTROL_LOOP_PERIOD / SIDE_SENSOR_SPACING_M)
-	// At 0.07 m/s, 10 ms ticks and a 0.13 m span that is asin(0.0054 * ticks),
-	// i.e. ~2.8 deg at 9 ticks, ~10 deg at 32, ~20 deg at 64. Size it for the
-	// worst approach worth correcting; the only cost of a larger window is how
-	// far the robot drives past the strip before it stops to turn (ticks * 0.7 mm),
-	// which the square-up's rotation does not undo.
-	//
-	// 32 covers ~10 deg, which is more skew than line-following should ever leave.
-	// Note that overshoot only reaches the full 22 mm when the window actually
-	// runs out — a typical small skew closes it in a handful of ticks and stops
-	// the robot there, so the cost is paid on failed measurements, not good ones.
-	constexpr int kSideSensorGraceTicks = 32;
-
-	// Skew (rad) below which the square-up is skipped entirely. Below a couple of
-	// degrees the correction is smaller than what the drivetrain can resolve (one
-	// encoder tick is 0.03 rad of measured rotation), so acting on it would be
-	// noise dressed up as a correction — and it costs a stop, a settle and a turn.
-	constexpr double kSquareUpMinCorrectionRad = 0.035; // ~2 deg
+	// 5 ticks = 50 ms = ~5 mm of approach at FORWARD_SPEED, so the tolerance is
+	// whatever yaw offsets the two outer sensors by less than that (2 * half
+	// their spacing * sin(theta) < 5 mm). Raise it to tolerate more crookedness,
+	// lower to square up more eagerly.
+	constexpr int kSideSensorGraceTicks = 9;
 
 	// Longest (us) HABITAT_SQUARE_UP will rotate before giving up and proceeding
 	// unsquared. Generous next to the turn it should need — at
@@ -190,11 +176,10 @@ void AI::transitionTo(RobotState next){
 		// through MrKrabs::startSquaringUp()'s entry settle delay — during which
 		// stepControl() returns before tickAI() and the wheels are deliberately
 		// held stopped — so a timeout shorter than that settle would expire
-		// before the rotation was ever commanded. The target angle itself is
-		// computed by tickHabitatLineFollowing() before it returns this state,
-		// from the travel between the two sensor triggers.
+		// before the rotation was ever commanded. The rotation direction itself is
+		// latched by tickHabitatLineFollowing() before it returns this state,
+		// while the sensor readings that determine it are still valid.
 		square_up_entered_us_ = 0;
-		square_up_done_ = false;
 	} else if (next == RobotState::REVERSE_180){
 		// One-shot pose rather than a runner: REVERSE_180's DriveMode drives the
 		// spin, so nothing would step a sequence through. Written here, at the
@@ -348,42 +333,27 @@ RobotState AI::tickHabitatLineFollowing(){
 	if (!line_follower_){
 		return RobotState::HABITAT_LINE_FOLLOWING;
 	}
-	// Second sensor has arrived (or both landed on the same tick). The sensor pair
-	// is a segment of length SIDE_SENSOR_SPACING_M; yawed by theta, its ends are
-	// offset along the direction of travel by span * sin(theta), and that offset
-	// is exactly the distance driven between the two triggers. So the skew is
-	// asin(travel / span) — known before the robot turns at all, no searching.
+	// Both on the strip — square enough, whether they arrived together or the
+	// second one caught up inside the grace window below. The tick count says
+	// which: 0 means they landed on the same tick, 1-4 means the window opened
+	// and the trailing sensor arrived inside it.
 	if (line_follower_->bothSideSensorsOnLine()){
-		double travel_m = current_state_progress_m_ - square_up_start_progress_m_;
-		// Clamped because a travel longer than the span is geometrically
-		// impossible: it means the first trigger was something other than this
-		// strip, or a reading was missed. asin() would return NaN and the
-		// comparisons below would all be false, silently rotating to a NaN target.
-		double sin_theta = std::min(1.0, std::max(-1.0, travel_m / SIDE_SENSOR_SPACING_M));
-		double error_rad = std::asin(sin_theta);
-		// Rotate back by that much: square_up_omega_sign_ already encodes which
-		// way (the side that arrived first was leading).
-		square_up_target_rad_ = square_up_omega_sign_ * error_rad;
+		Serial.printf("[AI] habitat strip square, no square-up needed (both sides on after %d/%d grace ticks)\n",
+			side_sensor_grace_ticks_, kSideSensorGraceTicks);
 		side_sensor_grace_ticks_ = 0;
-		if (error_rad < kSquareUpMinCorrectionRad){
-			Serial.printf("[AI] habitat strip square within tolerance (%.1f mm skew = %.1f deg), no square-up\n",
-				travel_m * 1000.0, error_rad * 57.2958);
-			return RobotState::HABITAT_APPROACH_BACKUP;
-		}
-		Serial.printf("[AI] habitat strip skew %.1f mm over %.0f mm spacing = %.1f deg, square-up TRIGGERED (rotating %s)\n",
-			travel_m * 1000.0, SIDE_SENSOR_SPACING_M * 1000.0, error_rad * 57.2958,
-			square_up_target_rad_ > 0 ? "CCW" : "CW");
-		return RobotState::HABITAT_SQUARE_UP;
+		return RobotState::HABITAT_APPROACH_BACKUP;
 	}
 	bool left = line_follower_->leftSensorOnLine();
 	bool right = line_follower_->rightSensorOnLine();
 	if (left != right){
-		// One side has reached the strip: keep driving, and start measuring. The
-		// second sensor's arrival closes the measurement above.
+		// One side has reached the strip. Keep driving for kSideSensorGraceTicks
+		// to let the other one arrive; only a window that expires one-sided means
+		// the approach is genuinely crooked.
 		if (side_sensor_grace_ticks_ == 0){
-			// Latch on the tick the window opens, while the reading still says
-			// which side got there first — that identifies the leading side, and
-			// the odometer reading here is the baseline the skew is measured from.
+			// Latch the direction from the sensor that got there FIRST, on the
+			// tick the window opens — that identifies the leading side, which is
+			// the geometry the correction depends on. Reading it later risks the
+			// two sensors having swapped over an edge mid-window.
 			//
 			// Rotating counter-clockwise swings the right side of the array
 			// forward (a sensor at (+d, L) moves to y = L*cos + d*sin), so the
@@ -391,19 +361,15 @@ RobotState AI::tickHabitatLineFollowing(){
 			// to bring the *other* one forward: left first -> CCW (+1), right
 			// first -> CW (-1).
 			square_up_omega_sign_ = left ? 1.0 : -1.0;
-			square_up_start_progress_m_ = current_state_progress_m_;
 		}
 		if (++side_sensor_grace_ticks_ < kSideSensorGraceTicks){
 			return RobotState::HABITAT_LINE_FOLLOWING;
 		}
-		// Window expired with the second sensor still off. No travel figure means
-		// no angle to rotate, so carry on rather than turn by a guess — this is
-		// the "second sensor never sees the strip" case (missed edge, marginal
-		// reflectivity), not a large-but-measurable skew.
-		Serial.printf("[AI] second side sensor never reached the strip within %d ticks, proceeding unsquared\n",
-			kSideSensorGraceTicks);
+		Serial.printf("[AI] habitat strip crooked, square-up TRIGGERED (%s side first, other still off after %d ticks, rotating %s)\n",
+			square_up_omega_sign_ > 0 ? "left" : "right", kSideSensorGraceTicks,
+			square_up_omega_sign_ > 0 ? "CCW" : "CW");
 		side_sensor_grace_ticks_ = 0;
-		return RobotState::HABITAT_APPROACH_BACKUP;
+		return RobotState::HABITAT_SQUARE_UP;
 	}
 	// Neither sensor on the strip: whatever one of them clipped wasn't the
 	// marker, so drop the window rather than letting a later reading resume a
@@ -421,20 +387,18 @@ RobotState AI::tickHabitatSquareUp(){
 		square_up_entered_us_ = now;
 		return RobotState::HABITAT_SQUARE_UP;
 	}
-	// Done when the drivetrain reports the measured rotation has covered
-	// square_up_target_rad_ (see MrKrabs::driveCurrentMode's SQUARING_UP case).
-	// Not a sensor check: both side sensors are already on the strip by now —
-	// that's what closed the measurement — so they'd read "square" from the
-	// first tick and end the turn before it started.
-	if (square_up_done_){
-		Serial.printf("[AI] square-up complete (%.1f deg) after %.0f ms\n",
-			square_up_target_rad_ * 57.2958, (now - square_up_entered_us_) / 1000.0);
+	// Done the moment the trailing sensor catches up — both on the strip means
+	// the array is parallel to it.
+	if (line_follower_ && line_follower_->bothSideSensorsOnLine()){
+		Serial.printf("[AI] square-up complete after %.0f ms of rotation\n",
+			(now - square_up_entered_us_) / 1000.0);
 		return RobotState::HABITAT_APPROACH_BACKUP;
 	}
-	// Bail-out: if the rotation can't reach target (a wheel stalling, an
-	// over-large angle from a bad SIDE_SENSOR_SPACING_M) the robot would
-	// otherwise turn in place indefinitely at the habitat. Give up and carry on
-	// part-squared rather than hang.
+	// Bail-out: a strip the second sensor never reads (missed edge, marginal
+	// reflectivity, a sensor that just clipped a corner) would otherwise leave
+	// the robot rotating in place indefinitely at the habitat. Give up and carry
+	// on unsquared rather than hang — the habitat legs cope worse with a bad
+	// heading than with a slightly crooked one, but they cope.
 	if (esp_timer_get_time() - square_up_entered_us_ >= kSquareUpTimeoutUs){
 		Serial.println("[AI] HABITAT_SQUARE_UP timed out, proceeding unsquared");
 		return RobotState::HABITAT_APPROACH_BACKUP;
@@ -647,14 +611,6 @@ int AI::habitatFindDirection() const{
 	return current_habitat_find_direction_;
 }
 
-double AI::squareUpTargetRad() const{
-	return square_up_target_rad_;
-}
-
 double AI::squareUpOmegaSign() const{
-	return square_up_target_rad_ >= 0.0 ? 1.0 : -1.0;
-}
-
-void AI::setSquareUpDone(bool done){
-	square_up_done_ = done;
+	return square_up_omega_sign_;
 }

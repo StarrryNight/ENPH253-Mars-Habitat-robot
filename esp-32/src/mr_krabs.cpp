@@ -26,17 +26,19 @@ constexpr ArmCoordinate kArmTestPoses[] = {
 	//{0.30, -0.06, 120, 0, 500, 500},
 	//{0.24, 0.060, 120, 0, 500, 500},
 	//{0.24, 0.060, Arm::WRIST_PLACE, 0, 500, 500},
-	{0.30, 0.03, 120, 50, 500, 500},
-	{0.31, -0.05, 120, 50, 250, 500},
-	{0.36, -0.05, 120, 50, 250, 500},
-	{0.36, -0.05, 120, 0, 250, 500},
-	{0.24, 0.06, 120, 0, 250, 500},
-	{0.36, -0.05, 120, 0, 250, 500},
-	{0.31, -0.05, 120, 50, 250, 500},
-	{0.28, -0.05, 120, 50, 250, 500},
+	{0.30, 0.03, Arm::WRIST_PLACE, Arm::CLAW_CLOSE, 500, 500},
+	{0.30, 0.03, Arm::WRIST_PLACE, Arm::CLAW_OPEN,  500, 500},
+	//{0.31, -0.05, 100, 100, 250, 500},
+	//{0.31, -0.05, 100, 100, 250, 500},
+//	{0.36, -0.05, 120, 50, 250, 500},
+//	{0.36, -0.05, 120, 0, 250, 500},
+//	{0.24, 0.06, 120, 0, 250, 500},
+//	{0.36, -0.05, 120, 0, 250, 500},
+//	{0.31, -0.05, 120, 50, 250, 500},
+//	{0.28, -0.05, 120, 50, 250, 500},
 };
 constexpr size_t kArmTestPoseCount = sizeof(kArmTestPoses) / sizeof(kArmTestPoses[0]);
-constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 2000000; // 2 s per pose
+constexpr uint64_t ARM_TEST_POSE_PERIOD_US = 5000000; // 2 s per pose
 
 // Flip to true to re-enable the arm-only bench test loop below. Left in
 // place (not deleted) for future bench testing, but off now that the real
@@ -276,7 +278,11 @@ void MrKrabs::stepControl()
 		last_state_print_us_ = now;
 	}
 
-	sonar_->queryDistance();
+	// No sonar ping here: this call discarded its result (it existed to feed a
+	// debug print), while costing a full blocking ping every tick — and in
+	// HABITAT_FIND / ROTATING_TIL_ROCK a second one on top of AI's own. The
+	// states that need a reading take it themselves.
+	//
 	// Before the settle-delay return below and before ai_->tickAI() consumes
 	// the sensors: the array has to be sampled every tick no matter what the
 	// drivetrain is doing, or LineFollower's prev_state_ (which side the line
@@ -463,28 +469,13 @@ void MrKrabs::driveCurrentMode()
 			// startRotatingTilRock() from AI::rockSearchOmegaRadS().
 			motor_controller_->setVelocity({0, 0, rock_search_omega_rad_s_});
 			break;
-		case AI::DriveMode::SQUARING_UP: {
-			// Rotate through AI::squareUpTargetRad(), the angle computed from the
-			// travel between the two side sensors reaching the strip. Progress is
-			// getElapsedRotation() — the per-wheel estimate, which is the right
-			// one here precisely because this is a pure in-place rotation (no
-			// translation for it to misread as yaw), and it's the same estimator
-			// APPLYING_SEQUENCE's turns use.
-			//
-			// Constant omega rather than orientation_controller_'s PID: these
-			// corrections are a few degrees, and calculateCorrection()'s
-			// MIN_ROTATION_OMEGA_RAD_S floor (1.0 rad/s) would drive the whole of
-			// such a turn at a speed that overshoots it inside one tick.
-			double target = ai_->squareUpTargetRad();
-			double elapsed = motor_controller_->getElapsedRotation();
-			if (std::abs(elapsed) >= std::abs(target)){
-				motor_controller_->stopImmediate();
-				ai_->setSquareUpDone(true);
-			} else {
-				motor_controller_->setVelocity({0, 0, SQUARE_UP_OMEGA_RAD_S * ai_->squareUpOmegaSign()});
-			}
+		case AI::DriveMode::SQUARING_UP:
+			// AI::tickHabitatSquareUp() (called via ai_->tickAI() earlier this
+			// tick) watches for the second side sensor and transitions away the
+			// moment both read the strip — this just keeps rotating until then.
+			// Pure rotation, no translation: the robot is already at the strip.
+			motor_controller_->setVelocity({0, 0, SQUARE_UP_OMEGA_RAD_S * ai_->squareUpOmegaSign()});
 			break;
-		}
 		case AI::DriveMode::STRAFING_TIL_HABITAT: {
 			// AI::tickHabitatFind() (called via ai_->tickAI() earlier this
 			// tick) already checked the sonar and will transition the state
@@ -685,12 +676,11 @@ void MrKrabs::startSquaringUp()
 	motor_controller_->stopImmediate();
 	drive_mode_ = AI::DriveMode::SQUARING_UP;
 	action_settle_until_us_ = esp_timer_get_time() + SQUARE_UP_SETTLE_US;
-	// Zeroes the rotation counters the SQUARING_UP case measures its progress
-	// against, and clears the wheel PIDs' integral from the line-following leg,
-	// which was chasing a forward velocity this rotation doesn't want.
+	// Clears the wheel PIDs' integral from the line-following leg, which was
+	// chasing a forward velocity this rotation doesn't want.
 	motor_controller_->startRotation();
 	last_rotation_sign_ = ai_->squareUpOmegaSign();
-	Serial.printf("[MrKrabs] startSquaringUp, target=%.1f deg\n", ai_->squareUpTargetRad() * RAD_TO_DEG);
+	Serial.printf("[MrKrabs] startSquaringUp, omega_sign=%.0f\n", ai_->squareUpOmegaSign());
 }
 
 void MrKrabs::startStrafingTilHabitat()

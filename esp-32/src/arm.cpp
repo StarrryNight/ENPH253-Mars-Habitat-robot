@@ -7,12 +7,12 @@
 Arm::Arm()
 	: bus_servo_(6),
 	  wrist_servo_(WRIST_YAW_SERVO_PIN),
-	  claw_servo_(CLAW_OPEN_SERVO_PIN),
+	  claw_servo_(CLAW_OPEN_SERVO_PIN, servoPulseUsForDeg(CLAW_INITIAL_ANGLE_DEG)),
 	  // Home pose (base=0deg, elbow=70deg) — the only combination guaranteed
 	  // in range for both bus servos (base: [0,70], elbow: [23,70], see
 	  // STSServo's SERVO_1_*/SERVO_2_* calibration in servo.h). Applied fresh
 	  // by begin() on every setup(), not just used as a default.
-	  current_pose_({45, 29, 0, 0})
+	  current_pose_({45, 29, 0, 30})
 {
 }
 
@@ -21,7 +21,7 @@ void Arm::begin()
 	// Single-wire half-duplex UART: rx and tx are the same physical pin.
 	// Always reset to the home pose on startup, regardless of whatever
 	// current_pose_ might otherwise hold.
-	setPose({-2, 25, 120, 55});
+	setPose({-2, 25, Arm::WRIST_CENTER, 30});
 }
 
 
@@ -43,7 +43,7 @@ void Arm::setPoseXY(ArmCoordinate pose)
 ArmPose Arm::coordinateToDegrees(ArmCoordinate pose)
 {
 	pose.x_pos -= 92.73/1000;
-	pose.y_pos += 72.5/1000;
+	pose.y_pos += 65.5/1000;
 	double q2 = -acos((pow(pose.x_pos, 2) + pow(pose.y_pos, 2) - pow(UPPERARM_LENGTH, 2) - pow(FOREARM_LENGTH, 2))/(2*UPPERARM_LENGTH*FOREARM_LENGTH));
 	double q1 = atan(pose.y_pos/ pose.x_pos) + atan(FOREARM_LENGTH*sin(-q2)/( UPPERARM_LENGTH + FOREARM_LENGTH*cos(-q2)));
 
