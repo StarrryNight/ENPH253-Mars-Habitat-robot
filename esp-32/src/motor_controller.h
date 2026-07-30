@@ -104,7 +104,25 @@ public:
 	// of the most recent updateRotationTracking() call. Pure getter — safe to
 	// call from any tick (e.g. a different timer than motorStepControl's)
 	// without perturbing the accumulation.
+	//
+	// Valid ONLY for a pure in-place rotation: it takes the largest-magnitude
+	// per-wheel estimate, each of which assumes that wheel's whole travel is
+	// R*angle. Any translation in the command makes it read that translation as
+	// rotation. Use getYawDriftRad() while translating.
 	double getElapsedRotation() const;
+
+	// Rotation (rad) since startRotation() computed from the kiwi drive's
+	// forward kinematics — omega = (v_left + v_right + v_back) / (3R) — over the
+	// same signed encoder counts getElapsedRotation() reads. Because the three
+	// wheel contributions of any pure translation sum to zero, what survives is
+	// yaw alone, so this stays valid while the robot is also driving/strafing.
+	// That makes it the estimate to feed OrientationController::holdCorrection.
+	//
+	// Same caveats as the counts themselves: sign comes from each wheel's
+	// commanded direction (single-phase encoders), so a slipping or back-driven
+	// wheel reads as if it turned the commanded way, and resolution is
+	// ENCODER_RESOLUTION_DISTANCE_M / (3R) = 0.0297 rad (1.7 deg) per tick.
+	double getYawDriftRad() const;
 
 	// Folds this tick's measured (filtered) robot velocity into the running
 	// translation odometer (total_translation_m_) via velocity * dt —

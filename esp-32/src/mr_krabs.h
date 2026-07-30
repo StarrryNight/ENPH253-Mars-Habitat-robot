@@ -271,7 +271,7 @@ private:
 	size_t arm_test_pose_index_;
 	uint64_t arm_test_pose_until_us_;
 
-	static constexpr double HABITAT_STRAFE_SPEED = 0.13;
+	static constexpr double HABITAT_STRAFE_SPEED = 0.11;
 	// Deliberately slow: the backup legs are only 3-10 cm, and the encoder
 	// resolves 9.69 mm/tick (see ENCODER_RESOLUTION_DISTANCE_M), so a short
 	// leg is only a handful of ticks. Nothing decelerates before

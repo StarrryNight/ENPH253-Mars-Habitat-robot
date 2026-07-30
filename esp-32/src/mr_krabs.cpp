@@ -462,14 +462,19 @@ void MrKrabs::driveCurrentMode()
 			// startRotatingTilRock() from AI::rockSearchOmegaRadS().
 			motor_controller_->setVelocity({0, 0, rock_search_omega_rad_s_});
 			break;
-		case AI::DriveMode::STRAFING_TIL_HABITAT:
+		case AI::DriveMode::STRAFING_TIL_HABITAT: {
 			// AI::tickHabitatFind() (called via ai_->tickAI() earlier this
 			// tick) already checked the sonar and will transition the state
 			// once the habitat is found — this just keeps strafing until then.
 			// Direction comes straight from AI::habitatFindDirection(), which
 			// tickHabitatFind() flips once the second habitat slot is found.
-			motor_controller_->setVelocity({HABITAT_STRAFE_SPEED * ai_->habitatFindDirection(), 0, 0});
+			// The omega term holds the heading the strafe started at, off the
+			// encoder-derived yaw estimate — see startStrafingTilHabitat() and
+			// OrientationController::holdCorrection.
+			double yaw = orientation_controller_.holdCorrection(motor_controller_->getYawDriftRad());
+			motor_controller_->setVelocity({HABITAT_STRAFE_SPEED * ai_->habitatFindDirection(), 0, yaw});
 			break;
+		}
 		case AI::DriveMode::BACKING_UP: {
 			// AI::tickHabitatBackup() (called via ai_->tickAI() earlier this
 			// tick) tracks the distance leg itself off addProgress() below and
@@ -480,7 +485,7 @@ void MrKrabs::driveCurrentMode()
 			last_total_translation_m_ = total_translation_m;
 			break;
 		}
-		case AI::DriveMode::HOLDING_AND_MOVING:
+		case AI::DriveMode::HOLDING_AND_MOVING: {
 			// AI::tickHabitatHoldAndMove() (called via ai_->tickAI() earlier
 			// this tick) already checked the line sensors and will transition
 			// the state once both mids are on the line — this just keeps
@@ -488,8 +493,15 @@ void MrKrabs::driveCurrentMode()
 			// (HABITAT_POST_PICKUP_BACKUP's straight backward leg runs
 			// first instead), so this strafes opposite the direction
 			// HABITAT_FIND strafed to reach this slot.
-			motor_controller_->setVelocity({-HABITAT_STRAFE_SPEED * ai_->habitatFindDirection(), 0, 0});
+			//
+			// Same heading hold as STRAFING_TIL_HABITAT above — more valuable
+			// here if anything, since the load in the claw shifts the centre of
+			// mass and makes the chassis yaw more readily under a sideways
+			// command.
+			double yaw = orientation_controller_.holdCorrection(motor_controller_->getYawDriftRad());
+			motor_controller_->setVelocity({-HABITAT_STRAFE_SPEED * ai_->habitatFindDirection(), 0, yaw});
 			break;
+		}
 	}
 }
 
@@ -637,6 +649,14 @@ void MrKrabs::startStrafingTilHabitat()
 {
 	drive_mode_ = AI::DriveMode::STRAFING_TIL_HABITAT;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	// Zero the yaw reference the strafe will hold: startRotation() clears the
+	// signed encoder counts getYawDriftRad() reads, and the 0.0 target makes
+	// holdCorrection() null out any drift away from *this* heading. Whatever the
+	// heading was in absolute terms is irrelevant — the hold only keeps the
+	// robot from turning during the strafe, it doesn't know or fix which way it
+	// was pointing to begin with.
+	motor_controller_->startRotation();
+	orientation_controller_.startRotation(0.0);
 	Serial.printf("[MrKrabs] startStrafingTilHabitat, direction=%d\n", ai_->habitatFindDirection());
 }
 
@@ -644,6 +664,9 @@ void MrKrabs::startHoldingAndMoving()
 {
 	drive_mode_ = AI::DriveMode::HOLDING_AND_MOVING;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	// Same yaw reference reset as startStrafingTilHabitat().
+	motor_controller_->startRotation();
+	orientation_controller_.startRotation(0.0);
 	Serial.printf("[MrKrabs] startHoldingAndMoving, direction=%d\n", -ai_->habitatFindDirection());
 }
 

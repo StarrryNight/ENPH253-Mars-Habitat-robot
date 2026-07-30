@@ -57,6 +57,23 @@ static constexpr double ORIENTATION_PID_I = 0;
 static constexpr double ORIENTATION_PID_D = 0.2;
 static constexpr double ORIENTATION_PID_MAX_I = 1;
 
+// Heading-hold PID (OrientationController::holdCorrection) — the trim that keeps
+// the robot square while a strafe drives it sideways. Error is heading (rad)
+// from the encoder-derived rotation estimate, output is omega (rad/s), so P is
+// rad/s per rad of error: at P = 1.0 a 10 deg drift buys 0.17 rad/s of
+// correction, and MAX_HOLD_OMEGA_RAD_S caps it from ~23 deg up.
+//
+// Separate from ORIENTATION_PID_* on purpose. Those gains are irrelevant in
+// practice (MIN_ROTATION_OMEGA_RAD_S saturates them for every turn the robot
+// actually makes), whereas these ones are the only thing setting hold
+// behavior — so they need to be tunable without touching rotate-to-angle.
+// Leave I at 0: heading error here is a drift to be nulled, and an integral on
+// a quantized encoder estimate mostly winds up on noise.
+static constexpr double STRAFE_HOLD_PID_P = 1.0;
+static constexpr double STRAFE_HOLD_PID_I = 0.0;
+static constexpr double STRAFE_HOLD_PID_D = 0.0;
+static constexpr double STRAFE_HOLD_PID_MAX_I = 0.0;
+
 // Line-following lateral correction PID (LineFollower). Error from the
 // photoresistor array (SMALL_ERROR_VALUE / BIG_ERROR_VALUE units).
 static constexpr double LINE_PID_P = 1;

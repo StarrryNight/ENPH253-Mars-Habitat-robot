@@ -266,6 +266,17 @@ void MotorController::updateRotationTracking(){
 	current_rotation_rad_ = angle;
 }
 
+double MotorController::getYawDriftRad() const
+{
+	// omega = (v_left + v_right + v_back) / (3R), applied to accumulated counts
+	// instead of velocities — see wheelToEuclidean() for the same expression on
+	// the velocity side. Summing first is what cancels translation: a pure
+	// strafe commands (-0.5, -0.5, +1.0) * vx and a pure drive (-c, +c, 0) * vy,
+	// both of which add to zero here, so only genuine yaw is left.
+	int64_t count_sum = wheel_left_rotation_count_ + wheel_right_rotation_count_ + wheel_back_rotation_count_;
+	return (count_sum * ENCODER_RESOLUTION_DISTANCE_M) / (3.0 * WHEEL_DISTANCE_FROM_CENTER_M);
+}
+
 double MotorController::getElapsedRotation() const{
 	return current_rotation_rad_;
 }
