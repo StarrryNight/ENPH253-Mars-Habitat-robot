@@ -301,7 +301,7 @@ private:
 	// trips lands directly on top of the target — and coast energy goes as
 	// v². Keep this low enough that the coast stays small next to the
 	// shortest leg (kHabitatPostPickupBackupDistanceM et al. in ai.cpp).
-	static constexpr double HABITAT_BACKUP_SPEED = 0.12;
+	static constexpr double HABITAT_BACKUP_SPEED = 0.07;
 
 	// Extra settle delay (µs) held after HOLDING_AND_MOVING's strafe-back-
 	// onto-the-line phase finishes, before LINE_FOLLOWING_REVERSE starts

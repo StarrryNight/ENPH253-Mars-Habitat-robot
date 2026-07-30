@@ -463,13 +463,28 @@ void MrKrabs::driveCurrentMode()
 			// startRotatingTilRock() from AI::rockSearchOmegaRadS().
 			motor_controller_->setVelocity({0, 0, rock_search_omega_rad_s_});
 			break;
-		case AI::DriveMode::SQUARING_UP:
-			// AI::tickHabitatSquareUp() (called via ai_->tickAI() earlier this
-			// tick) watches for the second side sensor and transitions away the
-			// moment both read the strip — this just keeps rotating until then.
-			// Pure rotation, no translation: the robot is already at the strip.
-			motor_controller_->setVelocity({0, 0, SQUARE_UP_OMEGA_RAD_S * ai_->squareUpOmegaSign()});
+		case AI::DriveMode::SQUARING_UP: {
+			// Rotate through AI::squareUpTargetRad(), the angle computed from the
+			// travel between the two side sensors reaching the strip. Progress is
+			// getElapsedRotation() — the per-wheel estimate, which is the right
+			// one here precisely because this is a pure in-place rotation (no
+			// translation for it to misread as yaw), and it's the same estimator
+			// APPLYING_SEQUENCE's turns use.
+			//
+			// Constant omega rather than orientation_controller_'s PID: these
+			// corrections are a few degrees, and calculateCorrection()'s
+			// MIN_ROTATION_OMEGA_RAD_S floor (1.0 rad/s) would drive the whole of
+			// such a turn at a speed that overshoots it inside one tick.
+			double target = ai_->squareUpTargetRad();
+			double elapsed = motor_controller_->getElapsedRotation();
+			if (std::abs(elapsed) >= std::abs(target)){
+				motor_controller_->stopImmediate();
+				ai_->setSquareUpDone(true);
+			} else {
+				motor_controller_->setVelocity({0, 0, SQUARE_UP_OMEGA_RAD_S * ai_->squareUpOmegaSign()});
+			}
 			break;
+		}
 		case AI::DriveMode::STRAFING_TIL_HABITAT: {
 			// AI::tickHabitatFind() (called via ai_->tickAI() earlier this
 			// tick) already checked the sonar and will transition the state
@@ -487,7 +502,16 @@ void MrKrabs::driveCurrentMode()
 			// AI::tickHabitatBackup() (called via ai_->tickAI() earlier this
 			// tick) tracks the distance leg itself off addProgress() below and
 			// will transition the state once it's done.
-			motor_controller_->setVelocity({0, -HABITAT_BACKUP_SPEED, 0});
+			//
+			// Heading held the same way as the strafe legs — a backward leg has
+			// no line sensors ahead of it and no sonar bearing to correct
+			// against, so without this any yaw it picks up is simply kept, and
+			// every later fixed distance/angle inherits it. getYawDriftRad()
+			// works here for the same reason it does while strafing: a pure
+			// backward drive commands (-0.866, +0.866, 0) * vy, which sums to
+			// zero, so what the estimate reports is yaw alone.
+			double yaw = orientation_controller_.holdCorrection(motor_controller_->getYawDriftRad());
+			motor_controller_->setVelocity({0, -HABITAT_BACKUP_SPEED, yaw});
 			double total_translation_m = motor_controller_->getTotalTranslationM();
 			ai_->addProgress(total_translation_m - last_total_translation_m_);
 			last_total_translation_m_ = total_translation_m;
@@ -661,11 +685,12 @@ void MrKrabs::startSquaringUp()
 	motor_controller_->stopImmediate();
 	drive_mode_ = AI::DriveMode::SQUARING_UP;
 	action_settle_until_us_ = esp_timer_get_time() + SQUARE_UP_SETTLE_US;
-	// Clears the wheel PIDs' integral from the line-following leg, which was
-	// chasing a forward velocity this rotation doesn't want.
+	// Zeroes the rotation counters the SQUARING_UP case measures its progress
+	// against, and clears the wheel PIDs' integral from the line-following leg,
+	// which was chasing a forward velocity this rotation doesn't want.
 	motor_controller_->startRotation();
 	last_rotation_sign_ = ai_->squareUpOmegaSign();
-	Serial.printf("[MrKrabs] startSquaringUp, omega_sign=%.0f\n", ai_->squareUpOmegaSign());
+	Serial.printf("[MrKrabs] startSquaringUp, target=%.1f deg\n", ai_->squareUpTargetRad() * RAD_TO_DEG);
 }
 
 void MrKrabs::startStrafingTilHabitat()
@@ -702,6 +727,12 @@ void MrKrabs::startBackingUp()
 	// STRAFING_TIL_HABITAT) preceded this — same reasoning as startRotation().
 	motor_controller_->resetTranslationTracking();
 	last_total_translation_m_ = 0.0;
+	// Zero the yaw reference this leg will hold, same as the strafe legs. Note
+	// startRotation() also clears the rotation counts getYawDriftRad() reads,
+	// which is what makes the hold relative to the heading we start backing up
+	// at rather than to something inherited from the previous leg.
+	motor_controller_->startRotation();
+	orientation_controller_.startRotation(0.0);
 	Serial.printf("[MrKrabs] startBackingUp\n");
 }
 

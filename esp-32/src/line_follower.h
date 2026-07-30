@@ -9,6 +9,20 @@
 
 // Raw 12-bit ADC threshold (0–4095). Calibrate on your surface.
 static constexpr double LIGHT_THRESHOLD_ADC = 2000;
+
+// Distance (m) between the two OUTER photoresistors — the FULL left-centre to
+// right-centre span, not the half-span from the middle of the array.
+//
+// Used to turn the travel measured between their two triggers on the habitat
+// strip into a heading error. The two sensors are the ends of a segment of this
+// length; yawing it by theta offsets the ends along the direction of travel by
+// span * sin(theta), so the segment is the hypotenuse and the measured travel
+// the opposite side: theta = asin(travel / span). (Not atan — that would make
+// this the adjacent side, i.e. the array's projection onto the strip, which is
+// span * cos(theta), not span.)
+//
+// Measured on the robot.
+static constexpr double SIDE_SENSOR_SPACING_M = 0.13;
 static constexpr double TURNING_RADIUS = 0.13;
 static constexpr double SMALL_ERROR_VALUE = FORWARD_SPEED*1.20;
 static constexpr double BIG_ERROR_VALUE =FORWARD_SPEED/(TURNING_RADIUS);
