@@ -20,7 +20,7 @@ static constexpr int servoPulseUsForDeg(double deg)
 // ever sees — before Arm::begin() applies the home pose. Set apart from the
 // 1500 us centre default the wrist uses so the claw doesn't swing through
 // centre on power-up.
-static constexpr double CLAW_INITIAL_ANGLE_DEG = 100.0;
+static constexpr double CLAW_INITIAL_ANGLE_DEG = 40.0;
 
 class Servo
 {

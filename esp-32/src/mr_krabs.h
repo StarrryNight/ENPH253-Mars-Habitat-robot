@@ -31,7 +31,7 @@ static constexpr double OPEN_LOOP_TEST_OMEGA_RAD_S = 2.0;
 // Non-blocking settle delay (µs) held between the three drive actions
 // (line-following, rotating, applying an arm pose) so each has time to
 // physically settle before the next begins. See MrKrabs::stepControl.
-static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1200000; // 1.5 s
+static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 800000; // 1.5 s
 
 // Teleoperation (manual numpad/o/p control over USB serial, bypassing the
 // RPi/AI). See MrKrabs::handleTeleopChar. Numpad 7/8/9/4/6/1/2/3 drive the 8

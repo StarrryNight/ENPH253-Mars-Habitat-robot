@@ -189,6 +189,6 @@ class AI {
 		// Sonar reading (cm) below which HABITAT_FIND counts itself as having
 		// reached the habitat — the only threshold it uses, now that the
 		// second (depth) check is gone. See tickHabitatFind.
-		static constexpr double HABITAT_SIDE_THRESHOLD = 5;
+		static constexpr double HABITAT_SIDE_THRESHOLD = 5.8;
 
 };

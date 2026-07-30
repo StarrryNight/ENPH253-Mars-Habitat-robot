@@ -22,7 +22,7 @@ struct ArmPoseSequence {
 	// else (ACTION_TRANSITION_DELAY_US in mr_krabs.h); sequences that don't
 	// need poses to fully settle (e.g. a fast wave/dance) can override this
 	// to move through their poses quicker.
-	uint64_t pose_settle_us = 2500000;
+	uint64_t pose_settle_us = 1200000;
 };
 
 // Placeholder poses — need real tuning against the named poses in CLAUDE.md
@@ -45,7 +45,7 @@ struct ArmPoseSequence {
 struct ArmXYSequence {
 	double rotation_degrees = 0.0;
 	std::vector<ArmCoordinate> poses;
-	uint64_t pose_settle_us = 900000;
+	uint64_t pose_settle_us = 500000;
 };
 
 // Runs during METAL_DETECTING (pose 0) and PICKUP_ROCK (poses 1-6). x_pos for
@@ -89,7 +89,7 @@ const ArmXYSequence kHabitatPickupXYSequence = {
 // squares it up. Positive is counter-clockwise (see RobotVelocity::omega);
 // negate it to turn the other way.
 const ArmXYSequence kHabitatPlaceXYSequence = {
-	-49.0,
+	-62.0,
 	{
 		{0.28,  0.04, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
 		{0.18, -0.00, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding

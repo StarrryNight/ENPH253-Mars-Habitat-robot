@@ -628,7 +628,7 @@ void MrKrabs::startSearchingForLine()
 // LINE_SEARCH_INITIAL_TURN_DEG — it only has to carry the mid sensors clear
 // of the line, since the reactive spin that follows covers the remaining
 // ~150° until the line is reacquired on the far side.
-static constexpr double REVERSE_180_INITIAL_TURN_DEG = 30.0;
+static constexpr double REVERSE_180_INITIAL_TURN_DEG = 120.0;
 
 void MrKrabs::startReverse180()
 {

@@ -55,3 +55,7 @@ static constexpr int OLED_SCK = 2;
 // TODO: placeholder GPIOs, not yet confirmed against wiring — update once known.
 static constexpr int SONAR_TRIG = 41;
 static constexpr int SONAR_ECHO = 42;
+
+
+// LED
+static constexpr int TELETUBBY_LED = 12;

@@ -1,5 +1,7 @@
 #include "ai.h"
 #include "HWCDC.h"
+#include "esp32-hal-gpio.h"
+#include "pins.h"
 #include "robot_state.h"
 #include "sonar.h"
 #include <Arduino.h>
@@ -53,7 +55,7 @@ namespace {
 	// Distance (m) driven straight backward on the HABITAT_POST_PICKUP_BACKUP
 	// leg, after HABITAT_PICKUP's arm sequence completes — clears the
 	// habitat before HABITAT_HOLD_AND_MOVE strafes back onto the line.
-	constexpr double kHabitatPostPickupBackupDistanceM = 0.05;
+	constexpr double kHabitatPostPickupBackupDistanceM = 0.07;
 
 	// Sonar range (cm) that counts as "found the rock" — see
 	// AI::tickRotatingTilRock. Placeholder pending hardware tuning.
@@ -125,6 +127,8 @@ AI::AI():
 	// it's bypassed for this initial state.
 	state_visit_count_[idx(current_state_)] = 1;
 	xy_sequence_runner_.start(kHabitatPickupXYSequence, 0.0);
+	pinMode(TELETUBBY_LED, OUTPUT);
+	digitalWrite(TELETUBBY_LED, HIGH);
 }
 
 void AI::setArm(Arm* arm){
@@ -301,9 +305,10 @@ RobotState AI::tickRotatingTilRock(){
 RobotState AI::tickMetalDetecting(){
 	// Bench-test override: go straight to PICKUP_ROCK regardless of the
 	// metal detector reading, so the grab sequence can be exercised without
-	// a working/present metal hit. Teletubby still takes priority since it's
+	// a working/present metal hit. Teletubby still takes priority since it'sH
 	// an explicit RPi report, not a sensor poll.
 	if (teletubby_detected_){
+		digitalWrite(TELETUBBY_LED,  HIGH);
 		teletubby_detected_ = false;
 		return RobotState::TELETUBBYING;
 	}
@@ -316,6 +321,7 @@ RobotState AI::tickTeletubbying(){
 	}
 	// Metal may have been detected while the wave was playing — prefer
 	// picking up the rock over moving on, same priority as tickMetalDetecting.
+	digitalWrite(TELETUBBY_LED, LOW);
 	if (metal_detector_.getMetalDetectorState()){
 		return RobotState::PICKUP_ROCK;
 	}
