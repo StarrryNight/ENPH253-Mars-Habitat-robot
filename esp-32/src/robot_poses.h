@@ -69,10 +69,8 @@ const ArmXYSequence kPickupRockXYSequence = {
 	1500000,
 };
 
-// No rotation — HABITAT_PICKUP/HABITAT_PLACE run in place at whatever
-// heading the robot's already at. The only rotation in the habitat
-// pickup/place loop is REACQUIRING_LINE's fixed-45°-then-continue turn
-// (see MrKrabs::startSearchingForLine/driveCurrentMode).
+// No rotation — HABITAT_PICKUP runs in place at whatever heading the robot's
+// already at (HABITAT_PLACE does rotate first; see below).
 const ArmXYSequence kHabitatPickupXYSequence = {
 	0.0,
 	{
@@ -80,17 +78,26 @@ const ArmXYSequence kHabitatPickupXYSequence = {
 		{0.31, -0.05, 120, 50, 250, 500},
 		{0.36, -0.05, 120, 50, 250, 500},
 		{0.36, -0.05, 120,  0, 250, 500}, // close claw — grabbed
-		{0.24,  0.06, 120,  0, 250, 500}, // retract, holding item
+		{0.22,0.06, 120,  0, 250, 500}, // retract, holding item
 	},
 };
 
+// Rotates 38° before the first pose. HABITAT_PLACE is entered from the
+// LINE_FOLLOWING_REVERSE leg the instant the right sensor crosses the place
+// marker (see AI::tickLineFollowingReverse), which leaves the robot still
+// aligned along the line rather than facing the slot — this turn is what
+// squares it up. Positive is counter-clockwise (see RobotVelocity::omega);
+// negate it to turn the other way.
 const ArmXYSequence kHabitatPlaceXYSequence = {
-	0.0,
+	-45.0,
 	{
-		{0.36, -0.05, 120,  0, 250, 500}, // reach in, still holding
-		{0.31, -0.05, 120, 50, 250, 500}, // open claw — release
-		{0.28, -0.05, 120, 50, 250, 500}, // pull back, open
-		{0.30,  0.03, 120, 50, 500, 500}, // retract to home
+		{0.22,0.06, 120,  0, 250, 500}, // retract, holding item
+		{0.28, -0.05, 120,  0, 250, 500}, // reach in, still holding
+		{0.28, -0.05, 120,  0, 250, 500}, // reach in, still holding
+		{0.25, -0.05, 120, 50, 250, 500}, // open claw — release
+		{0.25, -0.05, 120, 50, 250, 500}, // pull back, open
+		{0.25,  0.03, 120, 50, 500, 500}, // retract to home
+		{0.23,  0.06, 120, 50, 500, 500},
 	},
 };
 
@@ -108,6 +115,21 @@ const ArmPoseSequence kTeletubbySequence = {
 	},
 	700000,
 };
+
+// Single pose (joint angles, not XY) written once on entering REVERSE_180 — see
+// AI::transitionTo. Not an ArmPoseSequence: REVERSE_180 has its own DriveMode,
+// so sequenceForState() below is never consulted for it and no runner steps
+// through poses; the arm just gets this one command and holds it through the
+// spin. MrKrabs::startReverse180's ACTION_TRANSITION_DELAY_US settle runs after
+// the write, so the servos have that long to arrive before the robot turns.
+//
+// Claw stays closed: REVERSE_180 is entered mid-carry, holding the item picked
+// up at the habitat (HABITAT_HOLD_AND_MOVE -> REVERSE_180), so opening it here
+// drops the load. The pitch angles are a starting point — base_pitch is degrees
+// from vertical (usable range [0,70]) and elbow_pitch degrees down from
+// horizontal ([23,70]), so this pulls the load up and in, close to the turn
+// axis. Tune on hardware.
+const ArmPose kReverse180ArmPose = {05, 60, Arm::WRIST_CENTER, Arm::CLAW_CLOSE};
 
 // Looks up the ArmPoseSequence to run when entering state. Returns nullptr
 // for states with no fixed arm sequence — the line-following states, DONE,

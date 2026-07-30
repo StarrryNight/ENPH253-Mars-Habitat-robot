@@ -27,13 +27,13 @@ void MotorController::setup()
 {
 	wheel_left_motor_.emplace(1, WHEEL_LEFT_PWM_CHANNEL_0, WHEEL_LEFT_PWM_CHANNEL_1,
 	                       WHEEL_LEFT_PWM_PIN_0, WHEEL_LEFT_PWM_PIN_1,
-	                       WHEEL_LEFT_ENCODER_0);
+	                       WHEEL_LEFT_ENCODER_0, WHEEL_LEFT_PWM_OFFSET);
 	wheel_right_motor_.emplace(2, WHEEL_RIGHT_PWM_CHANNEL_0, WHEEL_RIGHT_PWM_CHANNEL_1,
 	                       WHEEL_RIGHT_PWM_PIN_0, WHEEL_RIGHT_PWM_PIN_1,
-	                       WHEEL_RIGHT_ENCODER_0);
+	                       WHEEL_RIGHT_ENCODER_0, WHEEL_RIGHT_PWM_OFFSET);
 	wheel_back_motor_.emplace(3, WHEEL_BACK_PWM_CHANNEL_0, WHEEL_BACK_PWM_CHANNEL_1,
 	                       WHEEL_BACK_PWM_PIN_0, WHEEL_BACK_PWM_PIN_1,
-	                       WHEEL_BACK_ENCODER_0);
+	                       WHEEL_BACK_ENCODER_0, WHEEL_BACK_PWM_OFFSET);
 	prev_step_time_us_ = esp_timer_get_time();
 }
 

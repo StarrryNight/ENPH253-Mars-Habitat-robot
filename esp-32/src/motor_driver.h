@@ -16,6 +16,12 @@ static constexpr int VELOCITY_BUFFER_SIZE = 5;
 // back wheel while driving straight) from producing a small nonzero duty cycle.
 static constexpr double MOTOR_SPEED_DEADZONE = 3.0;
 
+// Fallback for MotorDriver's pwm_offset constructor argument, used only when a
+// caller doesn't pass one. Real values live in pid_config.h next to the rest of
+// the per-wheel tuning (WHEEL_*_PWM_OFFSET) — this just preserves the behavior
+// the offset had when it was hardcoded in speedToDutyCycle().
+static constexpr int MOTOR_PWM_OFFSET_DEFAULT = 60;
+
 // Controls a single DC motor with quadrature encoder feedback.
 // PWM is driven via ESP32 LEDC channels. Velocity is measured by tickVelocity(),
 // which is called once per control loop tick (every 10 ms) by MotorController —
@@ -28,7 +34,12 @@ public:
 	// pwm_channel_0/1: LEDC channels (must be unique per motor).
 	// pwm_pin_0 drives forward, pwm_pin_1 drives reverse.
 	// encoder_pin_0: single-phase encoder input (RISING edge counted).
-	MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1, int pwm_pin_0, int pwm_pin_1, int encoder_pin_0);
+	// pwm_offset: static duty added to every nonzero command for this motor —
+	//   see pwm_offset_ below. Per-motor because the three drivetrains don't
+	//   break loose at the same duty. Tuned in pid_config.h
+	//   (WHEEL_*_PWM_OFFSET); MOTOR_PWM_OFFSET_DEFAULT if omitted.
+	MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1, int pwm_pin_0, int pwm_pin_1, int encoder_pin_0,
+	            int pwm_offset = MOTOR_PWM_OFFSET_DEFAULT);
 
 	// Direct PWM control. Zeroes the opposite channel before applying speed.
 	// These do NOT include a direction-change delay; use set_velocity for the
@@ -106,6 +117,16 @@ private:
 	const int pwm_pin_1_;
 
 	const int encoder_pin_0_;
+
+	// Static duty added to the magnitude of every nonzero command before the
+	// clamp to 255 (see speedToDutyCycle). Covers the duty a motor needs just
+	// to overcome stiction/gearbox drag, so a small commanded speed produces
+	// actual rotation instead of a stalled hum — the feedforward gain alone
+	// can't express that, being proportional to speed. Consequences to keep in
+	// mind when tuning: the smallest nonzero speed this motor can produce is
+	// whatever this duty spins it at, and the headroom above it shrinks to
+	// (255 - offset), so the command rails at a lower speed the higher it goes.
+	const int pwm_offset_;
 
 	// uint32_t: wraps instead of overflowing at ~2 billion counts. Wraparound is
 	// handled correctly as long as deltas are computed with unsigned subtraction.

@@ -10,5 +10,5 @@ static constexpr double MOTOR_CONTROL_LOOP_PERIOD = MOTOR_CONTROL_LOOP_PERIOD_US
 static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.009687; // at 74 mm diameter (37 mm measured radius), 24 ticks-per-rev
 
 // Forward speed during line following (m/s). Tune empirically.
-static constexpr double FORWARD_SPEED = 0.1;
+static constexpr double FORWARD_SPEED = 0.15;
 

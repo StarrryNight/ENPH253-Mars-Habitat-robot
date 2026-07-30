@@ -43,17 +43,17 @@ namespace {
 	// Distance (m) driven straight backward on the HABITAT_BACKUP leg, to
 	// clear the habitat wall HABITAT_FIND's sonar just read close-range
 	// before HABITAT_PICKUP's arm sequence runs.
-	constexpr double kHabitatBackupDistanceM = 0.09;
+	constexpr double kHabitatBackupDistanceM = 0.05;
 
 	// Distance (m) driven straight backward on the HABITAT_APPROACH_BACKUP
 	// leg, before HABITAT_FIND starts its sonar-based strafe search — clears
 	// the wall the robot just line-followed up to.
-	constexpr double kHabitatApproachBackupDistanceM = 0.02;
+	constexpr double kHabitatApproachBackupDistanceM = 0.015;
 
 	// Distance (m) driven straight backward on the HABITAT_POST_PICKUP_BACKUP
 	// leg, after HABITAT_PICKUP's arm sequence completes — clears the
 	// habitat before HABITAT_HOLD_AND_MOVE strafes back onto the line.
-	constexpr double kHabitatPostPickupBackupDistanceM = 0.10;
+	constexpr double kHabitatPostPickupBackupDistanceM = 0.08;
 
 	// Sonar range (cm) that counts as "found the rock" — see
 	// AI::tickRotatingTilRock. Placeholder pending hardware tuning.
@@ -73,7 +73,15 @@ namespace {
 	// the very first tick after the entry settle delay — before
 	// MrKrabs::driveCurrentMode() ever issues a single rotate command, so
 	// the robot appears to sit still in ROTATING_TIL_ROCK.
-	constexpr uint64_t kRockSonarConfirmDelayUs = 25000; // 0.1 s
+	constexpr uint64_t kRockSonarConfirmDelayUs = 20000; // 0.025 s
+
+	// How long (us) HABITAT_FIND keeps strafing after the sonar first reads
+	// closer than HABITAT_SIDE_THRESHOLD, before handing off to HABITAT_BACKUP.
+	// Pure extra travel, not a debounce: at HABITAT_STRAFE_SPEED (0.13 m/s)
+	// every 10 ms here is ~1.3 mm of strafe past the point the sonar first went
+	// close. Raise it to end up further along the habitat, lower to stop nearer
+	// to where it was detected.
+	constexpr uint64_t kHabitatSideStopDelayUs = 10000; // 0.05 s
 }
 
 AI::AI():
@@ -85,8 +93,7 @@ AI::AI():
 	// restore the real competition flow.
 	current_state_(RobotState::LINE_FOLLOWING),
 	current_state_progress_m_(0),
-	post_reacquire_state_(RobotState::LINE_FOLLOWING),
-	saw_habitat_()
+	post_reacquire_state_(RobotState::LINE_FOLLOWING)
 {
 	Serial.printf("[AI] constructed, initial state: %s\n", robotStateName(current_state_));
 	// Set the counter directly rather than routing through transitionTo(),
@@ -141,6 +148,14 @@ void AI::transitionTo(RobotState next){
 		xy_sequence_runner_.start(kHabitatPickupXYSequence, 0.0);
 	} else if (next == RobotState::HABITAT_PLACE){
 		xy_sequence_runner_.start(kHabitatPlaceXYSequence, 0.0);
+	} else if (next == RobotState::REVERSE_180){
+		// One-shot pose rather than a runner: REVERSE_180's DriveMode drives the
+		// spin, so nothing would step a sequence through. Written here, at the
+		// transition, so it lands before MrKrabs::startReverse180() starts its
+		// settle delay and the turn begins. See kReverse180ArmPose.
+		if (arm_){
+			arm_->setPose(kReverse180ArmPose);
+		}
 	} else if (const ArmPoseSequence* sequence = sequenceForState(next)){
 		sequence_runner_.start(*sequence);
 	}
@@ -298,19 +313,29 @@ RobotState AI::tickHabitatFind(){
 	if (!sonar_){
 		return RobotState::HABITAT_FIND;
 	}
-	double d = sonar_->queryDistance();
-	if (d < HABITAT_SIDE_THRESHOLD){
-		saw_habitat_= true;
+	// Strafe until the sonar first reads close (HABITAT_SIDE_THRESHOLD), then
+	// keep going for kHabitatSideStopDelayUs before handing off to
+	// HABITAT_BACKUP — the extra travel carries the robot past the edge it just
+	// detected. The countdown is latched, not re-armed each tick: once the edge
+	// has been seen it runs to completion regardless of what the sonar reads
+	// next, so the long readings that come back while passing the slot itself
+	// can't cancel it.
+	if (habitat_side_seen_us_ == 0){
+		if (sonar_->queryDistance() >= HABITAT_SIDE_THRESHOLD){
+			return RobotState::HABITAT_FIND;
+		}
+		habitat_side_seen_us_ = esp_timer_get_time();
 		return RobotState::HABITAT_FIND;
 	}
-	else if (saw_habitat_ && (d>HABITAT_DEPTH_THRESHOLD)){
-		habitat_found_num_+=1;
-		if(habitat_found_num_==2){
-			current_habitat_find_direction_=-1;
-		}
-		return RobotState::HABITAT_BACKUP;
+	if (esp_timer_get_time() - habitat_side_seen_us_ < kHabitatSideStopDelayUs){
+		return RobotState::HABITAT_FIND;
 	}
-	return RobotState::HABITAT_FIND;
+	habitat_side_seen_us_ = 0;
+	habitat_found_num_+=1;
+	if(habitat_found_num_==2){
+		current_habitat_find_direction_=-1;
+	}
+	return RobotState::HABITAT_BACKUP;
 }
 
 RobotState AI::tickHabitatBackup(){
@@ -346,16 +371,18 @@ RobotState AI::tickHabitatHoldAndMove(){
 
 RobotState AI::tickLineFollowingReverse(){
 	// The post-pickup leg (heading to HABITAT_PLACE) drives until the right
-	// sensor crosses the habitat place marker, then reacquires the line (45°
-	// turn + reactive spin, see tickReacquiringLine) before actually handing
-	// off to HABITAT_PLACE — triggering the arm sequence the instant the
-	// sensor fires leaves the robot facing the wrong way to place.
+	// sensor crosses the habitat place marker, then hands straight to
+	// HABITAT_PLACE — whose sequence rotates by its rotation_degrees before any
+	// pose is applied (see kHabitatPlaceXYSequence and MrKrabs::
+	// driveCurrentMode's APPLYING_SEQUENCE case), which is what squares the
+	// robot up to the slot. That fixed turn replaces the REACQUIRING_LINE
+	// (45° + reactive spin) leg this used to route through: the marker is a
+	// known geometry, so a known angle beats hunting for the line again.
 	if (post_line_reverse_state_ == RobotState::HABITAT_PLACE){
 		if (!line_follower_ || !line_follower_->rightSensorOnLine()){
 			return RobotState::LINE_FOLLOWING_REVERSE;
 		}
-		post_reacquire_state_ = RobotState::HABITAT_PLACE;
-		return RobotState::REACQUIRING_LINE;
+		return RobotState::HABITAT_PLACE;
 	}
 	return current_state_progress_m_ >= kLineFollowingReverseDistanceM
 		? post_line_reverse_state_

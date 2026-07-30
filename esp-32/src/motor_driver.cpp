@@ -10,13 +10,15 @@
 #include "esp_timer.h"
 #include "motor_driver.h"
 
-MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1, int pwm_pin_0, int pwm_pin_1, int encoder_pin_0)
+MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1, int pwm_pin_0, int pwm_pin_1, int encoder_pin_0,
+                         int pwm_offset)
 	: wheel_number_(wheel_number),
 	  pwm_channel_0_(pwm_channel_0),
 	  pwm_channel_1_(pwm_channel_1),
 	  pwm_pin_0_(pwm_pin_0),
 	  pwm_pin_1_(pwm_pin_1),
 	  encoder_pin_0_(encoder_pin_0),
+	  pwm_offset_(pwm_offset),
 	  wheel_speed_(0),
 	  encoder_count_(0),
 	  prev_measurement_encoder_count_(0),
@@ -125,7 +127,7 @@ int MotorDriver::speedToDutyCycle(int speed){
 	if (abs_speed < MOTOR_SPEED_DEADZONE){
 		return 0;
 	}
-	return std::clamp(abs_speed+60, 0, 255);
+	return std::clamp(abs_speed + pwm_offset_, 0, 255);
 }
 double MotorDriver::getCurrentTargetSpeed()
 {

@@ -137,6 +137,11 @@ class AI {
 		// rock-detection range this ROTATING_TIL_ROCK visit, or 0 if not
 		// currently in range — see tickRotatingTilRock's debounce.
 		uint64_t rock_sonar_in_range_since_us_ = 0;
+		// esp_timer_get_time() timestamp HABITAT_FIND's sonar first read closer
+		// than HABITAT_SIDE_THRESHOLD, or 0 before that happens — the start of
+		// kHabitatSideStopDelayUs's extra-strafe countdown. Cleared again when
+		// the countdown completes, so the next HABITAT_FIND visit starts fresh.
+		uint64_t habitat_side_seen_us_ = 0;
 		// Guards METAL_DETECTING's probe pose (kPickupRockXYSequence[0]) so it's
 		// applied exactly once and then held until metal is detected, instead
 		// of auto-advancing to the next pose every settle cycle. Reset by
@@ -159,14 +164,12 @@ class AI {
 		bool line_search_initial_turn_done_ = false;
 
 
-		//If seen habitat yet, if seen, we start capturing once sonar detects >15
-		
-		bool saw_habitat_ = false;
-
 		int habitat_found_num_ = 0;
 		int current_habitat_find_direction_ = 1;
 
-		static constexpr double HABITAT_DEPTH_THRESHOLD = 15;
-		static constexpr double HABITAT_SIDE_THRESHOLD = 7;
+		// Sonar reading (cm) below which HABITAT_FIND counts itself as having
+		// reached the habitat — the only threshold it uses, now that the
+		// second (depth) check is gone. See tickHabitatFind.
+		static constexpr double HABITAT_SIDE_THRESHOLD = 5;
 
 };
