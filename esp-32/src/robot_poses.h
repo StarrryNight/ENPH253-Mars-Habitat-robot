@@ -89,14 +89,13 @@ const ArmXYSequence kHabitatPickupXYSequence = {
 // squares it up. Positive is counter-clockwise (see RobotVelocity::omega);
 // negate it to turn the other way.
 const ArmXYSequence kHabitatPlaceXYSequence = {
-	-45.0,
+	-55.0,
 	{
-		{0.22,0.06, 120,  0, 250, 500}, // retract, holding item
-		{0.28, -0.05, 120,  0, 250, 500}, // reach in, still holding
-		{0.28, -0.05, 120,  0, 250, 500}, // reach in, still holding
-		{0.25, -0.05, 120, 50, 250, 500}, // open claw — release
-		{0.25, -0.05, 120, 50, 250, 500}, // pull back, open
-		{0.25,  0.03, 120, 50, 500, 500}, // retract to home
+		{0.28, 0.04, 120,  0, 250, 500}, // reach in, still holding
+		{0.18, -0.00, 120,  0, 250, 500}, // reach in, still holdin
+		{0.18, -0.00, 120, 50, 250, 500}, // open claw — release
+		{0.18, -0.00, 120, 50, 250, 500}, // pull back, open
+		{0.21,  0.03, 120, 50, 500, 500}, // retract to home
 		{0.23,  0.06, 120, 50, 500, 500},
 	},
 };
@@ -129,7 +128,7 @@ const ArmPoseSequence kTeletubbySequence = {
 // from vertical (usable range [0,70]) and elbow_pitch degrees down from
 // horizontal ([23,70]), so this pulls the load up and in, close to the turn
 // axis. Tune on hardware.
-const ArmPose kReverse180ArmPose = {05, 60, Arm::WRIST_CENTER, Arm::CLAW_CLOSE};
+const ArmPose kReverse180ArmPose = {-2, 25, Arm::WRIST_CENTER, Arm::CLAW_CLOSE};
 
 // Looks up the ArmPoseSequence to run when entering state. Returns nullptr
 // for states with no fixed arm sequence — the line-following states, DONE,

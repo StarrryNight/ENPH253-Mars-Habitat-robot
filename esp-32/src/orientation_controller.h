@@ -12,7 +12,7 @@ static constexpr double ROTATION_TOLERANCE_RAD = 0.05;
 // ROTATION_TOLERANCE_RAD is reached and the robot just stalls out mid-turn.
 // Derived from MOTOR_SPEED_DEADZONE(5) / (VELOCITY_TO_PWM(200) + wheel PID P) /
 // WHEEL_DISTANCE_FROM_CENTER_M(0.3) ≈ 0.082 rad/s; rounded up for margin.
-static constexpr double MIN_ROTATION_OMEGA_RAD_S = 1.5;
+static constexpr double MIN_ROTATION_OMEGA_RAD_S = 1.0;
 
 class OrientationController
 {

@@ -277,6 +277,13 @@ void MrKrabs::stepControl()
 	}
 
 	sonar_->queryDistance();
+	// Before the settle-delay return below and before ai_->tickAI() consumes
+	// the sensors: the array has to be sampled every tick no matter what the
+	// drivetrain is doing, or LineFollower's prev_state_ (which side the line
+	// was last on) goes stale across rotations, strafes and arm sequences —
+	// precisely the manoeuvres that move the line across it. See
+	// LineFollower::tick.
+	line_follower_->tick();
 	updateMetalDetectorLed(ai_->metalDetected(), now);
 
 	if (now < action_settle_until_us_){

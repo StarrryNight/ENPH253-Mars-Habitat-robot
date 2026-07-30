@@ -3,7 +3,7 @@
 #include "constants.h"
 #include "pid_config.h"
 
-LineFollower::LineFollower() : line_followng_pid_(PidController(LINE_PID_P, LINE_PID_I, LINE_PID_D, LINE_PID_MAX_I)), prev_state_({0, 0, 0, 0})
+LineFollower::LineFollower() : line_followng_pid_(PidController(LINE_PID_P, LINE_PID_I, LINE_PID_D, LINE_PID_MAX_I)), current_state_({0, 0, 0, 0}), prev_state_({0, 0, 0, 0})
 {
     pinMode(LEFT_PHOTORESISTOR, INPUT);
     pinMode(MID_LEFT_PHOTORESISTOR, INPUT);
@@ -11,9 +11,22 @@ LineFollower::LineFollower() : line_followng_pid_(PidController(LINE_PID_P, LINE
     pinMode(RIGHT_PHOTORESISTOR, INPUT);
 }
 
+void LineFollower::tick()
+{
+    current_state_ = readPhotoresistors();
+    // Only latch a reading that still has a mid sensor on the line. prev_state_
+    // exists purely to remember which side the line was last seen on, so
+    // storing an all-mids-off reading would erase the one thing the big-error
+    // branch below needs to pick a direction.
+    if (current_state_[1] == 1 || current_state_[2] == 1)
+    {
+        prev_state_ = current_state_;
+    }
+}
+
 double LineFollower::calculateCorrection()
 {
-    std::array<double, 4> current_state = readPhotoresistors();
+    const std::array<double, 4>& current_state = current_state_;
     double correction = 0;
     // Both mids on the line: dead center, no drift to correct. Reset the PID
     // so stale integral/derivative from the last correction doesn't leak
@@ -21,19 +34,16 @@ double LineFollower::calculateCorrection()
     if (current_state[1] == 1 && current_state[2] == 1)
     {
         line_followng_pid_.reset();
-        prev_state_ = current_state;
     }
     // steer left if mid-left is on the line and mid-right isn't (robot drifted right)
     else if (current_state[1] == 1 && current_state[2] == 0)
     {
         correction = line_followng_pid_.step(-SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
-    prev_state_ = current_state;
     }
     // steer right if mid-right is on the line and mid-left isn't (robot drifted left)
     else if (current_state[1] == 0 && current_state[2] == 1)
     {
         correction = line_followng_pid_.step(SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
-    prev_state_ = current_state;
     }
     // both mids lost the line — use previous mid state as memory for big correction
     else if (current_state[1] == 0 && current_state[2] == 0)
@@ -54,20 +64,17 @@ double LineFollower::calculateCorrection()
 //currently changed
 bool LineFollower::bothMidSensorsOnLine()
 {
-    std::array<double, 4> current_state = readPhotoresistors();
-    return current_state[1] == 1 || current_state[2] == 1;
+    return current_state_[1] == 1 || current_state_[2] == 1;
 }
 
 bool LineFollower::bothSideSensorsOnLine()
 {
-    std::array<double, 4> current_state = readPhotoresistors();
-    return current_state[0] == 1 && current_state[3] == 1;
+    return current_state_[0] == 1 && current_state_[3] == 1;
 }
 
 bool LineFollower::rightSensorOnLine()
 {
-    std::array<double, 4> current_state = readPhotoresistors();
-    return current_state[3] == 1;
+    return current_state_[3] == 1;
 }
 
 // Issue: For metal detecting, we will need to spin the robot arm while following line to be efficient. But our robot cannot support both actions at once.

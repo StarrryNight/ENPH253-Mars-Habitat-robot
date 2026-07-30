@@ -53,7 +53,7 @@ namespace {
 	// Distance (m) driven straight backward on the HABITAT_POST_PICKUP_BACKUP
 	// leg, after HABITAT_PICKUP's arm sequence completes — clears the
 	// habitat before HABITAT_HOLD_AND_MOVE strafes back onto the line.
-	constexpr double kHabitatPostPickupBackupDistanceM = 0.08;
+	constexpr double kHabitatPostPickupBackupDistanceM = 0.05;
 
 	// Sonar range (cm) that counts as "found the rock" — see
 	// AI::tickRotatingTilRock. Placeholder pending hardware tuning.
@@ -81,7 +81,7 @@ namespace {
 	// every 10 ms here is ~1.3 mm of strafe past the point the sonar first went
 	// close. Raise it to end up further along the habitat, lower to stop nearer
 	// to where it was detected.
-	constexpr uint64_t kHabitatSideStopDelayUs = 10000; // 0.05 s
+	constexpr uint64_t kHabitatSideStopDelayUs = 15000; // 0.05 s
 }
 
 AI::AI():
