@@ -99,6 +99,13 @@ public:
 	// (see RobotState::HABITAT_FIND).
 	void startStrafingTilHabitat();
 
+	// Enters habitat-square-up mode. Rotates in place at SQUARE_UP_OMEGA_RAD_S,
+	// direction given by AI::squareUpOmegaSign(), until AI's state transitions
+	// away (see RobotState::HABITAT_SQUARE_UP). Deliberately no translation: the
+	// robot has already reached the strip, and driving on while turning would
+	// carry it past the marker it's aligning to.
+	void startSquaringUp();
+
 	// Enters habitat-backup mode. Drives straight backward at
 	// HABITAT_BACKUP_SPEED until AI's distance leg completes (see
 	// RobotState::HABITAT_BACKUP). Resets the translation odometer on entry
@@ -270,6 +277,21 @@ private:
 	// OrientationController::reachedTarget), which never fires without wheels.
 	size_t arm_test_pose_index_;
 	uint64_t arm_test_pose_until_us_;
+
+	// Entry settle for HABITAT_SQUARE_UP, in place of the usual
+	// ACTION_TRANSITION_DELAY_US. Only has to let the approach's forward motion
+	// die before the rotation starts, which stopImmediate() already does most of
+	// — and the settle is dead time in a state whose own bail-out clock (see
+	// kSquareUpTimeoutUs in ai.cpp) is on the same order, so keeping it short
+	// leaves that budget for actual rotating.
+	static constexpr uint64_t SQUARE_UP_SETTLE_US = 300000; // 0.3 s
+
+	// In-place rotation speed (rad/s, magnitude) for HABITAT_SQUARE_UP. Slower
+	// than the search spins (LINE_SEARCH_OMEGA_RAD_S): this is a fine alignment
+	// that ends the instant a sensor crosses an edge, and nothing decelerates
+	// before stopImmediate(), so the faster it turns the further past square it
+	// coasts. Direction comes from AI::squareUpOmegaSign().
+	static constexpr double SQUARE_UP_OMEGA_RAD_S = 0.4;
 
 	static constexpr double HABITAT_STRAFE_SPEED = 0.11;
 	// Deliberately slow: the backup legs are only 3-10 cm, and the encoder

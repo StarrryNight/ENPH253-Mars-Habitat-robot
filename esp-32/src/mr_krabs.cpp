@@ -363,6 +363,7 @@ bool MrKrabs::handleDriveTransition()
 			case AI::DriveMode::SEARCHING_FOR_LINE: startSearchingForLine(); break;
 			case AI::DriveMode::IDLE: startIdle(); break;
 			case AI::DriveMode::ROTATING_TIL_ROCK: startRotatingTilRock(); break;
+			case AI::DriveMode::SQUARING_UP: startSquaringUp(); break;
 			case AI::DriveMode::STRAFING_TIL_HABITAT: startStrafingTilHabitat(); break;
 			case AI::DriveMode::BACKING_UP: startBackingUp(); break;
 			case AI::DriveMode::HOLDING_AND_MOVING: startHoldingAndMoving(); break;
@@ -461,6 +462,13 @@ void MrKrabs::driveCurrentMode()
 			// Direction (rock_search_omega_rad_s_) was latched by
 			// startRotatingTilRock() from AI::rockSearchOmegaRadS().
 			motor_controller_->setVelocity({0, 0, rock_search_omega_rad_s_});
+			break;
+		case AI::DriveMode::SQUARING_UP:
+			// AI::tickHabitatSquareUp() (called via ai_->tickAI() earlier this
+			// tick) watches for the second side sensor and transitions away the
+			// moment both read the strip — this just keeps rotating until then.
+			// Pure rotation, no translation: the robot is already at the strip.
+			motor_controller_->setVelocity({0, 0, SQUARE_UP_OMEGA_RAD_S * ai_->squareUpOmegaSign()});
 			break;
 		case AI::DriveMode::STRAFING_TIL_HABITAT: {
 			// AI::tickHabitatFind() (called via ai_->tickAI() earlier this
@@ -643,6 +651,21 @@ void MrKrabs::startRotatingTilRock()
 	// find this rock, sending REACQUIRING_LINE the wrong way.
 	last_rotation_sign_ = (rock_search_omega_rad_s_ > 0.0) ? 1.0 : -1.0;
 	Serial.printf("[MrKrabs] startRotatingTilRock, omega=%.2f\n", rock_search_omega_rad_s_);
+}
+
+void MrKrabs::startSquaringUp()
+{
+	// Stop before turning: the entry condition is "one side sensor reached the
+	// strip", so any residual forward motion carries the array past the marker
+	// being aligned to while the rotation is still working.
+	motor_controller_->stopImmediate();
+	drive_mode_ = AI::DriveMode::SQUARING_UP;
+	action_settle_until_us_ = esp_timer_get_time() + SQUARE_UP_SETTLE_US;
+	// Clears the wheel PIDs' integral from the line-following leg, which was
+	// chasing a forward velocity this rotation doesn't want.
+	motor_controller_->startRotation();
+	last_rotation_sign_ = ai_->squareUpOmegaSign();
+	Serial.printf("[MrKrabs] startSquaringUp, omega_sign=%.0f\n", ai_->squareUpOmegaSign());
 }
 
 void MrKrabs::startStrafingTilHabitat()

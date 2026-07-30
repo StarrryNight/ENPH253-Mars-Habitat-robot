@@ -50,7 +50,7 @@ class AI {
 		// reported (see computer_vision.py), so the cap lives here instead.
 		void notifyTeletubbyDetected();
 
-		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK , STRAFING_TIL_HABITAT, BACKING_UP, HOLDING_AND_MOVING, REVERSE_180};
+		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK , STRAFING_TIL_HABITAT, BACKING_UP, HOLDING_AND_MOVING, REVERSE_180, SQUARING_UP};
 		// What the drivetrain should currently be doing, derived from current_state_.
 		DriveMode desiredDriveMode() const;
 		// +1 while driving forward, -1 during LINE_FOLLOWING_REVERSE.
@@ -62,6 +62,11 @@ class AI {
 		// of the strafe direction — flipped by tickHabitatFind() once the
 		// second habitat slot has been found.
 		int habitatFindDirection() const;
+		// Valid while desiredDriveMode() == SQUARING_UP. Sign (+1 = CCW) of the
+		// in-place rotation that brings the not-yet-triggered side sensor onto
+		// the habitat strip, latched by tickHabitatLineFollowing() from whichever
+		// sensor fired first — see RobotState::HABITAT_SQUARE_UP.
+		double squareUpOmegaSign() const;
 
 		// Valid while desiredDriveMode() == APPLYING_SEQUENCE. Delegates to sequence_runner_.
 		double targetRotationDegrees() const;
@@ -82,7 +87,7 @@ class AI {
 		RobotState currentState() const;
 		// How many times state has been entered (the current state included,
 		// counting from 1). Used by per-state handlers to index checkpoint/
-		// threshold tables — see tickFindingRock, tickLineFollowing.
+		// threshold tables — see tickFindingRock, tickHabitatLineFollowing.
 		int visits(RobotState state) const;
 
 	private:
@@ -106,10 +111,11 @@ class AI {
 		RobotState tickMetalDetecting();
 		RobotState tickTeletubbying();
 		RobotState tickPickupRock();
-		RobotState tickLineFollowing();
+		RobotState tickHabitatLineFollowing();
 		RobotState tickHabitatPickup();
 		RobotState tickLineFollowingReverse();
 		RobotState tickHabitatPlace();
+		RobotState tickHabitatSquareUp();
 		RobotState tickHabitatApproachBackup();
 		RobotState tickHabitatFind();
 		RobotState tickHabitatBackup();
@@ -163,6 +169,19 @@ class AI {
 		// See setLineSearchInitialTurnDone().
 		bool line_search_initial_turn_done_ = false;
 
+
+		// Control ticks elapsed since exactly one side sensor first read the
+		// habitat strip, 0 when no such window is open — see
+		// kSideSensorGraceTicks in ai.cpp. Counts ticks in which the state
+		// machine actually ran, which is what we want: tickAI() is skipped during
+		// settle delays, and no travel happens then either.
+		int side_sensor_grace_ticks_ = 0;
+		// Rotation direction for HABITAT_SQUARE_UP (+1 = CCW), and the
+		// esp_timer_get_time() stamp that state was entered at, so the rotation
+		// can't spin forever if the second sensor never reads the strip. Both set
+		// on entering the state — see tickHabitatLineFollowing/tickHabitatSquareUp.
+		double square_up_omega_sign_ = 1.0;
+		uint64_t square_up_entered_us_ = 0;
 
 		int habitat_found_num_ = 0;
 		int current_habitat_find_direction_ = 1;

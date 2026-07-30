@@ -75,6 +75,28 @@ namespace {
 	// the robot appears to sit still in ROTATING_TIL_ROCK.
 	constexpr uint64_t kRockSonarConfirmDelayUs = 20000; // 0.025 s
 
+	// Grace window, in control ticks, granted to the second side sensor after the
+	// first one reads the habitat strip. Only if it hasn't come on by then does
+	// the approach count as crooked and divert to HABITAT_SQUARE_UP; otherwise
+	// this is a square arrival and the robot carries on to
+	// HABITAT_APPROACH_BACKUP. Exists because "both at once" would otherwise mean
+	// "within one 10 ms tick", i.e. within 1 mm of travel at FORWARD_SPEED, which
+	// no real approach achieves — without a window the square-up would fire on
+	// essentially every run, including dead-straight ones.
+	//
+	// 5 ticks = 50 ms = ~5 mm of approach at FORWARD_SPEED, so the tolerance is
+	// whatever yaw offsets the two outer sensors by less than that (2 * half
+	// their spacing * sin(theta) < 5 mm). Raise it to tolerate more crookedness,
+	// lower to square up more eagerly.
+	constexpr int kSideSensorGraceTicks = 9;
+
+	// Longest (us) HABITAT_SQUARE_UP will rotate before giving up and proceeding
+	// unsquared. Generous next to the turn it should need — at
+	// SQUARE_UP_OMEGA_RAD_S a realistic misalignment is a fraction of a second —
+	// so it only ever fires when the second sensor genuinely isn't going to read
+	// the strip. See AI::tickHabitatSquareUp.
+	constexpr uint64_t kSquareUpTimeoutUs = 1000000; // 1.5 s
+
 	// How long (us) HABITAT_FIND keeps strafing after the sonar first reads
 	// closer than HABITAT_SIDE_THRESHOLD, before handing off to HABITAT_BACKUP.
 	// Pure extra travel, not a debounce: at HABITAT_STRAFE_SPEED (0.13 m/s)
@@ -91,9 +113,9 @@ AI::AI():
 	// habitat pickup/place cycle in isolation, instead of the real
 	// FINDING_ROCK entry point. Flip back to RobotState::FINDING_ROCK to
 	// restore the real competition flow.
-	current_state_(RobotState::LINE_FOLLOWING),
+	current_state_(RobotState::HABITAT_LINE_FOLLOWING),
 	current_state_progress_m_(0),
-	post_reacquire_state_(RobotState::LINE_FOLLOWING)
+	post_reacquire_state_(RobotState::HABITAT_LINE_FOLLOWING)
 {
 	Serial.printf("[AI] constructed, initial state: %s\n", robotStateName(current_state_));
 	// Set the counter directly rather than routing through transitionTo(),
@@ -148,6 +170,16 @@ void AI::transitionTo(RobotState next){
 		xy_sequence_runner_.start(kHabitatPickupXYSequence, 0.0);
 	} else if (next == RobotState::HABITAT_PLACE){
 		xy_sequence_runner_.start(kHabitatPlaceXYSequence, 0.0);
+	} else if (next == RobotState::HABITAT_SQUARE_UP){
+		// Cleared, not stamped: tickHabitatSquareUp() starts the bail-out clock
+		// on its own first tick instead. Stamping here would run the clock
+		// through MrKrabs::startSquaringUp()'s entry settle delay — during which
+		// stepControl() returns before tickAI() and the wheels are deliberately
+		// held stopped — so a timeout shorter than that settle would expire
+		// before the rotation was ever commanded. The rotation direction itself is
+		// latched by tickHabitatLineFollowing() before it returns this state,
+		// while the sensor readings that determine it are still valid.
+		square_up_entered_us_ = 0;
 	} else if (next == RobotState::REVERSE_180){
 		// One-shot pose rather than a runner: REVERSE_180's DriveMode drives the
 		// spin, so nothing would step a sequence through. Written here, at the
@@ -177,10 +209,11 @@ RobotState AI::tickCurrentState(){
 		case RobotState::METAL_DETECTING: return tickMetalDetecting();
 		case RobotState::TELETUBBYING: return tickTeletubbying();
 		case RobotState::PICKUP_ROCK: return tickPickupRock();
-		case RobotState::LINE_FOLLOWING: return tickLineFollowing();
+		case RobotState::HABITAT_LINE_FOLLOWING: return tickHabitatLineFollowing();
 		case RobotState::HABITAT_PICKUP: return tickHabitatPickup();
 		case RobotState::LINE_FOLLOWING_REVERSE: return tickLineFollowingReverse();
 		case RobotState::HABITAT_PLACE: return tickHabitatPlace();
+		case RobotState::HABITAT_SQUARE_UP: return tickHabitatSquareUp();
 		case RobotState::HABITAT_APPROACH_BACKUP: return tickHabitatApproachBackup();
 		case RobotState::HABITAT_FIND: return tickHabitatFind();
 		case RobotState::HABITAT_BACKUP: return tickHabitatBackup();
@@ -223,7 +256,7 @@ RobotState AI::tickReverse180(){
 
 RobotState AI::nextRockOrDone(){
 	post_reacquire_state_ = visits(RobotState::FINDING_ROCK) >= kNumRocks
-		? RobotState::LINE_FOLLOWING
+		? RobotState::HABITAT_LINE_FOLLOWING
 		: RobotState::FINDING_ROCK;
 	return RobotState::REACQUIRING_LINE;
 }
@@ -231,7 +264,7 @@ RobotState AI::nextRockOrDone(){
 RobotState AI::tickFindingRock(){
 	int n = visits(RobotState::FINDING_ROCK); // 1-based
 	if (n > kNumRocks){
-		return RobotState::LINE_FOLLOWING;
+		return RobotState::HABITAT_LINE_FOLLOWING;
 	}
 	if (current_state_progress_m_ >= kRockCheckpoints[n - 1].trigger_progress_m){
 		return RobotState::ROTATING_TIL_ROCK;
@@ -296,11 +329,81 @@ RobotState AI::tickPickupRock(){
 	return nextRockOrDone();
 }
 
-RobotState AI::tickLineFollowing(){
-	if (line_follower_ && line_follower_->bothSideSensorsOnLine()){
+RobotState AI::tickHabitatLineFollowing(){
+	if (!line_follower_){
+		return RobotState::HABITAT_LINE_FOLLOWING;
+	}
+	// Both on the strip — square enough, whether they arrived together or the
+	// second one caught up inside the grace window below. The tick count says
+	// which: 0 means they landed on the same tick, 1-4 means the window opened
+	// and the trailing sensor arrived inside it.
+	if (line_follower_->bothSideSensorsOnLine()){
+		Serial.printf("[AI] habitat strip square, no square-up needed (both sides on after %d/%d grace ticks)\n",
+			side_sensor_grace_ticks_, kSideSensorGraceTicks);
+		side_sensor_grace_ticks_ = 0;
 		return RobotState::HABITAT_APPROACH_BACKUP;
 	}
-	return RobotState::LINE_FOLLOWING;
+	bool left = line_follower_->leftSensorOnLine();
+	bool right = line_follower_->rightSensorOnLine();
+	if (left != right){
+		// One side has reached the strip. Keep driving for kSideSensorGraceTicks
+		// to let the other one arrive; only a window that expires one-sided means
+		// the approach is genuinely crooked.
+		if (side_sensor_grace_ticks_ == 0){
+			// Latch the direction from the sensor that got there FIRST, on the
+			// tick the window opens — that identifies the leading side, which is
+			// the geometry the correction depends on. Reading it later risks the
+			// two sensors having swapped over an edge mid-window.
+			//
+			// Rotating counter-clockwise swings the right side of the array
+			// forward (a sensor at (+d, L) moves to y = L*cos + d*sin), so the
+			// side that arrived first was already leading and the correction has
+			// to bring the *other* one forward: left first -> CCW (+1), right
+			// first -> CW (-1).
+			square_up_omega_sign_ = left ? 1.0 : -1.0;
+		}
+		if (++side_sensor_grace_ticks_ < kSideSensorGraceTicks){
+			return RobotState::HABITAT_LINE_FOLLOWING;
+		}
+		Serial.printf("[AI] habitat strip crooked, square-up TRIGGERED (%s side first, other still off after %d ticks, rotating %s)\n",
+			square_up_omega_sign_ > 0 ? "left" : "right", kSideSensorGraceTicks,
+			square_up_omega_sign_ > 0 ? "CCW" : "CW");
+		side_sensor_grace_ticks_ = 0;
+		return RobotState::HABITAT_SQUARE_UP;
+	}
+	// Neither sensor on the strip: whatever one of them clipped wasn't the
+	// marker, so drop the window rather than letting a later reading resume a
+	// half-elapsed count.
+	side_sensor_grace_ticks_ = 0;
+	return RobotState::HABITAT_LINE_FOLLOWING;
+}
+
+RobotState AI::tickHabitatSquareUp(){
+	uint64_t now = esp_timer_get_time();
+	// First tick of the state (see transitionTo): start the bail-out clock here,
+	// so it measures time actually spent rotating rather than including the entry
+	// settle delay that precedes any rotation.
+	if (square_up_entered_us_ == 0){
+		square_up_entered_us_ = now;
+		return RobotState::HABITAT_SQUARE_UP;
+	}
+	// Done the moment the trailing sensor catches up — both on the strip means
+	// the array is parallel to it.
+	if (line_follower_ && line_follower_->bothSideSensorsOnLine()){
+		Serial.printf("[AI] square-up complete after %.0f ms of rotation\n",
+			(now - square_up_entered_us_) / 1000.0);
+		return RobotState::HABITAT_APPROACH_BACKUP;
+	}
+	// Bail-out: a strip the second sensor never reads (missed edge, marginal
+	// reflectivity, a sensor that just clipped a corner) would otherwise leave
+	// the robot rotating in place indefinitely at the habitat. Give up and carry
+	// on unsquared rather than hang — the habitat legs cope worse with a bad
+	// heading than with a slightly crooked one, but they cope.
+	if (esp_timer_get_time() - square_up_entered_us_ >= kSquareUpTimeoutUs){
+		Serial.println("[AI] HABITAT_SQUARE_UP timed out, proceeding unsquared");
+		return RobotState::HABITAT_APPROACH_BACKUP;
+	}
+	return RobotState::HABITAT_SQUARE_UP;
 }
 
 RobotState AI::tickHabitatApproachBackup(){
@@ -416,6 +519,9 @@ AI::DriveMode AI::desiredDriveMode() const{
 	if (current_state_ == RobotState::HABITAT_FIND){
 		return DriveMode::STRAFING_TIL_HABITAT;
 	}
+	if (current_state_ == RobotState::HABITAT_SQUARE_UP){
+		return DriveMode::SQUARING_UP;
+	}
 	if (current_state_ == RobotState::HABITAT_BACKUP || current_state_ == RobotState::HABITAT_APPROACH_BACKUP ||
 	    current_state_ == RobotState::HABITAT_POST_PICKUP_BACKUP){
 		return DriveMode::BACKING_UP;
@@ -503,4 +609,8 @@ int AI::visits(RobotState state) const{
 
 int AI::habitatFindDirection() const{
 	return current_habitat_find_direction_;
+}
+
+double AI::squareUpOmegaSign() const{
+	return square_up_omega_sign_;
 }

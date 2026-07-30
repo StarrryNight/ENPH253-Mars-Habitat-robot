@@ -19,7 +19,14 @@ enum class RobotState {
 	// METAL_DETECTING's probe pose 0), then closes the claw, retracts, and
 	// places the rock. See AI::tickPickupRock.
 	PICKUP_ROCK,
-	LINE_FOLLOWING,
+	// Line-following leg that ends at the habitat: the only line-following state
+	// watching for the habitat marker's perpendicular strip (both side sensors
+	// -> HABITAT_APPROACH_BACKUP, one side sensor -> HABITAT_SQUARE_UP). Named
+	// for that rather than called plain LINE_FOLLOWING, since the rock legs
+	// line-follow under FINDING_ROCK and must NOT divert on a side sensor
+	// clipping tape. Drives with DriveMode::LINE_FOLLOWING like any other leg.
+	// See AI::tickHabitatLineFollowing.
+	HABITAT_LINE_FOLLOWING,
 	HABITAT_PICKUP,
 	LINE_FOLLOWING_REVERSE,
 	HABITAT_PLACE,
@@ -38,6 +45,14 @@ enum class RobotState {
 	// AI::post_reacquire_state_. Guarantees a full ~180° reversal regardless
 	// of which way the robot last turned. See AI::tickReverse180.
 	REVERSE_180,
+	// Entered from LINE_FOLLOWING the moment ONE side sensor triggers on the
+	// habitat marker's perpendicular strip — which means the robot met the strip
+	// at an angle, since a square approach trips both at once. Stops translating
+	// and rotates in place, in the direction that swings the sensor that hasn't
+	// triggered yet forward onto the strip, until both read it. That squares the
+	// robot to the strip before the habitat legs (which are all fixed distances
+	// and headings) start relying on its heading. See AI::tickHabitatSquareUp.
+	HABITAT_SQUARE_UP,
 	// Entered from LINE_FOLLOWING once both side sensors trigger on the
 	// habitat marker. Drives straight backward a fixed distance
 	// (kHabitatApproachBackupDistanceM) before HABITAT_FIND starts its
@@ -63,7 +78,7 @@ enum class RobotState {
 	DONE,
 };
 
-static constexpr size_t kNumRobotStates = 17;
+static constexpr size_t kNumRobotStates = 18;
 
 // Debug/serial-print helper — not used by any control-flow logic.
 inline const char* robotStateName(RobotState s) {
@@ -73,12 +88,13 @@ inline const char* robotStateName(RobotState s) {
 		case RobotState::METAL_DETECTING: return "METAL_DETECTING";
 		case RobotState::TELETUBBYING: return "TELETUBBYING";
 		case RobotState::PICKUP_ROCK: return "PICKUP_ROCK";
-		case RobotState::LINE_FOLLOWING: return "LINE_FOLLOWING";
+		case RobotState::HABITAT_LINE_FOLLOWING: return "HABITAT_LINE_FOLLOWING";
 		case RobotState::HABITAT_PICKUP: return "HABITAT_PICKUP";
 		case RobotState::LINE_FOLLOWING_REVERSE: return "LINE_FOLLOWING_REVERSE";
 		case RobotState::HABITAT_PLACE: return "HABITAT_PLACE";
 		case RobotState::REACQUIRING_LINE: return "REACQUIRING_LINE";
 		case RobotState::REVERSE_180: return "REVERSE_180";
+		case RobotState::HABITAT_SQUARE_UP: return "HABITAT_SQUARE_UP";
 		case RobotState::HABITAT_APPROACH_BACKUP: return "HABITAT_APPROACH_BACKUP";
 		case RobotState::HABITAT_FIND: return "HABITAT_FIND";
 		case RobotState::HABITAT_BACKUP: return "HABITAT_BACKUP";

@@ -58,6 +58,12 @@ public:
 	// hand off to RobotState::HABITAT_PLACE.
 	bool rightSensorOnLine();
 
+	// True while the left outer sensor detects the line. Paired with
+	// rightSensorOnLine() by AI::tickLineFollowing to tell *which* side reached
+	// the habitat strip first, which is the direction information
+	// bothSideSensorsOnLine() throws away — see RobotState::HABITAT_SQUARE_UP.
+	bool leftSensorOnLine();
+
 private:
 	// Returns binarised sensor readings (1 = on line, 0 = off line)
 	// ordered as {left, mid-left, mid-right, right}.
