@@ -162,7 +162,7 @@ AI::AI():
 	// habitat pickup/place cycle in isolation, instead of the real
 	// FINDING_ROCK entry point. Flip back to RobotState::FINDING_ROCK to
 	// restore the real competition flow.
-	current_state_(RobotState::FINDING_ROCK),
+	current_state_(RobotState::HABITAT_LINE_FOLLOWING),
 	current_state_progress_m_(0),
 	post_reacquire_state_(RobotState::HABITAT_LINE_FOLLOWING)
 {
