@@ -55,6 +55,15 @@ public:
 	// Returns the last raw speed passed to set_velocity (pre-deadzone, pre-quantization).
 	double getCurrentTargetSpeed();
 
+	// The duty actually written to the LEDC channels by the most recent
+	// set_velocity(), signed by the direction it was written in (+ = channel 0,
+	// - = channel 1). This is the number after the deadzone, after +pwm_offset_
+	// and after the clamp to 255 — i.e. what the H-bridge really got, which is
+	// what getCurrentTargetSpeed() deliberately does NOT tell you. Zero whenever
+	// the write was suppressed: deadzone, a direction flip, or waiting out the
+	// shoot-through guard.
+	int getLastDutyCycle();
+
 	// Returns the raw cumulative encoder count since construction (monotonic, unsigned,
 	// wraps at 2^32 — callers must diff with unsigned arithmetic to handle wraparound).
 	uint32_t getEncoderCount();
@@ -129,6 +138,7 @@ private:
 	volatile double wheel_speed_;
 	double motor_target_speed_; // last raw speed passed to set_velocity
 	int last_direction_;                  // -1, 0, or 1 — tracks last direction for H-bridge protection and speed tracking
+	int last_duty_cycle_ = 0;             // signed duty actually written; see getLastDutyCycle()
 
 	const int pwm_channel_0_;
 	const int pwm_channel_1_;

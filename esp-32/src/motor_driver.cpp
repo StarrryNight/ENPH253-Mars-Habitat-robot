@@ -31,11 +31,18 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 	  buffer_filled_count_(0),
 	  last_delta_count_(0)
 {
-	ledcSetup(pwm_channel_0_, 100, 8);
+	// 20.2 kHz: above hearing, so no motor whine, and still comfortably inside
+	// what LEDC can produce at 8 bits. The core pins the LEDC clock to the 40 MHz
+	// XTAL (LEDC_DEFAULT_CLK in esp32-hal-ledc.c), and the divider register is
+	// 10.8 fixed-point, so the usable band at this resolution is
+	// 40e6 / (1024 * 256) = 153 Hz up to 40e6 / 256 = 156 kHz. Asking for
+	// anything below that floor — 100 Hz, say — makes ledc_timer_config() fail
+	// outright and the channel never outputs at all.
+	ledcSetup(pwm_channel_0_, 200, 8);
 	ledcAttachPin(pwm_pin_0_, pwm_channel_0_);
 	ledcWrite(pwm_channel_0_, 0);
 
-	ledcSetup(pwm_channel_1_, 100, 8);
+	ledcSetup(pwm_channel_1_, 200, 8);
 	ledcAttachPin(pwm_pin_1_, pwm_channel_1_);
 	ledcWrite(pwm_channel_1_, 0);
 
@@ -70,6 +77,7 @@ void MotorDriver::set_velocity(double speed)
         {
             if (new_direction > 0)       rotateClockwise(duty_cycle);
             else if (new_direction < 0)  rotateCounterClockwise(duty_cycle);
+            last_duty_cycle_ = duty_cycle * new_direction;
 
             last_direction_ = new_direction;
             pending_direction_change_ = false;
@@ -82,6 +90,7 @@ void MotorDriver::set_velocity(double speed)
         {
             ledcWrite(pwm_channel_0_, 0);
             ledcWrite(pwm_channel_1_, 0);
+            last_duty_cycle_ = 0;
         }
         return;
     }
@@ -90,6 +99,7 @@ void MotorDriver::set_velocity(double speed)
     {
         ledcWrite(pwm_channel_0_, 0);
         ledcWrite(pwm_channel_1_, 0);
+        last_duty_cycle_ = 0;
         // Deliberately NOT resetting last_direction_ here: tickSpeed()'s sign
         // fallback reads it whenever intended_direction_ is 0, and a command
         // dithering at the deadzone shouldn't discard real encoder counts by
@@ -100,11 +110,13 @@ void MotorDriver::set_velocity(double speed)
     {
         if (new_direction > 0) ledcWrite(pwm_channel_0_, duty_cycle);
         else                   ledcWrite(pwm_channel_1_, duty_cycle);
+        last_duty_cycle_ = duty_cycle * new_direction;
     }
     else
     {
         ledcWrite(pwm_channel_0_, 0);
         ledcWrite(pwm_channel_1_, 0);
+        last_duty_cycle_ = 0;
         prev_pwm_reset_time_ = static_cast<uint64_t>(esp_timer_get_time());
         pending_direction_change_ = true;
     }
@@ -215,4 +227,9 @@ int MotorDriver::getIntendedDirection()
 bool MotorDriver::isDirectionChangePending() const
 {
 	return pending_direction_change_;
+}
+
+int MotorDriver::getLastDutyCycle()
+{
+	return last_duty_cycle_;
 }

@@ -18,10 +18,10 @@ static constexpr int WHEEL_BACK_PWM_PIN_1 = 40;
 // "BACK" on altium
 
 // Encoder pins; second is set to zero since we're doing 1 encoder pin per wheel
-static constexpr int WHEEL_LEFT_ENCODER_0 = 8;
+static constexpr int WHEEL_LEFT_ENCODER_0 = 9;
 // "LEFT"
 
-static constexpr int WHEEL_RIGHT_ENCODER_0 = 9;
+static constexpr int WHEEL_RIGHT_ENCODER_0 = 8;
 // "RIGHT"
 
 static constexpr int WHEEL_BACK_ENCODER_0 = 7;

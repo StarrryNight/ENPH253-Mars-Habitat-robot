@@ -1,5 +1,4 @@
 #pragma once
-
 // PID gains for every controller on the robot, gathered here for tuning.
 // Constructor order is PidController(p, i, d, max_i) — max_i clamps the
 // running integral to [-max_i, max_i] to prevent wind-up.
@@ -41,8 +40,8 @@ static constexpr int VELOCITY_TO_PWM = 150;
 // 0.557 m/s. Values below are the ones tuned on hardware; 60 is where all three
 // sat when this was one hardcoded number.
 static constexpr int WHEEL_LEFT_PWM_OFFSET = 30;
-static constexpr int WHEEL_RIGHT_PWM_OFFSET =25;
-static constexpr int WHEEL_BACK_PWM_OFFSET = 25;
+static constexpr int WHEEL_RIGHT_PWM_OFFSET =40;
+static constexpr int WHEEL_BACK_PWM_OFFSET = 30;
 
 // Orientation (rotate-to-angle) PID (OrientationController). Error in radians.
 static constexpr double ORIENTATION_PID_P = FORWARD_SPEED*5;
