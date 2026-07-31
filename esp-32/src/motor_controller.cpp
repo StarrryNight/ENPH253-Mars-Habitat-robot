@@ -104,11 +104,27 @@ int wheel_back_pwm = static_cast<int>(
 	wheel_right_motor_->set_velocity(wheel_right_pwm);
 	wheel_back_motor_->set_velocity(wheel_back_pwm);
 
-	// Rate-limited (every 20 calls =~ 200ms at MOTOR_CONTROL_LOOP_PERIOD_US)
-	// diagnostic for tracking down commanded-but-not-moving wheels: shows
-	// whether the PWM actually being written is zero (a software/PID issue)
-	// or nonzero (points at wiring/H-bridge/motor instead). Remove once
-	// ROTATING_TIL_ROCK's drivetrain issue is root-caused.
+	// Rate-limited (every 20 calls =~ 200 ms at MOTOR_CONTROL_LOOP_PERIOD_US)
+	// closed-loop diagnostic — the counterpart to the open-loop [FF] print, but
+	// running on the real state machine with the PIDs live.
+	//
+	// Reading it: wheel_target vs actual is the tracking error the PIDs are
+	// working on; pwm is what applyVelocity() asked for (feedforward + PID trim,
+	// pre-deadzone/offset/clamp); duty is what MotorDriver actually wrote to the
+	// pins. pwm nonzero with duty zero means the command was swallowed — the
+	// deadzone, a direction flip, or the shoot-through guard — rather than the
+	// motor failing to turn.
+	static int debug_print_counter = 0;
+	if (++debug_print_counter >= 20){
+		debug_print_counter = 0;
+		Serial.printf("[Motor] target(x=%.2f y=%.2f w=%.2f) wheel_target(L=%.3f R=%.3f B=%.3f) actual(L=%.3f R=%.3f B=%.3f) pwm(L=%d R=%d B=%d) duty(L=%d R=%d B=%d)\n",
+			current_target_velocity_.x, current_target_velocity_.y, current_target_velocity_.omega,
+			target_wheel_velocity.wheel_left, target_wheel_velocity.wheel_right, target_wheel_velocity.wheel_back,
+			current_wheel_velocities_.wheel_left, current_wheel_velocities_.wheel_right, current_wheel_velocities_.wheel_back,
+			wheel_left_pwm, wheel_right_pwm, wheel_back_pwm,
+			wheel_left_motor_->getLastDutyCycle(), wheel_right_motor_->getLastDutyCycle(),
+			wheel_back_motor_->getLastDutyCycle());
+	}
 }
 
 void MotorController::driveOpenLoop(RobotVelocity v)

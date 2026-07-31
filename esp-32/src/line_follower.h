@@ -25,8 +25,8 @@ static constexpr double LIGHT_THRESHOLD_ADC = 2000;
 static constexpr double SIDE_SENSOR_SPACING_M = 0.13;
 static constexpr double TURNING_RADIUS = 0.13;
 //static constexpr double SMALL_ERROR_VALUE = FORWARD_SPEED*0.8;
-static constexpr double SMALL_ERROR_VALUE = 0.5;
-static constexpr double BIG_ERROR_VALUE =FORWARD_SPEED/(TURNING_RADIUS);
+static constexpr double SMALL_ERROR_VALUE = 0.35;
+static constexpr double BIG_ERROR_VALUE =0.7*FORWARD_SPEED/(TURNING_RADIUS);
 
 // IR photoresistor line follower with PID-based lateral correction.
 // Uses a 4-sensor array: [left, mid-left, mid-right, right].

@@ -121,8 +121,12 @@ class AI {
 		RobotState tickMetalDetecting();
 		RobotState tickTeletubbying();
 		RobotState tickPickupRock();
-		// See RobotState::LINE_FOLLOWING — returns itself unconditionally.
+		// See RobotState::LINE_FOLLOWING — line-follows until
+		// kRampTriggerDistanceM of progress, then hands to the ramp leg.
 		RobotState tickLineFollowing();
+		// See RobotState::RAMP_LINE_FOLLOWING / RobotState::SECOND_ROCK_FIND.
+		RobotState tickRampLineFollowing();
+		RobotState tickSecondRockFind();
 		RobotState tickHabitatLineFollowing();
 		RobotState tickHabitatPickup();
 		RobotState tickLineFollowingReverse();
@@ -155,6 +159,11 @@ class AI {
 		// rock-detection range this ROTATING_TIL_ROCK visit, or 0 if not
 		// currently in range — see tickRotatingTilRock's debounce.
 		uint64_t rock_sonar_in_range_since_us_ = 0;
+		// Same debounce for RAMP_LINE_FOLLOWING's forward-looking check: when the
+		// sonar first read inside the second-rock window, or 0 if it currently
+		// isn't. Separate from the rock-search one so the two can't consume each
+		// other's confirmation. See tickRampLineFollowing.
+		uint64_t ramp_sonar_in_range_since_us_ = 0;
 		// esp_timer_get_time() timestamp HABITAT_FIND's sonar first read closer
 		// than HABITAT_SIDE_THRESHOLD, or 0 before that happens — the start of
 		// kHabitatSideStopDelayUs's extra-strafe countdown. Cleared again when
@@ -165,12 +174,13 @@ class AI {
 		// of auto-advancing to the next pose every settle cycle. Reset by
 		// transitionTo() on entering METAL_DETECTING. See onRotationReached().
 		bool metal_probe_pose_applied_ = false;
-		// True once a rock has actually been collected — set on entering
-		// PICKUP_ROCK, which only happens off a real metal hit. From then on the
-		// remaining rock checkpoints are skipped outright: tickFindingRock and
-		// nextRockOrDone() both hand straight to HABITAT_LINE_FOLLOWING instead of
-		// stopping to search again. Never cleared — one rock is the whole job.
-		bool rock_picked_up_ = false;
+		// How many rocks have actually been collected — incremented on entering
+		// PICKUP_ROCK, which only happens off a real metal hit, so a rock skipped
+		// for lack of metal doesn't count. nextRockOrDone() routes the run off
+		// this: 1 sends it down the line to the ramp, 2 back to the checkpoint
+		// machinery for the third, kRocksToCollect stops the searching. Never
+		// cleared.
+		int rocks_collected_ = 0;
 		// esp_timer_get_time() stamp of the tick the probe pose landed, or 0
 		// before that — the start of kMetalProbeTimeoutUs's window. Timed from
 		// the pose landing rather than from entering the state so the arm's

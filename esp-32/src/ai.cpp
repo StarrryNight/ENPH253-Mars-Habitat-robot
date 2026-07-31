@@ -26,6 +26,7 @@ namespace {
 		double rotation_degrees;
 	};
 	constexpr std::array<RockCheckpoint, kNumRocks> kRockCheckpoints = {{
+		{500000, -47.0},
 		{0.45, -47.0},
 		{0.7, 48.0},
 		{0.25, -45.0},
@@ -76,6 +77,37 @@ namespace {
 	// MrKrabs::driveCurrentMode() ever issues a single rotate command, so
 	// the robot appears to sit still in ROTATING_TIL_ROCK.
 	constexpr uint64_t kRockSonarConfirmDelayUs = 38000; // 0.025 s
+
+	// Progress (m) into LINE_FOLLOWING at which the ramp leg begins — see
+	// RobotState::RAMP_LINE_FOLLOWING. Measured from where LINE_FOLLOWING was
+	// entered (transitionTo zeroes current_state_progress_m_), i.e. from wherever
+	// ROCK_REACQUIRE_LINE put the robot back on the line.
+	constexpr double kRampTriggerDistanceM = 0.7;
+
+	// Sonar window (cm) that counts as "second rock ahead" during
+	// RAMP_LINE_FOLLOWING. The lower bound is not just a range limit: NewPing
+	// returns 0 for no echo (see Sonar::queryDistance), so a bare "closer than
+	// 20" test would fire continuously whenever the sensor reads nothing at all.
+	// Requiring > 8 excludes that case as well as anything implausibly close.
+	constexpr double kSecondRockSonarMinCm = 8.0;
+	constexpr double kSecondRockSonarMaxCm = 20.0;
+
+	// Range (cm) SECOND_ROCK_FIND drives forward to before stopping and picking
+	// up. The reading taken at that moment is what the pickup's sonar-relative
+	// poses are placed from, so this is a real positioning number, not just a
+	// trigger — the arm reaches to wherever the sonar last said the rock was.
+	constexpr double kSecondRockApproachStopCm = 15.0;
+
+	// Below this the sonar reading is "no echo" rather than "very close":
+	// NewPing returns 0 when nothing comes back (see Sonar::queryDistance), and
+	// every closing-distance test has to exclude it or it fires immediately.
+	constexpr double kSonarNoEchoCm = 2.0;
+
+	// Rocks collected before the run stops looking for more. The three are
+	// handled differently: the first from a FINDING_ROCK checkpoint, the second
+	// off the ramp (RAMP_LINE_FOLLOWING -> SECOND_ROCK_FIND), and the third back
+	// through the ordinary checkpoint machinery. See nextRockOrDone().
+	constexpr int kRocksToCollect = 3;
 
 	// How many poses from the front of kPickupRockXYSequence belong to
 	// METAL_DETECTING rather than PICKUP_ROCK. The runner is shared across both
@@ -193,9 +225,11 @@ void AI::transitionTo(RobotState next){
 	} else if (next == RobotState::PICKUP_ROCK){
 		// Entered only from a confirmed metal hit (tickMetalDetecting, or
 		// tickTeletubbying re-checking after the wave), so this is the one place
-		// that knows a rock is being collected. Latching here rather than in the
-		// tick functions covers both entries with one line.
-		rock_picked_up_ = true;
+		// that knows a rock is being collected. Counting here rather than in the
+		// tick functions covers both entries with one line, and the count is what
+		// nextRockOrDone() routes the run on.
+		rocks_collected_++;
+		Serial.printf("[AI] rock %d of %d\n", rocks_collected_, kRocksToCollect);
 	} else if (next == RobotState::HABITAT_PICKUP){
 		xy_sequence_runner_.start(kHabitatPickupXYSequence, 0.0);
 	} else if (next == RobotState::HABITAT_PLACE){
@@ -241,6 +275,8 @@ RobotState AI::tickCurrentState(){
 		case RobotState::TELETUBBYING: return tickTeletubbying();
 		case RobotState::PICKUP_ROCK: return tickPickupRock();
 		case RobotState::LINE_FOLLOWING: return tickLineFollowing();
+		case RobotState::RAMP_LINE_FOLLOWING: return tickRampLineFollowing();
+		case RobotState::SECOND_ROCK_FIND: return tickSecondRockFind();
 		case RobotState::HABITAT_LINE_FOLLOWING: return tickHabitatLineFollowing();
 		case RobotState::HABITAT_PICKUP: return tickHabitatPickup();
 		case RobotState::LINE_FOLLOWING_REVERSE: return tickLineFollowingReverse();
@@ -287,14 +323,30 @@ RobotState AI::tickReverse180(){
 }
 
 RobotState AI::nextRockOrDone(){
-	// A collected rock ends the rock phase, as does running out of checkpoints.
-	// Both hand to plain LINE_FOLLOWING rather than HABITAT_LINE_FOLLOWING: the
-	// habitat states are deliberately not entered for now, so the robot just
-	// keeps driving the line. Point this back at HABITAT_LINE_FOLLOWING to
-	// re-enable the habitat phase.
-	post_reacquire_state_ = (rock_picked_up_ || visits(RobotState::FINDING_ROCK) >= kNumRocks)
-		? RobotState::LINE_FOLLOWING
-		: RobotState::FINDING_ROCK;
+	// Where the run goes after a rock is resolved depends on how many have
+	// actually been collected, because the three are reached differently:
+	//
+	//   0 — nothing collected yet (this rock was skipped for lack of metal):
+	//       carry on through the checkpoint table as before.
+	//   1 — first rock done: LINE_FOLLOWING, whose distance trigger starts the
+	//       ramp leg that finds the second.
+	//   2 — second (ramp) rock done: back to FINDING_ROCK, so the third is
+	//       handled by the ordinary checkpoint machinery.
+	//  3+ — done collecting; hold on the line.
+	//
+	// LINE_FOLLOWING rather than HABITAT_LINE_FOLLOWING throughout: the habitat
+	// states are deliberately not entered yet.
+	if (rocks_collected_ >= kRocksToCollect){
+		post_reacquire_state_ = RobotState::LINE_FOLLOWING;
+	} else if (rocks_collected_ == 1){
+		post_reacquire_state_ = RobotState::LINE_FOLLOWING;
+	} else if (rocks_collected_ == 2){
+		post_reacquire_state_ = RobotState::FINDING_ROCK;
+	} else {
+		post_reacquire_state_ = visits(RobotState::FINDING_ROCK) >= kNumRocks
+			? RobotState::LINE_FOLLOWING
+			: RobotState::FINDING_ROCK;
+	}
 	// Rock path: retrace the search spin, no blind initial turn.
 	line_search_continues_last_rotation_ = false;
 	return RobotState::ROCK_REACQUIRE_LINE;
@@ -313,10 +365,12 @@ RobotState AI::tickRockReacquireLine(){
 }
 
 RobotState AI::tickFindingRock(){
-	// Already carrying a rock: don't stop for any further checkpoint, just keep
-	// line-following at the same speed (both states drive
-	// DriveMode::LINE_FOLLOWING at FORWARD_SPEED).
-	if (rock_picked_up_){
+	// Quota filled: stop stopping for checkpoints and just keep line-following
+	// (same speed — both states drive DriveMode::LINE_FOLLOWING at
+	// FORWARD_SPEED). Note this is a count now, not a "have we got one" flag:
+	// the third rock is reached by coming back into this state after the ramp
+	// rock, so an early return on the first pickup would make it unreachable.
+	if (rocks_collected_ >= kRocksToCollect){
 		return RobotState::LINE_FOLLOWING;
 	}
 	int n = visits(RobotState::FINDING_ROCK); // 1-based
@@ -423,11 +477,67 @@ RobotState AI::tickPickupRock(){
 }
 
 RobotState AI::tickLineFollowing(){
-	// Terminal by design: nothing here watches for a marker or a distance, so
-	// the robot just keeps following the line. desiredDriveMode() falls through
-	// to DriveMode::LINE_FOLLOWING for it (no sequenceForState entry), which
-	// drives FORWARD_SPEED with the usual photoresistor correction.
+	// Drives the line at FORWARD_SPEED (desiredDriveMode() falls through to
+	// DriveMode::LINE_FOLLOWING — no sequenceForState entry) until enough
+	// distance has passed to be at the ramp, then hands over to the leg that
+	// watches the sonar. Nothing else ends this state.
+	if (current_state_progress_m_ >= kRampTriggerDistanceM){
+		Serial.printf("[AI] %.2f m of line-following done, entering ramp leg\n",
+			current_state_progress_m_);
+		return RobotState::RAMP_LINE_FOLLOWING;
+	}
 	return RobotState::LINE_FOLLOWING;
+}
+
+RobotState AI::tickRampLineFollowing(){
+	// Same driving as LINE_FOLLOWING; the only difference is that this leg
+	// watches ahead. Stops as soon as the sonar reads inside the second-rock
+	// window — the stop itself happens through the state change, since
+	// SECOND_ROCK_FIND's drive mode holds the wheels.
+	if (!sonar_){
+		return RobotState::RAMP_LINE_FOLLOWING;
+	}
+	double d = sonar_->queryDistance();
+	if (d <= kSecondRockSonarMinCm || d >= kSecondRockSonarMaxCm){
+		// Out of the window (0 = no echo lands here too) — reset any part-served
+		// confirmation so a fresh one has to accumulate, same as the rock search.
+		ramp_sonar_in_range_since_us_ = 0;
+		return RobotState::RAMP_LINE_FOLLOWING;
+	}
+	uint64_t now = esp_timer_get_time();
+	if (ramp_sonar_in_range_since_us_ == 0){
+		ramp_sonar_in_range_since_us_ = now;
+		return RobotState::RAMP_LINE_FOLLOWING;
+	}
+	if (now - ramp_sonar_in_range_since_us_ < kRockSonarConfirmDelayUs){
+		return RobotState::RAMP_LINE_FOLLOWING;
+	}
+	Serial.printf("[AI] second rock at %.1f cm, stopping\n", d);
+	ramp_sonar_in_range_since_us_ = 0;
+	return RobotState::SECOND_ROCK_FIND;
+}
+
+RobotState AI::tickSecondRockFind(){
+	// Keeps line-following straight at the rock the ramp leg spotted, closing
+	// until the sonar reads kSecondRockApproachStopCm, then picks up from there.
+	// No rotation involved, unlike the checkpoint rocks — the ramp leg already
+	// left the robot pointed at it, so this is purely an approach.
+	if (!sonar_){
+		return RobotState::SECOND_ROCK_FIND;
+	}
+	double d = sonar_->queryDistance();
+	if (d <= kSonarNoEchoCm || d > kSecondRockApproachStopCm){
+		// Still closing (or momentarily no echo — driving on is the right
+		// response either way, since the rock was seen a moment ago).
+		return RobotState::SECOND_ROCK_FIND;
+	}
+	// Close enough. Cache this reading as the origin for the pickup sequence's
+	// sonar-relative poses, exactly as tickRotatingTilRock does for a checkpoint
+	// rock, so the arm reaches to where the rock actually is rather than to a
+	// fixed distance.
+	cached_rock_sonar_x_m_ = d / 100.0 + kSonarMountOffsetM;
+	Serial.printf("[AI] second rock reached at %.1f cm, picking up\n", d);
+	return RobotState::METAL_DETECTING;
 }
 
 RobotState AI::tickHabitatLineFollowing(){

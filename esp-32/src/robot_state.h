@@ -25,6 +25,16 @@ enum class RobotState {
 	// HABITAT_LINE_FOLLOWING while the habitat states are held back.
 	// See AI::tickLineFollowing.
 	LINE_FOLLOWING,
+	// Line-following continued up the ramp. Entered from LINE_FOLLOWING once
+	// kRampTriggerDistanceM of progress has accumulated, and it drives exactly
+	// the same way — the split exists so that only this leg watches the sonar,
+	// keeping LINE_FOLLOWING free of a sensor check that would fire on anything
+	// the robot passes earlier. Ends when the sonar reads something ahead.
+	// See AI::tickRampLineFollowing.
+	RAMP_LINE_FOLLOWING,
+	// Entered when RAMP_LINE_FOLLOWING's sonar finds the second rock.
+	// See AI::tickSecondRockFind.
+	SECOND_ROCK_FIND,
 	// Line-following leg that ends at the habitat: the only line-following state
 	// watching for the habitat marker's perpendicular strip (both side sensors
 	// -> HABITAT_APPROACH_BACKUP, one side sensor -> HABITAT_SQUARE_UP). Named
@@ -96,7 +106,7 @@ enum class RobotState {
 	DONE,
 };
 
-static constexpr size_t kNumRobotStates = 20;
+static constexpr size_t kNumRobotStates = 22;
 
 // Debug/serial-print helper — not used by any control-flow logic.
 inline const char* robotStateName(RobotState s) {
@@ -107,6 +117,8 @@ inline const char* robotStateName(RobotState s) {
 		case RobotState::TELETUBBYING: return "TELETUBBYING";
 		case RobotState::PICKUP_ROCK: return "PICKUP_ROCK";
 		case RobotState::LINE_FOLLOWING: return "LINE_FOLLOWING";
+		case RobotState::RAMP_LINE_FOLLOWING: return "RAMP_LINE_FOLLOWING";
+		case RobotState::SECOND_ROCK_FIND: return "SECOND_ROCK_FIND";
 		case RobotState::HABITAT_LINE_FOLLOWING: return "HABITAT_LINE_FOLLOWING";
 		case RobotState::HABITAT_PICKUP: return "HABITAT_PICKUP";
 		case RobotState::LINE_FOLLOWING_REVERSE: return "LINE_FOLLOWING_REVERSE";

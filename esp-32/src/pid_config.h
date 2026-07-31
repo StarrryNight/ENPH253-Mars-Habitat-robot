@@ -9,26 +9,26 @@
 // gains — the three motors don't respond identically, so tune independently
 // on hardware.
 #include "constants.h"
-static constexpr double WHEEL_LEFT_PID_P = 0.3;
-static constexpr double WHEEL_LEFT_PID_I = 0.1;
-static constexpr double WHEEL_LEFT_PID_D = 0.1;
-static constexpr double WHEEL_LEFT_PID_MAX_I = 2;
+static constexpr double WHEEL_LEFT_PID_P = 0.1;
+static constexpr double WHEEL_LEFT_PID_I = 0.05;
+static constexpr double WHEEL_LEFT_PID_D = 0.01;
+static constexpr double WHEEL_LEFT_PID_MAX_I = 0.3;
 
-static constexpr double WHEEL_RIGHT_PID_P =0.3;
-static constexpr double WHEEL_RIGHT_PID_I =0.1;
-static constexpr double WHEEL_RIGHT_PID_D =0.1;
-static constexpr double WHEEL_RIGHT_PID_MAX_I = 2;
+static constexpr double WHEEL_RIGHT_PID_P =0.1;
+static constexpr double WHEEL_RIGHT_PID_I =0.05;
+static constexpr double WHEEL_RIGHT_PID_D =0.01;
+static constexpr double WHEEL_RIGHT_PID_MAX_I = 0.3;
 
 // the back wheel oscillates/overshoots.
-static constexpr double WHEEL_BACK_PID_P = 0.3;
-static constexpr double WHEEL_BACK_PID_I = 0.1;
-static constexpr double WHEEL_BACK_PID_D = 0.1;
-static constexpr double WHEEL_BACK_PID_MAX_I = 2;
+static constexpr double WHEEL_BACK_PID_P = 0.1;
+static constexpr double WHEEL_BACK_PID_I = 0.05;
+static constexpr double WHEEL_BACK_PID_D = 0.01;
+static constexpr double WHEEL_BACK_PID_MAX_I = 0.3;
 
 // Converts a wheel velocity (m/s) into a PWM duty magnitude for
 // MotorDriver::set_velocity (which expects commanded PWM, not m/s — see
 // MOTOR_SPEED_DEADZONE). Placeholder — tune against real wheel speed on hardware.
-static constexpr int VELOCITY_TO_PWM = 150;
+static constexpr int VELOCITY_TO_PWM =250;
 
 // Per-wheel static PWM offset, added to the duty of every nonzero command for
 // that motor (MotorDriver::speedToDutyCycle, passed in via the constructor).
@@ -40,7 +40,7 @@ static constexpr int VELOCITY_TO_PWM = 150;
 // 0.557 m/s. Values below are the ones tuned on hardware; 60 is where all three
 // sat when this was one hardcoded number.
 static constexpr int WHEEL_LEFT_PWM_OFFSET = 30;
-static constexpr int WHEEL_RIGHT_PWM_OFFSET =40;
+static constexpr int WHEEL_RIGHT_PWM_OFFSET =30;
 static constexpr int WHEEL_BACK_PWM_OFFSET = 30;
 
 // Orientation (rotate-to-angle) PID (OrientationController). Error in radians.
