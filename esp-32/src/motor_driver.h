@@ -20,7 +20,7 @@ static constexpr double MOTOR_SPEED_DEADZONE = 3.0;
 // caller doesn't pass one. Real values live in pid_config.h next to the rest of
 // the per-wheel tuning (WHEEL_*_PWM_OFFSET) — this just preserves the behavior
 // the offset had when it was hardcoded in speedToDutyCycle().
-static constexpr int MOTOR_PWM_OFFSET_DEFAULT = 60;
+static constexpr int MOTOR_PWM_OFFSET_DEFAULT = 30;
 
 // Controls a single DC motor with quadrature encoder feedback.
 // PWM is driven via ESP32 LEDC channels. Velocity is measured by tickVelocity(),

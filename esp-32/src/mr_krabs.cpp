@@ -290,7 +290,6 @@ void MrKrabs::stepControl()
 	// precisely the manoeuvres that move the line across it. See
 	// LineFollower::tick.
 	line_follower_->tick();
-	updateMetalDetectorLed(ai_->metalDetected(), now);
 
 	if (now < action_settle_until_us_){
 		motor_controller_->stopImmediate();
@@ -530,31 +529,6 @@ void MrKrabs::driveCurrentMode()
 			motor_controller_->setVelocity({-HABITAT_STRAFE_SPEED * ai_->habitatFindDirection(), 0, yaw});
 			break;
 		}
-	}
-}
-
-// Blinks the DevKitM-1's onboard addressable RGB LED (GPIO48) red while
-// metal is detected, off otherwise. RGB_BUILTIN/neopixelWrite come from the
-// arduino-esp32 core itself (no NeoPixel library needed) — plain
-// digitalWrite() can't drive a WS2812, hence the dedicated call.
-namespace {
-	constexpr uint64_t METAL_LED_BLINK_PERIOD_US = 200000; // 200 ms
-}
-
-void MrKrabs::updateMetalDetectorLed(bool metal_detected, uint64_t now)
-{
-	if (!metal_detected){
-		if (metal_led_on_){
-			neopixelWrite(RGB_BUILTIN, 0, 0, 0);
-			metal_led_on_ = false;
-		}
-		return;
-	}
-
-	if (now - metal_led_last_toggle_us_ >= METAL_LED_BLINK_PERIOD_US){
-		metal_led_on_ = !metal_led_on_;
-		neopixelWrite(RGB_BUILTIN, metal_led_on_ ? 255 : 0, 0, 0);
-		metal_led_last_toggle_us_ = now;
 	}
 }
 

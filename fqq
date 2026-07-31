@@ -1,0 +1,341 @@
+[1mdiff --git a/esp-32/src/motor_controller.cpp b/esp-32/src/motor_controller.cpp[m
+[1mindex 6fa32da..5560fb4 100644[m
+[1m--- a/esp-32/src/motor_controller.cpp[m
+[1m+++ b/esp-32/src/motor_controller.cpp[m
+[36m@@ -86,7 +86,7 @@[m [mvoid MotorController::applyVelocity()[m
+ 	// forces that from-stop jump through the H-bridge coast/dead-time guard.[m
+ 	// PID error is in m/s; multiply output by VELOCITY_TO_PWM to get PWM counts.[m
+ int wheel_left_pwm = static_cast<int>([m
+[31m-   ( target_wheel_velocity.wheel_left  +[m
+[32m+[m[32m    (target_wheel_velocity.wheel_left   +[m
+     wheel_left_pid_.step(target_wheel_velocity.wheel_left - current_wheel_velocities_.wheel_left, delta_t))*VELOCITY_TO_PWM[m
+ );[m
+ [m
+[36m@@ -96,7 +96,7 @@[m [mint wheel_right_pwm = static_cast<int>([m
+ );[m
+ [m
+ int wheel_back_pwm = static_cast<int>([m
+[31m-   ( target_wheel_velocity.wheel_back  +[m
+[32m+[m[32m    (target_wheel_velocity.wheel_back +[m
+     wheel_back_pid_.step(target_wheel_velocity.wheel_back - current_wheel_velocities_.wheel_back, delta_t))*VELOCITY_TO_PWM[m
+ );[m
+ [m
+[36m@@ -169,35 +169,6 @@[m [mdouble MotorController::computeAngle()[m
+ 				 ▼ -Y[m
+  *[m
+  */[m
+[31m-WheelVelocities MotorController::getCurrentWheelVelocities() const[m
+[31m-{[m
+[31m-	return current_wheel_velocities_;[m
+[31m-}[m
+[31m-[m
+[31m-WheelVelocities MotorController::getLastCommandedPwm()[m
+[31m-{[m
+[31m-	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return {0, 0, 0};[m
+[31m-	return {wheel_left_motor_->getCurrentTargetSpeed(),[m
+[31m-	        wheel_right_motor_->getCurrentTargetSpeed(),[m
+[31m-	        wheel_back_motor_->getCurrentTargetSpeed()};[m
+[31m-}[m
+[31m-[m
+[31m-WheelVelocities MotorController::getLastDutyCycles()[m
+[31m-{[m
+[31m-	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return {0, 0, 0};[m
+[31m-	return {static_cast<double>(wheel_left_motor_->getLastDutyCycle()),[m
+[31m-	        static_cast<double>(wheel_right_motor_->getLastDutyCycle()),[m
+[31m-	        static_cast<double>(wheel_back_motor_->getLastDutyCycle())};[m
+[31m-}[m
+[31m-[m
+[31m-int MotorController::directionChangePendingMask()[m
+[31m-{[m
+[31m-	if (!wheel_left_motor_ || !wheel_right_motor_ || !wheel_back_motor_) return 0;[m
+[31m-	return (wheel_left_motor_->isDirectionChangePending()  ? 1 : 0) |[m
+[31m-	       (wheel_right_motor_->isDirectionChangePending() ? 2 : 0) |[m
+[31m-	       (wheel_back_motor_->isDirectionChangePending()  ? 4 : 0);[m
+[31m-}[m
+[31m-[m
+ WheelVelocities MotorController::euclideanToWheel(RobotVelocity v)[m
+ {[m
+ 	// v_i = -sin(θ_i)*vx + cos(θ_i)*vy + R*ω[m
+[1mdiff --git a/esp-32/src/motor_controller.h b/esp-32/src/motor_controller.h[m
+[1mindex ead0246..0281656 100644[m
+[1m--- a/esp-32/src/motor_controller.h[m
+[1m+++ b/esp-32/src/motor_controller.h[m
+[36m@@ -144,35 +144,11 @@[m [mpublic:[m
+ 	void resetTranslationTracking();[m
+ [m
+ 	RobotVelocity getCurrentRobotVelocity();[m
+[31m-[m
+[31m-	// Per-wheel measured speeds (m/s) as of the last tickMotorSpeeds(), the same[m
+[31m-	// values applyVelocity() feeds the PIDs. Public so the feedforward bench test[m
+[31m-	// can compare them against what it commanded — see kRunFeedforwardTest in[m
+[31m-	// mr_krabs.cpp.[m
+[31m-	WheelVelocities getCurrentWheelVelocities() const;[m
+[31m-[m
+[31m-	// The raw PWM magnitudes last handed to each MotorDriver, before its[m
+[31m-	// deadzone/offset/clamp. Reusing WheelVelocities as a plain triple. Lets the[m
+[31m-	// bench test distinguish "we never asked this wheel to move" from "we asked[m
+[31m-	// and it didn't" — the two look identical in a speed measurement.[m
+[31m-	WheelVelocities getLastCommandedPwm();[m
+[31m-[m
+[31m-	// The duty each MotorDriver actually wrote to its pins, signed by direction —[m
+[31m-	// post deadzone, post +offset, post clamp. See MotorDriver::getLastDutyCycle.[m
+[31m-	WheelVelocities getLastDutyCycles();[m
+[31m-[m
+[31m-	// Bit per wheel (0 = left, 1 = right, 2 = back) set while that motor is[m
+[31m-	// sitting out MotorDriver's direction-change guard with PWM forced to zero.[m
+[31m-	// A wheel stuck here reads as commanded-but-stationary.[m
+[31m-	int directionChangePendingMask();[m
+[32m+[m[32mprivate:[m
+ [m
+ 	// Kiwi-drive inverse kinematics: maps robot-frame (x, y, omega) to wheel speeds (m/s).[m
+ 	// Wheel angles from +Y (forward): wheel_left=150°, wheel_right=30°, wheel_back=270°.[m
+[31m-	// Public for the same reason: the bench test needs the commanded per-wheel[m
+[31m-	// target that a robot velocity resolves to.[m
+ 	WheelVelocities euclideanToWheel(RobotVelocity v);[m
+[31m-private:[m
+[31m-[m
+ 	RobotVelocity wheelToEuclidean(WheelVelocities v);[m
+ [m
+ [m
+[1mdiff --git a/esp-32/src/motor_driver.h b/esp-32/src/motor_driver.h[m
+[1mindex 64f157e..e623ad0 100644[m
+[1m--- a/esp-32/src/motor_driver.h[m
+[1m+++ b/esp-32/src/motor_driver.h[m
+[36m@@ -20,7 +20,7 @@[m [mstatic constexpr double MOTOR_SPEED_DEADZONE = 3.0;[m
+ // caller doesn't pass one. Real values live in pid_config.h next to the rest of[m
+ // the per-wheel tuning (WHEEL_*_PWM_OFFSET) — this just preserves the behavior[m
+ // the offset had when it was hardcoded in speedToDutyCycle().[m
+[31m-static constexpr int MOTOR_PWM_OFFSET_DEFAULT = 60;[m
+[32m+[m[32mstatic constexpr int MOTOR_PWM_OFFSET_DEFAULT = 30;[m
+ [m
+ // Controls a single DC motor with quadrature encoder feedback.[m
+ // PWM is driven via ESP32 LEDC channels. Velocity is measured by tickVelocity(),[m
+[1mdiff --git a/esp-32/src/mr_krabs.cpp b/esp-32/src/mr_krabs.cpp[m
+[1mindex ca6c836..c376612 100644[m
+[1m--- a/esp-32/src/mr_krabs.cpp[m
+[1m+++ b/esp-32/src/mr_krabs.cpp[m
+[36m@@ -45,55 +45,6 @@[m [mconstexpr uint64_t ARM_TEST_POSE_PERIOD_US = 5000000; // 2 s per pose[m
+ // AI-driven sequence (ROTATING_TIL_ROCK -> METAL_DETECTING -> PICKUP_ROCK,[m
+ // see ai.cpp) is what should be moving the arm.[m
+ constexpr bool kRunArmBenchTest = false;[m
+[31m-[m
+[31m-// ---------------------------------------------------------------------------[m
+[31m-// Feedforward calibration bench test.[m
+[31m-//[m
+[31m-// Drives open-loop — driveOpenLoop(), so no wheel PID, nothing correcting the[m
+[31m-// number under test — through a table of robot velocities, holding each long[m
+[31m-// enough for the speed filter to settle, and prints commanded vs measured wheel[m
+[31m-// speed plus the VELOCITY_TO_PWM that measurement implies.[m
+[31m-//[m
+[31m-// The maths, per wheel: duty = v_cmd * K + offset, and above the offset duty is[m
+[31m-// roughly proportional to speed. If commanding v_cmd yielded v_meas, then to[m
+[31m-// have yielded v_cmd instead the gain wanted is[m
+[31m-//[m
+[31m-//     K_implied = K * (v_cmd / v_meas)[m
+[31m-//[m
+[31m-// which is what the print reports. Set VELOCITY_TO_PWM to what it converges on[m
+[31m-// across the middle of the speed range (the extremes lie: near zero the offset[m
+[31m-// dominates, near the top the duty clamps at 255).[m
+[31m-//[m
+[31m-// Read it with the robot on blocks or on a long straight run — the wheels are[m
+[31m-// uncorrected here, so it will not track a line and will drift.[m
+[31m-constexpr bool kRunFeedforwardTest = true;[m
+[31m-[m
+[31m-// Robot-frame velocities to step through. Forward entries exercise the two[m
+[31m-// front wheels (each gets 0.866 * vy) and leave the back wheel idle; the strafe[m
+[31m-// entry is what puts a real load on the back wheel (1.0 * vx, fronts -0.5 * vx),[m
+[31m-// so keep at least one if the back wheel's gain matters.[m
+[31m-// All backward. Beyond just testing the other direction, this swaps which[m
+[31m-// H-bridge channel each front wheel drives through: forward commands the left[m
+[31m-// wheel negative (cos(150 deg) * vy), which routes to pwm_channel_1_ = GPIO 48,[m
+[31m-// the pin physically wired to the board's onboard WS2812. Backward puts the left[m
+[31m-// wheel on pwm_channel_0_ = GPIO 47 instead. If the left wheel's intermittent[m
+[31m-// 0.000 readings disappear here, the pin is the problem, not the motor.[m
+[31m-constexpr RobotVelocity kFeedforwardTestVelocities[] = {[m
+[31m-	{0.0, -0.00, 2.0},[m
+[31m-	{-0.15, 0.0, 0.0},[m
+[31m-};[m
+[31m-constexpr size_t kFeedforwardTestCount =[m
+[31m-	sizeof(kFeedforwardTestVelocities) / sizeof(kFeedforwardTestVelocities[0]);[m
+[31m-[m
+[31m-// How long each velocity is held. Must comfortably exceed the speed filter's[m
+[31m-// window (VELOCITY_BUFFER_SIZE * MOTOR_CONTROL_LOOP_PERIOD = 150 ms) plus the[m
+[31m-// drivetrain's own settling, or the printed measurement is still catching up.[m
+[31m-constexpr uint64_t kFeedforwardStepUs = 3000000; // 3 s[m
+[31m-[m
+[31m-// Gap between steps, driven at zero, so each step starts from rest rather than[m
+[31m-// from the previous speed — otherwise a step following a faster one reads high[m
+[31m-// while the robot decelerates into it.[m
+[31m-constexpr uint64_t kFeedforwardRestUs = 1000000; // 1 s[m
+ }[m
+ [m
+ MrKrabs::MrKrabs() :[m
+[36m@@ -341,15 +292,6 @@[m [mvoid MrKrabs::stepControl()[m
+ 	line_follower_->tick();[m
+ 	updateMetalDetectorLed(ai_->metalDetected(), now);[m
+ [m
+[31m-	// Feedforward sweep owns the drivetrain: bail out before the settle-delay[m
+[31m-	// stopImmediate(), the AI dispatch and driveCurrentMode(), so motorStepControl's[m
+[31m-	// open-loop command is the only thing writing the wheels. Two callers per tick[m
+[31m-	// would fight through MotorDriver's direction-change guard and the measurement[m
+[31m-	// would be of neither one. See kRunFeedforwardTest.[m
+[31m-	if (kRunFeedforwardTest){[m
+[31m-		return;[m
+[31m-	}[m
+[31m-[m
+ 	if (now < action_settle_until_us_){[m
+ 		motor_controller_->stopImmediate();[m
+ 		if (debug_print_now_){[m
+[36m@@ -591,93 +533,29 @@[m [mvoid MrKrabs::driveCurrentMode()[m
+ 	}[m
+ }[m
+ [m
+[31m-// Metal-detected indicator. Deliberately writes NO pin.[m
+[31m-//[m
+[31m-// It used to blink the DevKitM-1's onboard RGB LED via neopixelWrite([m
+[31m-// RGB_BUILTIN, ...), but RGB_BUILTIN is GPIO 48 on this variant and GPIO 48 is[m
+[31m-// WHEEL_LEFT_PWM_PIN_1 — the left wheel's reverse channel. neopixelWrite()[m
+[31m-// reconfigures the pin for RMT, taking it away from LEDC permanently, and[m
+[31m-// forward motion drives the left wheel negative (cos(150 deg) * vy) i.e.[m
+[31m-// through exactly that channel. So the first metal detection cost the left[m
+[31m-// wheel all its forward drive: measured left speed went to 0.000 m/s on the[m
+[31m-// bench at the first detection and never recovered.[m
+[31m-//[m
+[31m-// Give it a free GPIO and a digitalWrite if the indicator is wanted back.[m
+[31m-void MrKrabs::updateMetalDetectorLed(bool metal_detected, uint64_t now)[m
+[31m-{[m
+[31m-	(void)metal_detected;[m
+[31m-	(void)now;[m
+[32m+[m[32m// Blinks the DevKitM-1's onboard addressable RGB LED (GPIO48) red while[m
+[32m+[m[32m// metal is detected, off otherwise. RGB_BUILTIN/neopixelWrite come from the[m
+[32m+[m[32m// arduino-esp32 core itself (no NeoPixel library needed) — plain[m
+[32m+[m[32m// digitalWrite() can't drive a WS2812, hence the dedicated call.[m
+[32m+[m[32mnamespace {[m
+[32m+[m	[32mconstexpr uint64_t METAL_LED_BLINK_PERIOD_US = 200000; // 200 ms[m
+ }[m
+ [m
+[31m-void MrKrabs::stepFeedforwardTest(){[m
+[31m-	uint64_t now = esp_timer_get_time();[m
+[31m-[m
+[31m-	// First tick ever: open with a rest rather than falling into the[m
+[31m-	// "step finished" branch below, which would report a step that never ran —[m
+[31m-	// that's the all-zeros line with no step header at the top of the log.[m
+[31m-	if (feedforward_test_until_us_ == 0){[m
+[31m-		feedforward_test_resting_ = true;[m
+[31m-		feedforward_test_until_us_ = now + kFeedforwardRestUs;[m
+[31m-	}[m
+[31m-[m
+[31m-	if (now >= feedforward_test_until_us_){[m
+[31m-		if (feedforward_test_resting_){[m
+[31m-			// Rest over — start the next step.[m
+[31m-			feedforward_test_resting_ = false;[m
+[31m-			feedforward_test_until_us_ = now + kFeedforwardStepUs;[m
+[31m-			RobotVelocity v = kFeedforwardTestVelocities[feedforward_test_index_];[m
+[31m-			Serial.printf("\n[FF] step %u/%u: cmd(x=%.2f y=%.2f w=%.2f)\n",[m
+[31m-				(unsigned)feedforward_test_index_ + 1, (unsigned)kFeedforwardTestCount,[m
+[31m-				v.x, v.y, v.omega);[m
+[31m-		} else {[m
+[31m-			// Step over — report it, then rest before the next one. Measuring on[m
+[31m-			// the last tick of the step means the filter has had the whole step[m
+[31m-			// to settle.[m
+[31m-			RobotVelocity v = kFeedforwardTestVelocities[feedforward_test_index_];[m
+[31m-			WheelVelocities target = motor_controller_->euclideanToWheel(v);[m
+[31m-			WheelVelocities measured = motor_controller_->getCurrentWheelVelocities();[m
+[31m-[m
+[31m-			// K_implied = K * (commanded / measured), per wheel. Skipped where[m
+[31m-			// either side is ~0: a wheel that wasn't asked to turn says nothing[m
+[31m-			// about the gain, and a stalled one would divide by ~zero.[m
+[31m-			auto implied = [](double cmd, double meas, int k) -> double {[m
+[31m-				if (std::abs(cmd) < 0.01 || std::abs(meas) < 0.005) return 0.0;[m
+[31m-				return k * (cmd / meas);[m
+[31m-			};[m
+[31m-			// pwm is what actually reached MotorDriver (pre-deadzone/offset/clamp)[m
+[31m-			// and pend is its direction-change guard. Together they separate the[m
+[31m-			// three ways a wheel can read 0.000: never commanded (pwm 0), commanded[m
+[31m-			// but held off by the guard (pend set), or commanded and driven yet not[m
+[31m-			// turning — only the last is mechanical.[m
+[31m-			WheelVelocities pwm = motor_controller_->getLastCommandedPwm();[m
+[31m-			int pend = motor_controller_->directionChangePendingMask();[m
+[31m-			Serial.printf("[FF] target(L=%.3f R=%.3f B=%.3f) measured(L=%.3f R=%.3f B=%.3f)\n",[m
+[31m-				target.wheel_left, target.wheel_right, target.wheel_back,[m
+[31m-				measured.wheel_left, measured.wheel_right, measured.wheel_back);[m
+[31m-			WheelVelocities duty = motor_controller_->getLastDutyCycles();[m
+[31m-			Serial.printf("[FF] pwm_req(L=%.0f R=%.0f B=%.0f) duty_written(L=%.0f R=%.0f B=%.0f) guard_pending(L=%d R=%d B=%d)\n",[m
+[31m-				pwm.wheel_left, pwm.wheel_right, pwm.wheel_back,[m
+[31m-				duty.wheel_left, duty.wheel_right, duty.wheel_back,[m
+[31m-				(pend & 1) ? 1 : 0, (pend & 2) ? 1 : 0, (pend & 4) ? 1 : 0);[m
+[31m-			Serial.printf("[FF] implied VELOCITY_TO_PWM: L=%.0f R=%.0f B=%.0f  (currently %d; 0 = not measurable)\n",[m
+[31m-				implied(target.wheel_left, measured.wheel_left, VELOCITY_TO_PWM),[m
+[31m-				implied(target.wheel_right, measured.wheel_right, VELOCITY_TO_PWM),[m
+[31m-				implied(target.wheel_back, measured.wheel_back, VELOCITY_TO_PWM),[m
+[31m-				VELOCITY_TO_PWM);[m
+[31m-[m
+[31m-			feedforward_test_index_ = (feedforward_test_index_ + 1) % kFeedforwardTestCount;[m
+[31m-			feedforward_test_resting_ = true;[m
+[31m-			feedforward_test_until_us_ = now + kFeedforwardRestUs;[m
+[32m+[m[32mvoid MrKrabs::updateMetalDetectorLed(bool metal_detected, uint64_t now)[m
+[32m+[m[32m{[m
+[32m+[m	[32mif (!metal_detected){[m
+[32m+[m		[32mif (metal_led_on_){[m
+[32m+[m			[32mneopixelWrite(RGB_BUILTIN, 0, 0, 0);[m
+[32m+[m			[32mmetal_led_on_ = false;[m
+ 		}[m
+[32m+[m		[32mreturn;[m
+ 	}[m
+ [m
+[31m-	if (feedforward_test_resting_){[m
+[31m-		motor_controller_->stopImmediate();[m
+[31m-		return;[m
+[32m+[m	[32mif (now - metal_led_last_toggle_us_ >= METAL_LED_BLINK_PERIOD_US){[m
+[32m+[m		[32mmetal_led_on_ = !metal_led_on_;[m
+[32m+[m		[32mneopixelWrite(RGB_BUILTIN, metal_led_on_ ? 255 : 0, 0, 0);[m
+[32m+[m		[32mmetal_led_last_toggle_us_ = now;[m
+ 	}[m
+[31m-	// Re-issued every tick: driveOpenLoop writes PWM directly, and this is the[m
+[31m-	// only thing writing it while the test runs.[m
+[31m-	motor_controller_->driveOpenLoop(kFeedforwardTestVelocities[feedforward_test_index_]);[m
+ }[m
+ [m
+ void MrKrabs::motorStepControl(){[m
+[36m@@ -690,16 +568,6 @@[m [mvoid MrKrabs::motorStepControl(){[m
+ 	// (startRotation(), startBackingUp()), so accumulation during modes that[m
+ 	// don't care doesn't leak into a later distance check.[m
+ 	motor_controller_->updateTranslationTracking();[m
+[31m-[m
+[31m-	// The feedforward sweep replaces the closed-loop path entirely — the whole[m
+[31m-	// point is to see what the feedforward alone produces, with no PID correcting[m
+[31m-	// it. tickMotorSpeeds() above still runs, so the measurement it prints is[m
+[31m-	// live. See kRunFeedforwardTest.[m
+[31m-	if (kRunFeedforwardTest){[m
+[31m-		stepFeedforwardTest();[m
+[31m-		return;[m
+[31m-	}[m
+[31m-[m
+ 	motor_controller_->applyVelocity();[m
+ }[m
+ [m
+[1mdiff --git a/esp-32/src/mr_krabs.h b/esp-32/src/mr_krabs.h[m
+[1mindex 8cf19fe..ab5f131 100644[m
+[1m--- a/esp-32/src/mr_krabs.h[m
+[1m+++ b/esp-32/src/mr_krabs.h[m
+[36m@@ -130,20 +130,6 @@[m [mprivate:[m
+ 	void stepControl();[m
+ 	void motorStepControl();[m
+ [m
+[31m-	// One tick of the feedforward calibration sweep (kRunFeedforwardTest in[m
+[31m-	// mr_krabs.cpp): advances the step schedule, issues the open-loop command,[m
+[31m-	// and prints commanded vs measured wheel speed with the implied[m
+[31m-	// VELOCITY_TO_PWM. Called from motorStepControl() in place of[m
+[31m-	// applyVelocity(), so nothing closed-loop touches the wheels while it runs.[m
+[31m-	void stepFeedforwardTest();[m
+[31m-[m
+[31m-	// Index into kFeedforwardTestVelocities, and the esp_timer_get_time()[m
+[31m-	// deadline for the current phase. feedforward_test_resting_ alternates the[m
+[31m-	// schedule between a driven step and the stop between steps.[m
+[31m-	size_t feedforward_test_index_ = 0;[m
+[31m-	uint64_t feedforward_test_until_us_ = 0;[m
+[31m-	bool feedforward_test_resting_ = false;[m
+[31m-[m
+ 	// Dispatches one teleop command character (numpad 1-9 + o/p) read from[m
+ 	// Serial. Enters teleop mode (taking priority over AI/line-following/[m
+ 	// rotation in stepControl) and refreshes that key's "held" timer — see[m

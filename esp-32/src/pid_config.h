@@ -9,21 +9,21 @@
 // gains — the three motors don't respond identically, so tune independently
 // on hardware.
 #include "constants.h"
-static constexpr double WHEEL_LEFT_PID_P = 1;
-static constexpr double WHEEL_LEFT_PID_I = 1.5;
+static constexpr double WHEEL_LEFT_PID_P = 0.3;
+static constexpr double WHEEL_LEFT_PID_I = 0.1;
 static constexpr double WHEEL_LEFT_PID_D = 0.1;
-static constexpr double WHEEL_LEFT_PID_MAX_I = 20;
+static constexpr double WHEEL_LEFT_PID_MAX_I = 2;
 
-static constexpr double WHEEL_RIGHT_PID_P =1;
-static constexpr double WHEEL_RIGHT_PID_I = 1.5;
-static constexpr double WHEEL_RIGHT_PID_D = 0.1;
-static constexpr double WHEEL_RIGHT_PID_MAX_I = 20;
+static constexpr double WHEEL_RIGHT_PID_P =0.3;
+static constexpr double WHEEL_RIGHT_PID_I =0.1;
+static constexpr double WHEEL_RIGHT_PID_D =0.1;
+static constexpr double WHEEL_RIGHT_PID_MAX_I = 2;
 
 // the back wheel oscillates/overshoots.
-static constexpr double WHEEL_BACK_PID_P = 1;
-static constexpr double WHEEL_BACK_PID_I = 1.5;
+static constexpr double WHEEL_BACK_PID_P = 0.3;
+static constexpr double WHEEL_BACK_PID_I = 0.1;
 static constexpr double WHEEL_BACK_PID_D = 0.1;
-static constexpr double WHEEL_BACK_PID_MAX_I = 20;
+static constexpr double WHEEL_BACK_PID_MAX_I = 2;
 
 // Converts a wheel velocity (m/s) into a PWM duty magnitude for
 // MotorDriver::set_velocity (which expects commanded PWM, not m/s — see

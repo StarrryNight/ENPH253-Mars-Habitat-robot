@@ -174,11 +174,6 @@ private:
 	// telling AI to apply the arm pose.
 	void driveCurrentMode();
 
-	// Blinks the onboard RGB LED red while metal_detected is true, off
-	// otherwise. now is esp_timer_get_time(), passed in rather than read
-	// again so it matches the rest of stepControl()'s timing this tick.
-	void updateMetalDetectorLed(bool metal_detected, uint64_t now);
-
 	// Which drive-mechanism action the loop is currently executing. AI decides
 	// which one is wanted (AI::desiredDriveMode()); rotating is not tracked
 	// separately — it's just the drivetrain's role while APPLYING_SEQUENCE, on
@@ -248,12 +243,6 @@ private:
 	// and read by driveCurrentMode() so its per-mode debug print fires on the
 	// same tick as the general one, without re-checking the clock.
 	bool debug_print_now_;
-
-	// State for updateMetalDetectorLed()'s blink: whether the onboard RGB LED
-	// is currently lit, and the esp_timer_get_time() timestamp it last
-	// toggled at.
-	bool metal_led_on_ = false;
-	uint64_t metal_led_last_toggle_us_ = 0;
 
 	// Held in optionals so the global MrKrabs object is safe to construct before
 	// Arduino init. setup() emplaces them once hardware is ready.
