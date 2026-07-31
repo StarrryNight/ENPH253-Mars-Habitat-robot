@@ -31,11 +31,11 @@ MotorDriver::MotorDriver(int wheel_number, int pwm_channel_0, int pwm_channel_1,
 	  buffer_filled_count_(0),
 	  last_delta_count_(0)
 {
-	ledcSetup(pwm_channel_0_, 1000, 8);
+	ledcSetup(pwm_channel_0_, 100, 8);
 	ledcAttachPin(pwm_pin_0_, pwm_channel_0_);
 	ledcWrite(pwm_channel_0_, 0);
 
-	ledcSetup(pwm_channel_1_, 1000, 8);
+	ledcSetup(pwm_channel_1_, 100, 8);
 	ledcAttachPin(pwm_pin_1_, pwm_channel_1_);
 	ledcWrite(pwm_channel_1_, 0);
 

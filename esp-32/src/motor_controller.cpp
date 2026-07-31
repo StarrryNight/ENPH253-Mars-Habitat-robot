@@ -86,18 +86,18 @@ void MotorController::applyVelocity()
 	// forces that from-stop jump through the H-bridge coast/dead-time guard.
 	// PID error is in m/s; multiply output by VELOCITY_TO_PWM to get PWM counts.
 int wheel_left_pwm = static_cast<int>(
-    target_wheel_velocity.wheel_left * VELOCITY_TO_PWM +
-    wheel_left_pid_.step(target_wheel_velocity.wheel_left - current_wheel_velocities_.wheel_left, delta_t)
+    (target_wheel_velocity.wheel_left   +
+    wheel_left_pid_.step(target_wheel_velocity.wheel_left - current_wheel_velocities_.wheel_left, delta_t))*VELOCITY_TO_PWM
 );
 
 int wheel_right_pwm = static_cast<int>(
-    target_wheel_velocity.wheel_right * VELOCITY_TO_PWM +
-    wheel_right_pid_.step(target_wheel_velocity.wheel_right - current_wheel_velocities_.wheel_right, delta_t)
+    (target_wheel_velocity.wheel_right  +
+    wheel_right_pid_.step(target_wheel_velocity.wheel_right - current_wheel_velocities_.wheel_right, delta_t))*VELOCITY_TO_PWM
 );
 
 int wheel_back_pwm = static_cast<int>(
-    target_wheel_velocity.wheel_back * WHEEL_BACK_VELOCITY_TO_PWM +
-    wheel_back_pid_.step(target_wheel_velocity.wheel_back - current_wheel_velocities_.wheel_back, delta_t)
+    (target_wheel_velocity.wheel_back +
+    wheel_back_pid_.step(target_wheel_velocity.wheel_back - current_wheel_velocities_.wheel_back, delta_t))*VELOCITY_TO_PWM
 );
 
 	wheel_left_motor_->set_velocity(wheel_left_pwm);
@@ -119,7 +119,7 @@ void MotorController::driveOpenLoop(RobotVelocity v)
 	WheelVelocities target = euclideanToWheel(v);
 	wheel_left_motor_->set_velocity(target.wheel_left  * VELOCITY_TO_PWM);
 	wheel_right_motor_->set_velocity(target.wheel_right * VELOCITY_TO_PWM);
-	wheel_back_motor_->set_velocity(target.wheel_back  * WHEEL_BACK_VELOCITY_TO_PWM);
+	wheel_back_motor_->set_velocity(target.wheel_back  * VELOCITY_TO_PWM);
 
 }
 

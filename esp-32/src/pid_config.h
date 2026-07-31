@@ -10,33 +10,26 @@
 // gains — the three motors don't respond identically, so tune independently
 // on hardware.
 #include "constants.h"
-static constexpr double WHEEL_LEFT_PID_P = 250;
-static constexpr double WHEEL_LEFT_PID_I = 150;
-static constexpr double WHEEL_LEFT_PID_D = 1.0;
-static constexpr double WHEEL_LEFT_PID_MAX_I = 2000;
+static constexpr double WHEEL_LEFT_PID_P = 1;
+static constexpr double WHEEL_LEFT_PID_I = 1.5;
+static constexpr double WHEEL_LEFT_PID_D = 0.1;
+static constexpr double WHEEL_LEFT_PID_MAX_I = 20;
 
-static constexpr double WHEEL_RIGHT_PID_P = 250;
-static constexpr double WHEEL_RIGHT_PID_I = 150;
-static constexpr double WHEEL_RIGHT_PID_D = 1.0;
-static constexpr double WHEEL_RIGHT_PID_MAX_I = 2000;
+static constexpr double WHEEL_RIGHT_PID_P =1;
+static constexpr double WHEEL_RIGHT_PID_I = 1.5;
+static constexpr double WHEEL_RIGHT_PID_D = 0.1;
+static constexpr double WHEEL_RIGHT_PID_MAX_I = 20;
 
 // the back wheel oscillates/overshoots.
-static constexpr double WHEEL_BACK_PID_P = 250;
-static constexpr double WHEEL_BACK_PID_I = 150;
-static constexpr double WHEEL_BACK_PID_D = 1.0;
-static constexpr double WHEEL_BACK_PID_MAX_I = 2000;
+static constexpr double WHEEL_BACK_PID_P = 1;
+static constexpr double WHEEL_BACK_PID_I = 1.5;
+static constexpr double WHEEL_BACK_PID_D = 0.1;
+static constexpr double WHEEL_BACK_PID_MAX_I = 20;
 
 // Converts a wheel velocity (m/s) into a PWM duty magnitude for
 // MotorDriver::set_velocity (which expects commanded PWM, not m/s — see
 // MOTOR_SPEED_DEADZONE). Placeholder — tune against real wheel speed on hardware.
-static constexpr int VELOCITY_TO_PWM = 250;
-
-// Back-wheel-specific feedforward override — see WHEEL_BACK_PID_* above for
-// why this wheel needs more PWM per unit commanded velocity than the front
-// two. Used in place of VELOCITY_TO_PWM for the back wheel only, so the PID
-// trim has less steady-state error to make up to begin with. Starting point
-// (30% over VELOCITY_TO_PWM) — tune against real back-wheel speed on hardware.
-static constexpr int WHEEL_BACK_VELOCITY_TO_PWM = 250;
+static constexpr int VELOCITY_TO_PWM = 150;
 
 // Per-wheel static PWM offset, added to the duty of every nonzero command for
 // that motor (MotorDriver::speedToDutyCycle, passed in via the constructor).
@@ -47,9 +40,9 @@ static constexpr int WHEEL_BACK_VELOCITY_TO_PWM = 250;
 // exceeds (255 - offset), so at 350 and an offset of 60 the ceiling is
 // 0.557 m/s. Values below are the ones tuned on hardware; 60 is where all three
 // sat when this was one hardcoded number.
-static constexpr int WHEEL_LEFT_PWM_OFFSET = 70;
-static constexpr int WHEEL_RIGHT_PWM_OFFSET =60;
-static constexpr int WHEEL_BACK_PWM_OFFSET = 65;
+static constexpr int WHEEL_LEFT_PWM_OFFSET = 30;
+static constexpr int WHEEL_RIGHT_PWM_OFFSET =25;
+static constexpr int WHEEL_BACK_PWM_OFFSET = 25;
 
 // Orientation (rotate-to-angle) PID (OrientationController). Error in radians.
 static constexpr double ORIENTATION_PID_P = FORWARD_SPEED*5;
