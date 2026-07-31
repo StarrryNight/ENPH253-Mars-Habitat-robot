@@ -19,6 +19,12 @@ enum class RobotState {
 	// METAL_DETECTING's probe pose 0), then closes the claw, retracts, and
 	// places the rock. See AI::tickPickupRock.
 	PICKUP_ROCK,
+	// Plain line-following: drives the line at FORWARD_SPEED and never
+	// transitions out of itself. No marker watching, no distance trigger. This
+	// is where the rock phase currently ends up, standing in for
+	// HABITAT_LINE_FOLLOWING while the habitat states are held back.
+	// See AI::tickLineFollowing.
+	LINE_FOLLOWING,
 	// Line-following leg that ends at the habitat: the only line-following state
 	// watching for the habitat marker's perpendicular strip (both side sensors
 	// -> HABITAT_APPROACH_BACKUP, one side sensor -> HABITAT_SQUARE_UP). Named
@@ -38,6 +44,18 @@ enum class RobotState {
 	// (or, for HABITAT_PICKUP/HABITAT_PLACE, not rotating at all) can leave
 	// the robot facing off the line. See AI::tickReacquiringLine.
 	REACQUIRING_LINE,
+	// The rock path's return to the line, used in place of REACQUIRING_LINE
+	// after ROTATING_TIL_ROCK/METAL_DETECTING/PICKUP_ROCK. Two differences, both
+	// because the robot is already off the line when this starts — it rotated
+	// away from it to face the rock:
+	//   * no fixed initial turn. REACQUIRING_LINE's blind 45° exists to carry
+	//     the sensors clear of a line the robot may still be sitting on; here
+	//     that has already happened, so the sensors are watched from tick one
+	//     and the sweep stops as soon as the line comes back.
+	//   * direction is the reverse of the rock search spin, so it retraces that
+	//     rotation rather than continuing away from the line.
+	// See AI::tickRockReacquireLine and MrKrabs::startRockSearchingForLine.
+	ROCK_REACQUIRE_LINE,
 	// Like REACQUIRING_LINE, but the direction is forced clockwise instead of
 	// derived from last_rotation_sign_ — first rotates a fixed 30° clockwise,
 	// then continues spinning clockwise (reactive, no fixed target) until
@@ -78,7 +96,7 @@ enum class RobotState {
 	DONE,
 };
 
-static constexpr size_t kNumRobotStates = 18;
+static constexpr size_t kNumRobotStates = 20;
 
 // Debug/serial-print helper — not used by any control-flow logic.
 inline const char* robotStateName(RobotState s) {
@@ -88,11 +106,13 @@ inline const char* robotStateName(RobotState s) {
 		case RobotState::METAL_DETECTING: return "METAL_DETECTING";
 		case RobotState::TELETUBBYING: return "TELETUBBYING";
 		case RobotState::PICKUP_ROCK: return "PICKUP_ROCK";
+		case RobotState::LINE_FOLLOWING: return "LINE_FOLLOWING";
 		case RobotState::HABITAT_LINE_FOLLOWING: return "HABITAT_LINE_FOLLOWING";
 		case RobotState::HABITAT_PICKUP: return "HABITAT_PICKUP";
 		case RobotState::LINE_FOLLOWING_REVERSE: return "LINE_FOLLOWING_REVERSE";
 		case RobotState::HABITAT_PLACE: return "HABITAT_PLACE";
 		case RobotState::REACQUIRING_LINE: return "REACQUIRING_LINE";
+		case RobotState::ROCK_REACQUIRE_LINE: return "ROCK_REACQUIRE_LINE";
 		case RobotState::REVERSE_180: return "REVERSE_180";
 		case RobotState::HABITAT_SQUARE_UP: return "HABITAT_SQUARE_UP";
 		case RobotState::HABITAT_APPROACH_BACKUP: return "HABITAT_APPROACH_BACKUP";

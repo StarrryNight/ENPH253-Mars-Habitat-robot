@@ -367,6 +367,7 @@ bool MrKrabs::handleDriveTransition()
 			case AI::DriveMode::LINE_FOLLOWING: startLineFollowing(); break;
 			case AI::DriveMode::APPLYING_SEQUENCE: startRotation(ai_->targetRotationDegrees() * DEG_TO_RAD); break;
 			case AI::DriveMode::SEARCHING_FOR_LINE: startSearchingForLine(); break;
+			case AI::DriveMode::ROCK_SEARCHING_FOR_LINE: startRockSearchingForLine(); break;
 			case AI::DriveMode::IDLE: startIdle(); break;
 			case AI::DriveMode::ROTATING_TIL_ROCK: startRotatingTilRock(); break;
 			case AI::DriveMode::SQUARING_UP: startSquaringUp(); break;
@@ -430,6 +431,10 @@ void MrKrabs::driveCurrentMode()
 		// Identical drive behavior — the two modes differ only in the
 		// direction/initial angle latched by their start*() functions.
 		case AI::DriveMode::REVERSE_180:
+		// ROCK_SEARCHING_FOR_LINE rides the same case: startRockSearchingForLine()
+		// pre-sets line_search_initial_turn_done_, so the fixed-turn branch below is
+		// skipped and it drops straight into the reactive spin.
+		case AI::DriveMode::ROCK_SEARCHING_FOR_LINE:
 		case AI::DriveMode::SEARCHING_FOR_LINE: {
 			if (!line_search_initial_turn_done_){
 				// Fixed initial turn first, same direction as the reactive spin
@@ -611,8 +616,11 @@ void MrKrabs::startSearchingForLine()
 	drive_mode_ = AI::DriveMode::SEARCHING_FOR_LINE;
 	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
 	motor_controller_->startRotation();
-	// Sweep back the way we came: opposite sign of the last real rotation.
-	search_omega_rad_s_ = -last_rotation_sign_ * LINE_SEARCH_OMEGA_RAD_S;
+	// Sweep back the way we came: opposite sign of the last real rotation —
+	// unless AI asks to carry on in the same direction instead (the hand-off out
+	// of HABITAT_PLACE; see AI::lineSearchContinuesLastRotation).
+	double search_sign = ai_->lineSearchContinuesLastRotation() ? last_rotation_sign_ : -last_rotation_sign_;
+	search_omega_rad_s_ = search_sign * LINE_SEARCH_OMEGA_RAD_S;
 	// Fixed 45° turn first (same direction as search_omega_rad_s_), then
 	// driveCurrentMode() falls back to the reactive continuous spin — see
 	// its SEARCHING_FOR_LINE case.
@@ -645,6 +653,25 @@ void MrKrabs::startReverse180()
 	orientation_controller_.startRotation(-REVERSE_180_INITIAL_TURN_DEG * DEG_TO_RAD);
 	last_rotation_sign_ = -1.0;
 	Serial.printf("[MrKrabs] startReverse180, omega=%.2f\n", search_omega_rad_s_);
+}
+
+void MrKrabs::startRockSearchingForLine()
+{
+	motor_controller_->stopImmediate();
+	drive_mode_ = AI::DriveMode::ROCK_SEARCHING_FOR_LINE;
+	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	motor_controller_->startRotation();
+	// Retrace the rock search: opposite the spin that turned us off the line.
+	search_omega_rad_s_ = -last_rotation_sign_ * LINE_SEARCH_OMEGA_RAD_S;
+	// Declare the fixed initial turn already done, on both sides. That is what
+	// makes this differ from startSearchingForLine(): driveCurrentMode()'s shared
+	// case skips straight to the reactive spin, and AI::tickRockReacquireLine
+	// watches the sensors from the first tick instead of waiting out a blind 45
+	// degrees the robot doesn't need here.
+	line_search_initial_turn_done_ = true;
+	ai_->setLineSearchInitialTurnDone(true);
+	Serial.printf("[MrKrabs] startRockSearchingForLine, last_rotation_sign=%.0f omega=%.2f\n",
+		last_rotation_sign_, search_omega_rad_s_);
 }
 
 void MrKrabs::startRotatingTilRock()

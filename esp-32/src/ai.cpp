@@ -26,10 +26,10 @@ namespace {
 		double rotation_degrees;
 	};
 	constexpr std::array<RockCheckpoint, kNumRocks> kRockCheckpoints = {{
-		{0.27, -47.0},
-		{0.41, 48.0},
-		{0.20, -45.0},
-		{0.42, -45.0},
+		{0.45, -47.0},
+		{0.7, 48.0},
+		{0.25, -45.0},
+		{0.55, -45.0},
 	}};
 
 	// Distance (m) into LINE_FOLLOWING's Nth visit at which the habitat is
@@ -59,15 +59,15 @@ namespace {
 
 	// Sonar range (cm) that counts as "found the rock" — see
 	// AI::tickRotatingTilRock. Placeholder pending hardware tuning.
-	constexpr double kRockSonarMinCm = 7.0;
-	constexpr double kRockSonarMaxCm = 20.0;
+	constexpr double kRockSonarMinCm = 5.0;
+	constexpr double kRockSonarMaxCm = 18.0;
 	// Sonar-to-arm-origin mounting offset (m), ported from the mr_krabs.cpp
 	// bench test that originally worked out this value on hardware.
 	constexpr double kSonarMountOffsetM = 0.18054;
 	// Same magnitude as LINE_SEARCH_OMEGA_RAD_S (mr_krabs.h) — kept as a
 	// separate constant since rock-search and line-search are independent
 	// bench-tuning knobs.
-	constexpr double kRockSearchOmegaRadS = 1.3;
+	constexpr double kRockSearchOmegaRadS = 0.9;
 	// Minimum time (us) the sonar must stay continuously in range before
 	// ROTATING_TIL_ROCK commits to "found the rock". Without this, a single
 	// spurious close-range reading (ultrasonic noise/reflections are common
@@ -75,7 +75,22 @@ namespace {
 	// the very first tick after the entry settle delay — before
 	// MrKrabs::driveCurrentMode() ever issues a single rotate command, so
 	// the robot appears to sit still in ROTATING_TIL_ROCK.
-	constexpr uint64_t kRockSonarConfirmDelayUs = 20000; // 0.025 s
+	constexpr uint64_t kRockSonarConfirmDelayUs = 38000; // 0.025 s
+
+	// How many poses from the front of kPickupRockXYSequence belong to
+	// METAL_DETECTING rather than PICKUP_ROCK. The runner is shared across both
+	// states — it isn't restarted on the hand-off — so this is the split point:
+	// the probe applies poses [0, kMetalProbePoseCount) and then holds, and
+	// PICKUP_ROCK resumes from wherever that left the index.
+	constexpr size_t kMetalProbePoseCount = 2;
+
+	// How long (us) METAL_DETECTING holds the probe pose waiting for the metal
+	// detector before deciding this rock isn't metal and moving on. Measured
+	// from when the probe pose is actually applied, not from entering the state,
+	// so the arm's travel time doesn't eat the window. Long enough for the
+	// detector to settle over the target, short enough that a non-metal rock
+	// doesn't cost the run much — every rock checkpoint pays this.
+	constexpr uint64_t kMetalProbeTimeoutUs = 500000; // 2 s
 
 	// Grace window, in control ticks, granted to the second side sensor after the
 	// first one reads the habitat strip. Only if it hasn't come on by then does
@@ -115,7 +130,7 @@ AI::AI():
 	// habitat pickup/place cycle in isolation, instead of the real
 	// FINDING_ROCK entry point. Flip back to RobotState::FINDING_ROCK to
 	// restore the real competition flow.
-	current_state_(RobotState::HABITAT_LINE_FOLLOWING),
+	current_state_(RobotState::FINDING_ROCK),
 	current_state_progress_m_(0),
 	post_reacquire_state_(RobotState::HABITAT_LINE_FOLLOWING)
 {
@@ -128,7 +143,7 @@ AI::AI():
 	state_visit_count_[idx(current_state_)] = 1;
 	xy_sequence_runner_.start(kHabitatPickupXYSequence, 0.0);
 	pinMode(TELETUBBY_LED, OUTPUT);
-	digitalWrite(TELETUBBY_LED, HIGH);
+	digitalWrite(TELETUBBY_LED, LOW);
 }
 
 void AI::setArm(Arm* arm){
@@ -151,6 +166,10 @@ void AI::setLineSearchInitialTurnDone(bool done){
 	line_search_initial_turn_done_ = done;
 }
 
+bool AI::lineSearchContinuesLastRotation() const{
+	return line_search_continues_last_rotation_;
+}
+
 void AI::notifyTeletubbyDetected(){
 	if (current_state_ == RobotState::METAL_DETECTING && visits(RobotState::TELETUBBYING) < kMaxTeletubbies){
 		teletubby_detected_ = true;
@@ -170,6 +189,13 @@ void AI::transitionTo(RobotState next){
 		// wherever this left off.
 		xy_sequence_runner_.start(kPickupRockXYSequence, cached_rock_sonar_x_m_);
 		metal_probe_pose_applied_ = false;
+		metal_probe_started_us_ = 0;
+	} else if (next == RobotState::PICKUP_ROCK){
+		// Entered only from a confirmed metal hit (tickMetalDetecting, or
+		// tickTeletubbying re-checking after the wave), so this is the one place
+		// that knows a rock is being collected. Latching here rather than in the
+		// tick functions covers both entries with one line.
+		rock_picked_up_ = true;
 	} else if (next == RobotState::HABITAT_PICKUP){
 		xy_sequence_runner_.start(kHabitatPickupXYSequence, 0.0);
 	} else if (next == RobotState::HABITAT_PLACE){
@@ -207,12 +233,14 @@ void AI::tickAI(){
 RobotState AI::tickCurrentState(){
 	switch (current_state_){
 		case RobotState::REACQUIRING_LINE: return tickReacquiringLine();
+		case RobotState::ROCK_REACQUIRE_LINE: return tickRockReacquireLine();
 		case RobotState::REVERSE_180: return tickReverse180();
 		case RobotState::FINDING_ROCK: return tickFindingRock();
 		case RobotState::ROTATING_TIL_ROCK: return tickRotatingTilRock();
 		case RobotState::METAL_DETECTING: return tickMetalDetecting();
 		case RobotState::TELETUBBYING: return tickTeletubbying();
 		case RobotState::PICKUP_ROCK: return tickPickupRock();
+		case RobotState::LINE_FOLLOWING: return tickLineFollowing();
 		case RobotState::HABITAT_LINE_FOLLOWING: return tickHabitatLineFollowing();
 		case RobotState::HABITAT_PICKUP: return tickHabitatPickup();
 		case RobotState::LINE_FOLLOWING_REVERSE: return tickLineFollowingReverse();
@@ -259,16 +287,43 @@ RobotState AI::tickReverse180(){
 }
 
 RobotState AI::nextRockOrDone(){
-	post_reacquire_state_ = visits(RobotState::FINDING_ROCK) >= kNumRocks
-		? RobotState::HABITAT_LINE_FOLLOWING
+	// A collected rock ends the rock phase, as does running out of checkpoints.
+	// Both hand to plain LINE_FOLLOWING rather than HABITAT_LINE_FOLLOWING: the
+	// habitat states are deliberately not entered for now, so the robot just
+	// keeps driving the line. Point this back at HABITAT_LINE_FOLLOWING to
+	// re-enable the habitat phase.
+	post_reacquire_state_ = (rock_picked_up_ || visits(RobotState::FINDING_ROCK) >= kNumRocks)
+		? RobotState::LINE_FOLLOWING
 		: RobotState::FINDING_ROCK;
-	return RobotState::REACQUIRING_LINE;
+	// Rock path: retrace the search spin, no blind initial turn.
+	line_search_continues_last_rotation_ = false;
+	return RobotState::ROCK_REACQUIRE_LINE;
+}
+
+RobotState AI::tickRockReacquireLine(){
+	// No line_search_initial_turn_done_ gate, unlike tickReacquiringLine: the
+	// rock search already rotated the robot off the line, so there is no line
+	// under the sensors to clear first and nothing to protect against. Watch from
+	// the first tick and stop the moment the line comes back, which keeps the
+	// overshoot past it to whatever one control tick of rotation covers.
+	if (!line_follower_ || !line_follower_->bothMidSensorsOnLine()){
+		return RobotState::ROCK_REACQUIRE_LINE;
+	}
+	return post_reacquire_state_;
 }
 
 RobotState AI::tickFindingRock(){
+	// Already carrying a rock: don't stop for any further checkpoint, just keep
+	// line-following at the same speed (both states drive
+	// DriveMode::LINE_FOLLOWING at FORWARD_SPEED).
+	if (rock_picked_up_){
+		return RobotState::LINE_FOLLOWING;
+	}
 	int n = visits(RobotState::FINDING_ROCK); // 1-based
 	if (n > kNumRocks){
-		return RobotState::HABITAT_LINE_FOLLOWING;
+		// Out of checkpoints — same destination as a successful pickup while the
+		// habitat states are held back (see nextRockOrDone).
+		return RobotState::LINE_FOLLOWING;
 	}
 	if (current_state_progress_m_ >= kRockCheckpoints[n - 1].trigger_progress_m){
 		return RobotState::ROTATING_TIL_ROCK;
@@ -303,16 +358,48 @@ RobotState AI::tickRotatingTilRock(){
 }
 
 RobotState AI::tickMetalDetecting(){
-	// Bench-test override: go straight to PICKUP_ROCK regardless of the
-	// metal detector reading, so the grab sequence can be exercised without
-	// a working/present metal hit. Teletubby still takes priority since it'sH
-	// an explicit RPi report, not a sensor poll.
+	// Teletubby takes priority over the sensor poll below: it's an explicit RPi
+	// report rather than something we're measuring, and it's only valid while
+	// we're sat here at the rock.
 	if (teletubby_detected_){
-		digitalWrite(TELETUBBY_LED,  HIGH);
 		teletubby_detected_ = false;
 		return RobotState::TELETUBBYING;
 	}
-	return RobotState::PICKUP_ROCK;
+	// Nothing to read until the probe pose is actually on the rock — the arm is
+	// still travelling out until onRotationReached() writes it (see
+	// metal_probe_pose_applied_).
+	if (!metal_probe_pose_applied_){
+		return RobotState::METAL_DETECTING;
+	}
+	uint64_t now = esp_timer_get_time();
+	if (metal_probe_started_us_ == 0){
+		// Probe pose just landed. Start the window here, and drop any latched
+		// detection so the verdict comes from this rock rather than from a hit
+		// still held over from the last one (the latch runs 5 s — see
+		// MetalDetector::clear).
+		metal_probe_started_us_ = now;
+		metal_detector_.clear();
+		return RobotState::METAL_DETECTING;
+	}
+	if (metal_detector_.getMetalDetectorState()){
+		Serial.printf("[AI] metal detected after %.0f ms, picking up\n",
+			(now - metal_probe_started_us_) / 1000.0);
+		digitalWrite(TELETUBBY_LED, HIGH);
+		return RobotState::PICKUP_ROCK;
+	}
+	if (now - metal_probe_started_us_ >= kMetalProbeTimeoutUs){
+		// Not metal. Leave the rock where it is and carry on to the next
+		// checkpoint. The arm is still extended in the probe pose and the
+		// pickup sequence is abandoned mid-run, so retract before the
+		// REACQUIRING_LINE spin that nextRockOrDone() hands off to.
+		Serial.printf("[AI] no metal after %d ms, skipping this rock\n",
+			static_cast<int>(kMetalProbeTimeoutUs / 1000));
+		if (arm_){
+			arm_->setPose(kArmHomePose);
+		}
+		return nextRockOrDone();
+	}
+	return RobotState::METAL_DETECTING;
 }
 
 RobotState AI::tickTeletubbying(){
@@ -333,6 +420,14 @@ RobotState AI::tickPickupRock(){
 		return RobotState::PICKUP_ROCK;
 	}
 	return nextRockOrDone();
+}
+
+RobotState AI::tickLineFollowing(){
+	// Terminal by design: nothing here watches for a marker or a distance, so
+	// the robot just keeps following the line. desiredDriveMode() falls through
+	// to DriveMode::LINE_FOLLOWING for it (no sequenceForState entry), which
+	// drives FORWARD_SPEED with the usual photoresistor correction.
+	return RobotState::LINE_FOLLOWING;
 }
 
 RobotState AI::tickHabitatLineFollowing(){
@@ -502,10 +597,19 @@ RobotState AI::tickHabitatPlace(){
 	if (!xy_sequence_runner_.complete()){
 		return RobotState::HABITAT_PLACE;
 	}
-	// Bench-test loop: cycle HABITAT_PICKUP <-> HABITAT_PLACE forever
-	// instead of capping at kNumHabitatCycles and finishing.
-	post_reacquire_state_ = RobotState::LINE_FOLLOWING_REVERSE;
-	post_line_reverse_state_ = RobotState::HABITAT_PICKUP;
+	// Rock released. Sweep back to the line and line-follow the habitat approach
+	// again — which re-runs the whole find sequence (square-up, approach backup,
+	// the sonar strafe) rather than assuming the next slot is where this one
+	// was. That strafe is also what flips current_habitat_find_direction_ on the
+	// second slot, so the cycle has to pass back through HABITAT_FIND for the
+	// two-slot behaviour to happen at all — see tickHabitatFind.
+	post_reacquire_state_ = RobotState::HABITAT_LINE_FOLLOWING;
+	// Keep turning the way the place rotation already went, rather than
+	// reversing it as a search normally would. The place turn
+	// (kHabitatPlaceXYSequence::rotation_degrees) swung the robot off the line
+	// to face the slot; continuing that way carries it the long way round to
+	// meet the line again, which is the approach the next pickup wants.
+	line_search_continues_last_rotation_ = true;
 	return RobotState::REACQUIRING_LINE;
 }
 
@@ -515,6 +619,9 @@ AI::DriveMode AI::desiredDriveMode() const{
 	}
 	if (current_state_ == RobotState::REACQUIRING_LINE){
 		return DriveMode::SEARCHING_FOR_LINE;
+	}
+	if (current_state_ == RobotState::ROCK_REACQUIRE_LINE){
+		return DriveMode::ROCK_SEARCHING_FOR_LINE;
 	}
 	if (current_state_ == RobotState::REVERSE_180){
 		return DriveMode::REVERSE_180;
@@ -575,15 +682,21 @@ bool AI::onRotationReached(){
 		return false;
 	}
 	switch (current_state_){
-		case RobotState::METAL_DETECTING:
+		case RobotState::METAL_DETECTING: {
 			if (metal_probe_pose_applied_){
-				// Hold the probe pose until tickMetalDetecting() sees a hit
-				// and moves the state on — don't auto-advance to the next
-				// (retract) pose just because a settle window elapsed.
+				// Probe poses all applied — hold here until tickMetalDetecting()
+				// reaches a verdict and moves the state on. Without this the
+				// runner would keep advancing into PICKUP_ROCK's poses every time
+				// a settle window elapsed, grabbing before anything was decided.
 				return false;
 			}
-			metal_probe_pose_applied_ = xy_sequence_runner_.onRotationReached(*arm_);
-			return metal_probe_pose_applied_;
+			bool wrote = xy_sequence_runner_.onRotationReached(*arm_);
+			// Flag flips only once the whole probe group has gone out, so the
+			// detector window in tickMetalDetecting() starts after the LAST probe
+			// pose rather than the first.
+			metal_probe_pose_applied_ = xy_sequence_runner_.currentIndex() >= kMetalProbePoseCount;
+			return wrote;
+		}
 		case RobotState::PICKUP_ROCK:
 		case RobotState::HABITAT_PICKUP:
 		case RobotState::HABITAT_PLACE:

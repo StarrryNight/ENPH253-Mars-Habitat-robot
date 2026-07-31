@@ -47,12 +47,12 @@ static constexpr int WHEEL_BACK_VELOCITY_TO_PWM = 250;
 // exceeds (255 - offset), so at 350 and an offset of 60 the ceiling is
 // 0.557 m/s. Values below are the ones tuned on hardware; 60 is where all three
 // sat when this was one hardcoded number.
-static constexpr int WHEEL_LEFT_PWM_OFFSET = 80;
-static constexpr int WHEEL_RIGHT_PWM_OFFSET = 90;
-static constexpr int WHEEL_BACK_PWM_OFFSET = 100;
+static constexpr int WHEEL_LEFT_PWM_OFFSET = 70;
+static constexpr int WHEEL_RIGHT_PWM_OFFSET =60;
+static constexpr int WHEEL_BACK_PWM_OFFSET = 65;
 
 // Orientation (rotate-to-angle) PID (OrientationController). Error in radians.
-static constexpr double ORIENTATION_PID_P = FORWARD_SPEED*4;
+static constexpr double ORIENTATION_PID_P = FORWARD_SPEED*5;
 static constexpr double ORIENTATION_PID_I = 0;
 static constexpr double ORIENTATION_PID_D = 0.2;
 static constexpr double ORIENTATION_PID_MAX_I = 1;

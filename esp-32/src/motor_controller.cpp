@@ -63,6 +63,19 @@ void MotorController::applyVelocity()
 
 	WheelVelocities target_wheel_velocity = euclideanToWheel(current_target_velocity_);
 
+	// Hold a wheel's PID in reset while it's sitting out MotorDriver's
+	// shoot-through guard after a direction reversal. PWM is forced to zero for
+	// that window and the wheel is coasting, so the error the PID would be
+	// integrating is error it cannot act on — and with the velocity buffer wiped
+	// by the reversal, measured speed reads ~0, making that error the full
+	// commanded speed. Left to accumulate, it dumps into the first PWM write
+	// after the guard clears, kicking the wheel past its target. Per-wheel
+	// because a strafe or a yaw trim flips one wheel while the others keep
+	// driving; stopImmediate()/startRotation() cover the deliberate-stop cases.
+	if (wheel_left_motor_->isDirectionChangePending())  wheel_left_pid_.reset();
+	if (wheel_right_motor_->isDirectionChangePending()) wheel_right_pid_.reset();
+	if (wheel_back_motor_->isDirectionChangePending())  wheel_back_pid_.reset();
+
 	// Feedforward (VELOCITY_TO_PWM * target) + PID trim on the residual error.
 	// Using the current target as the baseline — instead of accumulating the
 	// PID output onto the previous PWM — means PWM tracks the target directly:
@@ -224,6 +237,18 @@ void MotorController::startRotation(){
 	wheel_left_pid_.reset();
 	wheel_right_pid_.reset();
 	wheel_back_pid_.reset();
+	// Same argument for the velocity measurement: the samples in the moving
+	// average describe the leg that just ended, and legs that call this without
+	// stopping first (startStrafingTilHabitat, startHoldingAndMoving,
+	// startBackingUp) would otherwise spend up to VELOCITY_BUFFER_SIZE ticks
+	// with getSpeed() reporting the previous leg's motion — the PIDs above would
+	// correct against a measurement of something that is no longer happening.
+	// resetSpeedFilter() rather than primeForRestart(): the wheels may still be
+	// turning here, so forgetting last_direction_ would cost a needless tick of
+	// dead-time coast on the next command.
+	wheel_left_motor_->resetSpeedFilter();
+	wheel_right_motor_->resetSpeedFilter();
+	wheel_back_motor_->resetSpeedFilter();
 }
 void MotorController::updateRotationTracking(){
 	// Accumulate exact signed encoder pulses since startRotation() instead of

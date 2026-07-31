@@ -12,8 +12,13 @@ MetalDetector::MetalDetector():metal_detected_(false), detected_at_us_(0) {
 	    MetalDetector* m = static_cast<MetalDetector*>(arg);
 	    m->metal_detected_=true;
 	    m->detected_at_us_=esp_timer_get_time();
-	    Serial.print("[MetalDetector] RISING interrupt\n"); }, this, RISING);
+	    Serial.print("[MetalDetector] RISING interrupt\n"); }, this, FALLING);
 
+}
+
+void MetalDetector::clear(){
+	metal_detected_ = false;
+	detected_at_us_ = 0;
 }
 
 bool MetalDetector::getMetalDetectorState(){

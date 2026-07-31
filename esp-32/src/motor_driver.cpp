@@ -134,6 +134,13 @@ double MotorDriver::getCurrentTargetSpeed()
 	return motor_target_speed_;
 }
 
+void MotorDriver::resetSpeedFilter()
+{
+	std::fill_n(velocity_count_buffer_, VELOCITY_BUFFER_SIZE, 0.0);
+	buffer_index_ = 0;
+	buffer_filled_count_ = 0;
+}
+
 void MotorDriver::primeForRestart()
 {
 	last_direction_ = 0;
@@ -141,9 +148,7 @@ void MotorDriver::primeForRestart()
 	// stale pre-stop samples linger in the moving average and getSpeed()
 	// keeps reporting decaying nonzero velocity for VELOCITY_BUFFER_SIZE
 	// ticks after a real stop (MotorController::stopImmediate calls this).
-	std::fill_n(velocity_count_buffer_, VELOCITY_BUFFER_SIZE, 0.0);
-	buffer_index_ = 0;
-	buffer_filled_count_ = 0;
+	resetSpeedFilter();
 }
 
 uint32_t MotorDriver::getEncoderCount()
@@ -205,4 +210,9 @@ uint32_t MotorDriver::getCurrentDeltaCount()
 int MotorDriver::getIntendedDirection()
 {
 	return intended_direction_;
+}
+
+bool MotorDriver::isDirectionChangePending() const
+{
+	return pending_direction_change_;
 }

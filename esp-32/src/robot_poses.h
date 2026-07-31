@@ -22,7 +22,7 @@ struct ArmPoseSequence {
 	// else (ACTION_TRANSITION_DELAY_US in mr_krabs.h); sequences that don't
 	// need poses to fully settle (e.g. a fast wave/dance) can override this
 	// to move through their poses quicker.
-	uint64_t pose_settle_us = 1200000;
+	uint64_t pose_settle_us = 800000;
 };
 
 // Placeholder poses — need real tuning against the named poses in CLAUDE.md
@@ -45,7 +45,7 @@ struct ArmPoseSequence {
 struct ArmXYSequence {
 	double rotation_degrees = 0.0;
 	std::vector<ArmCoordinate> poses;
-	uint64_t pose_settle_us = 500000;
+	uint64_t pose_settle_us = 800000;
 };
 
 // Runs during METAL_DETECTING (pose 0) and PICKUP_ROCK (poses 1-6). x_pos for
@@ -57,11 +57,10 @@ struct ArmXYSequence {
 const ArmXYSequence kPickupRockXYSequence = {
 	0.0,
 	{
-		{0.08,  -0.03, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500, true},   // [0] METAL_DETECTING: reach in, probe for metal
-		{-0.02,  0.05, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500, true},   // [1] PICKUP_ROCK: retract slightly
-		{0.0,   -0.06, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 1000, true},  // [2] PICKUP_ROCK: position around rock, still open
-		{0.0,   -0.055,Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 500, 500, true},   // [3] PICKUP_ROCK: close claw
-		{0.24,   0.060,Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 500, 500, false},  // [4] PICKUP_ROCK: retract, claw closed
+		{-0.01,  0.025, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500, true},   // [2] METAL_DETECTING: reach in, probe for metal
+		{-0.00,  -0.065, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500, true},   // [1] METAL_DETECTING: reach in, probe for metal
+		{-0.00,  -0.065, Arm::WRIST_CENTER, Arm::CLAW_CLOSE,  500, 500, true},   // [3] PICKUP 
+		{0.28,   0.060,Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500, false},  // [4] PICKUP_ROCK: retract, claw closed
 		{0.24,   0.060,Arm::WRIST_PLACE,  Arm::CLAW_CLOSE, 500, 500, false},  // [5] PICKUP_ROCK: rotate to place
 		{0.24,   0.060,Arm::WRIST_PLACE,  Arm::CLAW_OPEN,  500, 500, false},  // [6] PICKUP_ROCK: release
 		{0.24,   0.060,Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500, false},  // [7] PICKUP_ROCK: back to centre, open
@@ -94,6 +93,7 @@ const ArmXYSequence kHabitatPlaceXYSequence = {
 		{0.28,  0.04, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
 		{0.18, -0.00, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
 		{0.18, -0.00, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500}, // open claw — release
+		{0.18, -0.00, Arm::WRIST_PLACE, Arm::CLAW_OPEN,  250, 500}, // open claw — release
 		{0.18, -0.00, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500}, // pull back, open
 		{0.21,  0.03, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500}, // retract to home
 		{0.23,  0.06, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500},
@@ -128,7 +128,15 @@ const ArmPoseSequence kTeletubbySequence = {
 // from vertical (usable range [0,70]) and elbow_pitch degrees down from
 // horizontal ([23,70]), so this pulls the load up and in, close to the turn
 // axis. Tune on hardware.
-const ArmPose kReverse180ArmPose = {-2, 35, Arm::WRIST_CENTER, Arm::CLAW_CLOSE};
+const ArmPose kReverse180ArmPose = {-2, 50, Arm::WRIST_CENTER, Arm::CLAW_CLOSE};
+
+// Arm pulled back out of the way, claw open — the same posture Arm::begin()
+// drives to on startup. Written when a state that had the arm extended is
+// abandoned partway rather than run to completion: METAL_DETECTING skipping a
+// rock leaves the probe pose reaching out over the field, and the
+// REACQUIRING_LINE spin that follows would swing it into whatever is beside the
+// robot. Claw open because nothing is being carried on that path.
+const ArmPose kArmHomePose = {-2, 25, Arm::WRIST_CENTER, Arm::CLAW_OPEN};
 
 // Looks up the ArmPoseSequence to run when entering state. Returns nullptr
 // for states with no fixed arm sequence — the line-following states, DONE,

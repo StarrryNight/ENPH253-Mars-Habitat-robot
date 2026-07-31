@@ -20,7 +20,7 @@
 // more likely to reacquire it than continuing the same direction.
 // Deliberately gentler than TELEOP_ANGULAR_SPEED for a controlled sweep.
 // Tune empirically.
-static constexpr double LINE_SEARCH_OMEGA_RAD_S = 1.3;
+static constexpr double LINE_SEARCH_OMEGA_RAD_S = 1.1;
 
 // Hardware validation: fixed angular speed (rad/s) driven open-loop (no wheel
 // PID, no dead-reckoning target) from the moment setup() finishes. Re-issued
@@ -31,7 +31,7 @@ static constexpr double OPEN_LOOP_TEST_OMEGA_RAD_S = 2.0;
 // Non-blocking settle delay (µs) held between the three drive actions
 // (line-following, rotating, applying an arm pose) so each has time to
 // physically settle before the next begins. See MrKrabs::stepControl.
-static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 800000; // 1.5 s
+static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1000000; // 1.5 s
 
 // Teleoperation (manual numpad/o/p control over USB serial, bypassing the
 // RPi/AI). See MrKrabs::handleTeleopChar. Numpad 7/8/9/4/6/1/2/3 drive the 8
@@ -79,6 +79,12 @@ public:
 	// direction opposite last_rotation_sign_, until AI's state transitions
 	// away (see RobotState::REACQUIRING_LINE).
 	void startSearchingForLine();
+
+	// Enters the rock path's line-search mode: rotates at LINE_SEARCH_OMEGA_RAD_S
+	// opposite last_rotation_sign_ — retracing the rock search spin — with NO
+	// fixed initial turn, so the line sensors are live from the first tick.
+	// See RobotState::ROCK_REACQUIRE_LINE.
+	void startRockSearchingForLine();
 
 	// Enters rock-search mode. Rotates at a fixed omega, direction given by
 	// AI::rockSearchOmegaRadS(), until AI's state transitions away (see

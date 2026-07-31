@@ -37,6 +37,12 @@ class AI {
 		// before the intended fixed amount, cutting the turn short.
 		void setLineSearchInitialTurnDone(bool done);
 
+		// True when the upcoming REACQUIRING_LINE sweep should carry on turning
+		// the SAME way as the last rotation instead of reversing it, which is
+		// what MrKrabs::startSearchingForLine does by default. Set only on the
+		// hand-off out of HABITAT_PLACE — see tickHabitatPlace.
+		bool lineSearchContinuesLastRotation() const;
+
 		void setArm(Arm* arm);
 		void setLineFollower(LineFollower* line_follower);
 		void setSonar(Sonar* sonar);
@@ -50,7 +56,7 @@ class AI {
 		// reported (see computer_vision.py), so the cap lives here instead.
 		void notifyTeletubbyDetected();
 
-		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK , STRAFING_TIL_HABITAT, BACKING_UP, HOLDING_AND_MOVING, REVERSE_180, SQUARING_UP};
+		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK , STRAFING_TIL_HABITAT, BACKING_UP, HOLDING_AND_MOVING, REVERSE_180, SQUARING_UP, ROCK_SEARCHING_FOR_LINE};
 		// What the drivetrain should currently be doing, derived from current_state_.
 		DriveMode desiredDriveMode() const;
 		// +1 while driving forward, -1 during LINE_FOLLOWING_REVERSE.
@@ -105,12 +111,18 @@ class AI {
 		// the line) — only the drivetrain's direction/initial angle differ,
 		// and those live in MrKrabs::startReverse180().
 		RobotState tickReverse180();
+		// See RobotState::ROCK_REACQUIRE_LINE. Same completion test as
+		// tickReacquiringLine, minus the fixed-initial-turn gate — the rock search
+		// already rotated the robot off the line, so there is nothing to clear.
+		RobotState tickRockReacquireLine();
 
 		RobotState tickFindingRock();
 		RobotState tickRotatingTilRock();
 		RobotState tickMetalDetecting();
 		RobotState tickTeletubbying();
 		RobotState tickPickupRock();
+		// See RobotState::LINE_FOLLOWING — returns itself unconditionally.
+		RobotState tickLineFollowing();
 		RobotState tickHabitatLineFollowing();
 		RobotState tickHabitatPickup();
 		RobotState tickLineFollowingReverse();
@@ -153,6 +165,18 @@ class AI {
 		// of auto-advancing to the next pose every settle cycle. Reset by
 		// transitionTo() on entering METAL_DETECTING. See onRotationReached().
 		bool metal_probe_pose_applied_ = false;
+		// True once a rock has actually been collected — set on entering
+		// PICKUP_ROCK, which only happens off a real metal hit. From then on the
+		// remaining rock checkpoints are skipped outright: tickFindingRock and
+		// nextRockOrDone() both hand straight to HABITAT_LINE_FOLLOWING instead of
+		// stopping to search again. Never cleared — one rock is the whole job.
+		bool rock_picked_up_ = false;
+		// esp_timer_get_time() stamp of the tick the probe pose landed, or 0
+		// before that — the start of kMetalProbeTimeoutUs's window. Timed from
+		// the pose landing rather than from entering the state so the arm's
+		// travel out doesn't count against the detector's chance to read. Reset
+		// by transitionTo() on entering METAL_DETECTING.
+		uint64_t metal_probe_started_us_ = 0;
 		std::array<int, kNumRobotStates> state_visit_count_{};
 		// Distance (m) traveled since the current state was entered.
 		double current_state_progress_m_;
@@ -168,6 +192,10 @@ class AI {
 		RobotState post_line_reverse_state_ = RobotState::HABITAT_PLACE;
 		// See setLineSearchInitialTurnDone().
 		bool line_search_initial_turn_done_ = false;
+		// See lineSearchContinuesLastRotation(). Every tick*() that hands off to
+		// REACQUIRING_LINE sets this explicitly, so it always describes the sweep
+		// about to start rather than a stale one.
+		bool line_search_continues_last_rotation_ = false;
 
 
 		// Control ticks elapsed since exactly one side sensor first read the

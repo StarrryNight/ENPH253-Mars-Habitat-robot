@@ -85,6 +85,16 @@ public:
 	// re-deriving direction from getSpeed() or getCurrentTargetSpeed().
 	int getIntendedDirection();
 
+	// True while this motor is sitting out the shoot-through guard after a
+	// commanded direction reversal — PWM forced to zero, waiting for
+	// SHOOTTHROUGH_GUARD_THRESHOLD_US before the new direction is applied.
+	// MotorController::applyVelocity() uses it to hold that wheel's velocity PID
+	// in reset for the duration: the wheel physically cannot follow a command
+	// during the coast, so the error accumulating into the integral is error the
+	// controller had no way to act on, and it would otherwise dump into the
+	// first PWM write after the guard clears.
+	bool isDirectionChangePending() const;
+
 	// Forgets the last driven direction, so the next set_velocity() call —
 	// whichever direction it's for — is treated as a direction change and
 	// goes through the coast/dead-time guard in set_velocity() instead of
@@ -98,6 +108,16 @@ public:
 	// reversal), so getSpeed() reads 0 immediately instead of decaying down
 	// from stale pre-stop samples.
 	void primeForRestart();
+
+	// Drops the velocity moving-average samples without touching last_direction_.
+	// Use when a new leg begins and the old samples describe a different motion
+	// (MotorController::startRotation) — getSpeed() would otherwise report the
+	// previous leg's velocity for up to VELOCITY_BUFFER_SIZE ticks and the wheel
+	// PID would correct against it. Deliberately NOT primeForRestart(): that also
+	// forgets the driven direction, which sends the next command through the
+	// shoot-through guard for a tick of coast. That's right after a real stop,
+	// wrong when the wheels are still turning.
+	void resetSpeedFilter();
 
 private:
 	int speedToDutyCycle(int speed);
