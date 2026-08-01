@@ -88,7 +88,7 @@ const ArmXYSequence kHabitatPickupXYSequence = {
 // squares it up. Positive is counter-clockwise (see RobotVelocity::omega);
 // negate it to turn the other way.
 const ArmXYSequence kHabitatPlaceXYSequence = {
-	-62.0,
+	-47.0,
 	{
 		{0.28,  0.04, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
 		{0.18, -0.00, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
@@ -111,10 +111,11 @@ const ArmXYSequence kHabitatSmackXYSequence = {
 	0.0,
 	{
 		{0.26, -0.00, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 1000, 1000},
-		{0.36, -0.08, Arm::WRIST_PLACE, Arm::CLAW_CLOSE, 500, 500},
-		{0.36, -0.08, 180,  Arm::CLAW_CLOSE, 500, 500},
+		{0.346, -0.08, Arm::WRIST_PLACE, Arm::CLAW_CLOSE, 700, 500},
+		{0.346, -0.08, 180,  Arm::CLAW_CLOSE, 700, 500},
 		{0.28,  0.04, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 500, 500}, // reach in, still holding
 	},
+	1000000
 };
 
 // Faster settle (0.4 s vs. the 2.5 s default) — this is a wave/dance, not a

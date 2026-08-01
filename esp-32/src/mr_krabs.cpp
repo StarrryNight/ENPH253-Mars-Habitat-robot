@@ -372,6 +372,7 @@ bool MrKrabs::handleDriveTransition()
 			case AI::DriveMode::SQUARING_UP: startSquaringUp(); break;
 			case AI::DriveMode::STRAFING_TIL_HABITAT: startStrafingTilHabitat(); break;
 			case AI::DriveMode::BACKING_UP: startBackingUp(); break;
+			case AI::DriveMode::DRIVING_FORWARD: startDrivingForward(); break;
 			case AI::DriveMode::HOLDING_AND_MOVING: startHoldingAndMoving(); break;
 			case AI::DriveMode::REVERSE_180: startReverse180(); break;
 		}
@@ -497,7 +498,12 @@ void MrKrabs::driveCurrentMode()
 			motor_controller_->setVelocity({HABITAT_STRAFE_SPEED * ai_->habitatFindDirection(), 0, yaw});
 			break;
 		}
+		// Same leg in both directions: a fixed distance driven straight with the
+		// heading held, the state watching the odometer to decide when it's done.
+		// Only the sign of vy differs, so they share everything below.
+		case AI::DriveMode::DRIVING_FORWARD:
 		case AI::DriveMode::BACKING_UP: {
+			const double drive_sign = (drive_mode_ == AI::DriveMode::DRIVING_FORWARD) ? 1.0 : -1.0;
 			// AI::tickHabitatBackup() (called via ai_->tickAI() earlier this
 			// tick) tracks the distance leg itself off addProgress() below and
 			// will transition the state once it's done.
@@ -510,7 +516,25 @@ void MrKrabs::driveCurrentMode()
 			// backward drive commands (-0.866, +0.866, 0) * vy, which sums to
 			// zero, so what the estimate reports is yaw alone.
 			double yaw = orientation_controller_.holdCorrection(motor_controller_->getYawDriftRad());
-			motor_controller_->setVelocity({0, -HABITAT_BACKUP_SPEED, yaw});
+			// Open loop, not setVelocity(): at HABITAT_BACKUP_SPEED each wheel
+			// turns ~0.087 m/s, which is ~9 encoder counts/s against a
+			// VELOCITY_BUFFER_SIZE window of 70 ms — most windows contain no
+			// counts at all, so getSpeed() reads a quantized 0 / 0.138 / 0.276
+			// ladder (one count in the window is 0.9687/7 m/s) with the target
+			// below its first nonzero rung. Feeding that to the wheel PIDs is
+			// feeding them quantization noise, not tracking error. The
+			// feedforward term is what actually drives these legs regardless, so
+			// take the PIDs out of it. Must be re-issued every tick — see
+			// MotorController::open_loop_active_.
+			//
+			// The yaw hold above is unaffected: it integrates the same speeds,
+			// and a boxcar average integrates to the right total (each count
+			// contributes raw/N for N ticks), so the drift estimate is unbiased
+			// even though the instantaneous readings are not.
+			motor_controller_->driveOpenLoop({0, drive_sign * HABITAT_BACKUP_SPEED, yaw});
+			// Unaffected too: this odometer is encoder-count based, not
+			// integrated filtered velocity, so the distance leg still terminates
+			// correctly at ~9.69 mm resolution.
 			double total_translation_m = motor_controller_->getTotalTranslationM();
 			ai_->addProgress(total_translation_m - last_total_translation_m_);
 			last_total_translation_m_ = total_translation_m;
@@ -711,6 +735,19 @@ void MrKrabs::startHoldingAndMoving()
 	motor_controller_->startRotation();
 	orientation_controller_.startRotation(0.0);
 	Serial.printf("[MrKrabs] startHoldingAndMoving, direction=%d\n", -ai_->habitatFindDirection());
+}
+
+void MrKrabs::startDrivingForward()
+{
+	// Same setup as startBackingUp() — see there for why each of these matters;
+	// the leg differs only in which way it drives.
+	drive_mode_ = AI::DriveMode::DRIVING_FORWARD;
+	action_settle_until_us_ = esp_timer_get_time() + ACTION_TRANSITION_DELAY_US;
+	motor_controller_->resetTranslationTracking();
+	last_total_translation_m_ = 0.0;
+	motor_controller_->startRotation();
+	orientation_controller_.startRotation(0.0);
+	Serial.printf("[MrKrabs] startDrivingForward\n");
 }
 
 void MrKrabs::startBackingUp()

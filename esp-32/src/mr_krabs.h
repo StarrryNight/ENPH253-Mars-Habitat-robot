@@ -117,6 +117,11 @@ public:
 	// RobotState::HABITAT_BACKUP). Resets the translation odometer on entry
 	// so the distance-based completion isn't inflated by whatever drive mode
 	// preceded it (same reasoning as startRotation()'s reset).
+	// Enters the straight-forward leg: drives forward at HABITAT_BACKUP_SPEED
+	// with the heading held, until AI's distance leg completes (see
+	// RobotState::HABITAT_SMACK_FORWARD). Mirror image of startBackingUp().
+	void startDrivingForward();
+
 	void startBackingUp();
 
 	// Enters habitat-hold-and-move mode. Strafes at HABITAT_STRAFE_SPEED,
@@ -286,7 +291,7 @@ private:
 	// that ends the instant a sensor crosses an edge, and nothing decelerates
 	// before stopImmediate(), so the faster it turns the further past square it
 	// coasts. Direction comes from AI::squareUpOmegaSign().
-	static constexpr double SQUARE_UP_OMEGA_RAD_S = 0.4;
+	static constexpr double SQUARE_UP_OMEGA_RAD_S = 0.9;
 
 	static constexpr double HABITAT_STRAFE_SPEED = 0.15;
 	// Deliberately slow: the backup legs are only 3-10 cm, and the encoder

@@ -46,12 +46,12 @@ namespace {
 	// Distance (m) driven straight backward on the HABITAT_BACKUP leg, to
 	// clear the habitat wall HABITAT_FIND's sonar just read close-range
 	// before HABITAT_PICKUP's arm sequence runs.
-	constexpr double kHabitatBackupDistanceM = 0.04;
+	constexpr double kHabitatBackupDistanceM = 0.07;
 
 	// Distance (m) driven straight backward on the HABITAT_APPROACH_BACKUP
 	// leg, before HABITAT_FIND starts its sonar-based strafe search — clears
 	// the wall the robot just line-followed up to.
-	constexpr double kHabitatApproachBackupDistanceM = 0.06;
+	constexpr double kHabitatApproachBackupDistanceM = 0.02;
 
 	// Distance (m) driven straight backward on the HABITAT_POST_PICKUP_BACKUP
 	// leg, after HABITAT_PICKUP's arm sequence completes — clears the
@@ -148,7 +148,7 @@ namespace {
 	// whatever yaw offsets the two outer sensors by less than that (2 * half
 	// their spacing * sin(theta) < 5 mm). Raise it to tolerate more crookedness,
 	// lower to square up more eagerly.
-	constexpr int kSideSensorGraceTicks = 9;
+	constexpr int kSideSensorGraceTicks = 4;
 
 	// Longest (us) HABITAT_SQUARE_UP will rotate before giving up and proceeding
 	// unsquared. Generous next to the turn it should need — at
@@ -163,7 +163,7 @@ namespace {
 	// every 10 ms here is ~1.3 mm of strafe past the point the sonar first went
 	// close. Raise it to end up further along the habitat, lower to stop nearer
 	// to where it was detected.
-	constexpr uint64_t kHabitatSideStopDelayUs = 15000; // 0.05 s
+	constexpr uint64_t kHabitatSideStopDelayUs = 70000; // 0.05 s
 }
 
 AI::AI():
@@ -807,6 +807,9 @@ AI::DriveMode AI::desiredDriveMode() const{
 		// The one state that changes drive mode partway through — backward leg
 		// first, then the arm sequence. See tickHabitatSmack.
 		return smack_sequence_started_ ? DriveMode::APPLYING_SEQUENCE : DriveMode::BACKING_UP;
+	}
+	if (current_state_ == RobotState::HABITAT_SMACK_FORWARD){
+		return DriveMode::DRIVING_FORWARD;
 	}
 	if (current_state_ == RobotState::HABITAT_HOLD_AND_MOVE){
 		return DriveMode::HOLDING_AND_MOVING;

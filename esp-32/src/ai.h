@@ -235,7 +235,7 @@ class AI {
 		// settle delays, and no travel happens then either.
 		int side_sensor_grace_ticks_ = 0;
 		// Rotation direction for HABITAT_SQUARE_UP (+1 = CCW), and the
-		// esp_timer_get_time() stamp that state was entered at, so the rotation
+	// esp_timer_get_time() stamp that state was entered at, so the rotation
 		// can't spin forever if the second sensor never reads the strip. Both set
 		// on entering the state — see tickHabitatLineFollowing/tickHabitatSquareUp.
 		double square_up_omega_sign_ = 1.0;
