@@ -24,9 +24,13 @@ void LineFollower::tick()
     }
 }
 
-double LineFollower::calculateCorrection()
+double LineFollower::calculateCorrection(double forward_speed)
 {
     const std::array<double, 4>& current_state = current_state_;
+    // Sized off the speed being driven, not off FORWARD_SPEED — see
+    // smallErrorValue/bigErrorValue in the header.
+    const double small_error = smallErrorValue(forward_speed);
+    const double big_error = bigErrorValue(forward_speed);
     double correction = 0;
     // Both mids on the line: dead center, no drift to correct. Reset the PID
     // so stale integral/derivative from the last correction doesn't leak
@@ -38,23 +42,23 @@ double LineFollower::calculateCorrection()
     // steer left if mid-left is on the line and mid-right isn't (robot drifted right)
     else if (current_state[1] == 1 && current_state[2] == 0)
     {
-        correction = line_followng_pid_.step(-SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
+        correction = line_followng_pid_.step(-small_error, CONTROL_LOOP_PERIOD);
     }
     // steer right if mid-right is on the line and mid-left isn't (robot drifted left)
     else if (current_state[1] == 0 && current_state[2] == 1)
     {
-        correction = line_followng_pid_.step(SMALL_ERROR_VALUE, CONTROL_LOOP_PERIOD);
+        correction = line_followng_pid_.step(small_error, CONTROL_LOOP_PERIOD);
     }
     // both mids lost the line — use previous mid state as memory for big correction
     else if (current_state[1] == 0 && current_state[2] == 0)
     {
         if (prev_state_[1] == 1 && prev_state_[2] == 0)
         {
-            correction = line_followng_pid_.step(-BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
+            correction = line_followng_pid_.step(-big_error, CONTROL_LOOP_PERIOD);
         }
         else if (prev_state_[1] == 0 && prev_state_[2] == 1)
         {
-            correction = line_followng_pid_.step(BIG_ERROR_VALUE, CONTROL_LOOP_PERIOD);
+            correction = line_followng_pid_.step(big_error, CONTROL_LOOP_PERIOD);
         }
     }
 	//Serial.printf("%f.2\n", correction);

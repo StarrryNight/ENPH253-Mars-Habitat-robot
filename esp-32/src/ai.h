@@ -61,6 +61,13 @@ class AI {
 		DriveMode desiredDriveMode() const;
 		// +1 while driving forward, -1 during LINE_FOLLOWING_REVERSE.
 		double lineFollowingDirection() const;
+
+		// Speed (m/s) the current line-following leg should drive at:
+		// HABITAT_FORWARD_SPEED for the habitat legs, FORWARD_SPEED for the rest.
+		// Valid while desiredDriveMode() == LINE_FOLLOWING. Also the speed
+		// LineFollower::calculateCorrection() must be given, so its corrections
+		// scale to match.
+		double lineFollowingSpeed() const;
 		// Valid while desiredDriveMode() == ROTATING_TIL_ROCK. Sign (+1/-1) of
 		// the current rock checkpoint's heading — see tickRotatingTilRock.
 		double rockSearchOmegaRadS() const;

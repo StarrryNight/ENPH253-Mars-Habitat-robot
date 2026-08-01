@@ -9,12 +9,12 @@
 // but more lag in the wheel velocity PID's feedback in applyVelocity() —
 // don't push this much further without checking the PID still responds
 // crisply to target changes.
-static constexpr int VELOCITY_BUFFER_SIZE = 15;
+static constexpr int VELOCITY_BUFFER_SIZE = 7;
 
 // Below this commanded PWM magnitude, treat speed as zero instead of applying
 // the deadband floor below. Prevents FP/PID noise around a 0 target (e.g. the
 // back wheel while driving straight) from producing a small nonzero duty cycle.
-static constexpr double MOTOR_SPEED_DEADZONE = 3.0;
+static constexpr double MOTOR_SPEED_DEADZONE = 5.0;
 
 // Fallback for MotorDriver's pwm_offset constructor argument, used only when a
 // caller doesn't pass one. Real values live in pid_config.h next to the rest of

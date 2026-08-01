@@ -11,18 +11,18 @@
 #include "constants.h"
 static constexpr double WHEEL_LEFT_PID_P = 0.1;
 static constexpr double WHEEL_LEFT_PID_I = 0.05;
-static constexpr double WHEEL_LEFT_PID_D = 0.01;
+static constexpr double WHEEL_LEFT_PID_D = 0.00;
 static constexpr double WHEEL_LEFT_PID_MAX_I = 0.3;
 
 static constexpr double WHEEL_RIGHT_PID_P =0.1;
 static constexpr double WHEEL_RIGHT_PID_I =0.05;
-static constexpr double WHEEL_RIGHT_PID_D =0.01;
+static constexpr double WHEEL_RIGHT_PID_D =0.00;
 static constexpr double WHEEL_RIGHT_PID_MAX_I = 0.3;
 
 // the back wheel oscillates/overshoots.
 static constexpr double WHEEL_BACK_PID_P = 0.1;
 static constexpr double WHEEL_BACK_PID_I = 0.05;
-static constexpr double WHEEL_BACK_PID_D = 0.01;
+static constexpr double WHEEL_BACK_PID_D = 0.00;
 static constexpr double WHEEL_BACK_PID_MAX_I = 0.3;
 
 // Converts a wheel velocity (m/s) into a PWM duty magnitude for
@@ -67,7 +67,8 @@ static constexpr double STRAFE_HOLD_PID_D = 0.0;
 static constexpr double STRAFE_HOLD_PID_MAX_I = 0.0;
 
 // Line-following lateral correction PID (LineFollower). Error from the
-// photoresistor array (SMALL_ERROR_VALUE / BIG_ERROR_VALUE units).
+// photoresistor array, in the units of smallErrorValue()/bigErrorValue() —
+// which are m/s, scaled off the speed of the leg being driven.
 static constexpr double LINE_PID_P = 1;
 static constexpr double LINE_PID_I = 0.0;
 static constexpr double LINE_PID_D = 0;

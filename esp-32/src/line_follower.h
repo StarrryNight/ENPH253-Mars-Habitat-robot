@@ -24,9 +24,21 @@ static constexpr double LIGHT_THRESHOLD_ADC = 2000;
 // Measured on the robot.
 static constexpr double SIDE_SENSOR_SPACING_M = 0.13;
 static constexpr double TURNING_RADIUS = 0.14;
-//static constexpr double SMALL_ERROR_VALUE = FORWARD_SPEED*0.8;
-static constexpr double SMALL_ERROR_VALUE = FORWARD_SPEED*1.2;
-static constexpr double BIG_ERROR_VALUE =FORWARD_SPEED/(TURNING_RADIUS);
+
+// Both correction magnitudes are now derived from the speed actually being
+// driven, passed into calculateCorrection(), rather than from FORWARD_SPEED —
+// the legs no longer all run at the same speed (see HABITAT_FORWARD_SPEED), and
+// a correction sized for 0.25 m/s applied at 0.1 m/s is a 2.5x over-correction
+// that turns the robot far more per unit of travel than intended.
+//
+// SMALL is the drift nudge when one mid sensor sees the line: a lateral
+// velocity proportional to forward speed, so the resulting path curvature is
+// speed-independent. BIG is the recovery when both mids have lost it, sized so
+// the robot turns on roughly TURNING_RADIUS — also speed-independent, since
+// v/r is exactly the omega that traces radius r at speed v.
+static constexpr double SMALL_ERROR_RATIO = 1.2;
+inline double smallErrorValue(double forward_speed) { return forward_speed * SMALL_ERROR_RATIO; }
+inline double bigErrorValue(double forward_speed) { return forward_speed / TURNING_RADIUS; }
 
 // IR photoresistor line follower with PID-based lateral correction.
 // Uses a 4-sensor array: [left, mid-left, mid-right, right].
@@ -55,7 +67,11 @@ public:
 
 	// Returns a lateral (x-axis) velocity correction from this tick's latched
 	// reading. Positive x = steer right, negative x = steer left.
-	double calculateCorrection();
+	//
+	// forward_speed is the speed the caller is about to drive at (m/s); the
+	// correction magnitudes scale off it so the path curvature they produce is
+	// the same whichever leg is running. Pass AI::lineFollowingSpeed().
+	double calculateCorrection(double forward_speed);
 
 	// True once both middle sensors detect the line — used by
 	// AI::tickReacquiringLine to tell when a search rotation has reoriented

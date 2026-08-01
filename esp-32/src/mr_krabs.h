@@ -20,7 +20,7 @@
 // more likely to reacquire it than continuing the same direction.
 // Deliberately gentler than TELEOP_ANGULAR_SPEED for a controlled sweep.
 // Tune empirically.
-static constexpr double LINE_SEARCH_OMEGA_RAD_S = 1.1;
+static constexpr double LINE_SEARCH_OMEGA_RAD_S = 0.8;
 
 // Hardware validation: fixed angular speed (rad/s) driven open-loop (no wheel
 // PID, no dead-reckoning target) from the moment setup() finishes. Re-issued
@@ -31,7 +31,7 @@ static constexpr double OPEN_LOOP_TEST_OMEGA_RAD_S = 2.0;
 // Non-blocking settle delay (µs) held between the three drive actions
 // (line-following, rotating, applying an arm pose) so each has time to
 // physically settle before the next begins. See MrKrabs::stepControl.
-static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 1000000; // 1.5 s
+static constexpr uint64_t ACTION_TRANSITION_DELAY_US = 400000; // 1.5 s
 
 // Teleoperation (manual numpad/o/p control over USB serial, bypassing the
 // RPi/AI). See MrKrabs::handleTeleopChar. Numpad 7/8/9/4/6/1/2/3 drive the 8
@@ -288,7 +288,7 @@ private:
 	// coasts. Direction comes from AI::squareUpOmegaSign().
 	static constexpr double SQUARE_UP_OMEGA_RAD_S = 0.4;
 
-	static constexpr double HABITAT_STRAFE_SPEED = 0.18;
+	static constexpr double HABITAT_STRAFE_SPEED = 0.15;
 	// Deliberately slow: the backup legs are only 3-10 cm, and the encoder
 	// resolves 9.69 mm/tick (see ENCODER_RESOLUTION_DISTANCE_M), so a short
 	// leg is only a handful of ticks. Nothing decelerates before
@@ -296,7 +296,7 @@ private:
 	// trips lands directly on top of the target — and coast energy goes as
 	// v². Keep this low enough that the coast stays small next to the
 	// shortest leg (kHabitatPostPickupBackupDistanceM et al. in ai.cpp).
-	static constexpr double HABITAT_BACKUP_SPEED = 0.07;
+	static constexpr double HABITAT_BACKUP_SPEED = 0.10;
 
 	// Extra settle delay (µs) held after HOLDING_AND_MOVING's strafe-back-
 	// onto-the-line phase finishes, before LINE_FOLLOWING_REVERSE starts

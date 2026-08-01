@@ -397,8 +397,12 @@ void MrKrabs::driveCurrentMode()
 {
 	switch (drive_mode_){
 		case AI::DriveMode::LINE_FOLLOWING: {
-			double correction = line_follower_->calculateCorrection();
-			double speed = FORWARD_SPEED * ai_->lineFollowingDirection();
+			// One speed for both: the correction has to be sized for the speed
+			// actually being driven, or a habitat leg at 0.1 m/s would get
+			// corrections scaled for 0.25 and turn 2.5x as hard per unit travel.
+			double forward_speed = ai_->lineFollowingSpeed();
+			double correction = line_follower_->calculateCorrection(forward_speed);
+			double speed = forward_speed * ai_->lineFollowingDirection();
 			motor_controller_->setVelocity({0, speed, -correction});
 			// Real odometry: diff of the encoder-count-based translation
 			// odometer (MotorController::updateTranslationTracking(), folded

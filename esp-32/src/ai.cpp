@@ -46,12 +46,12 @@ namespace {
 	// Distance (m) driven straight backward on the HABITAT_BACKUP leg, to
 	// clear the habitat wall HABITAT_FIND's sonar just read close-range
 	// before HABITAT_PICKUP's arm sequence runs.
-	constexpr double kHabitatBackupDistanceM = 0.05;
+	constexpr double kHabitatBackupDistanceM = 0.04;
 
 	// Distance (m) driven straight backward on the HABITAT_APPROACH_BACKUP
 	// leg, before HABITAT_FIND starts its sonar-based strafe search — clears
 	// the wall the robot just line-followed up to.
-	constexpr double kHabitatApproachBackupDistanceM = 0.01;
+	constexpr double kHabitatApproachBackupDistanceM = 0.06;
 
 	// Distance (m) driven straight backward on the HABITAT_POST_PICKUP_BACKUP
 	// leg, after HABITAT_PICKUP's arm sequence completes — clears the
@@ -759,6 +759,18 @@ AI::DriveMode AI::desiredDriveMode() const{
 		return DriveMode::APPLYING_SEQUENCE;
 	}
 	return sequenceForState(current_state_) ? DriveMode::APPLYING_SEQUENCE : DriveMode::LINE_FOLLOWING;
+}
+
+double AI::lineFollowingSpeed() const{
+	// The habitat legs both end on a sensor event whose position everything
+	// downstream is measured from — the marker strip for HABITAT_LINE_FOLLOWING,
+	// the place marker for LINE_FOLLOWING_REVERSE — so they run slow to keep the
+	// stopping point tight. The rock-phase legs have no such constraint.
+	if (current_state_ == RobotState::HABITAT_LINE_FOLLOWING ||
+	    current_state_ == RobotState::LINE_FOLLOWING_REVERSE){
+		return HABITAT_FORWARD_SPEED;
+	}
+	return FORWARD_SPEED;
 }
 
 double AI::lineFollowingDirection() const{
