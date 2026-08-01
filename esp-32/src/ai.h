@@ -56,7 +56,7 @@ class AI {
 		// reported (see computer_vision.py), so the cap lives here instead.
 		void notifyTeletubbyDetected();
 
-		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK , STRAFING_TIL_HABITAT, BACKING_UP, HOLDING_AND_MOVING, REVERSE_180, SQUARING_UP, ROCK_SEARCHING_FOR_LINE};
+		enum class DriveMode { LINE_FOLLOWING, APPLYING_SEQUENCE, SEARCHING_FOR_LINE, IDLE, ROTATING_TIL_ROCK , STRAFING_TIL_HABITAT, BACKING_UP, HOLDING_AND_MOVING, REVERSE_180, SQUARING_UP, ROCK_SEARCHING_FOR_LINE, DRIVING_FORWARD};
 		// What the drivetrain should currently be doing, derived from current_state_.
 		DriveMode desiredDriveMode() const;
 		// +1 while driving forward, -1 during LINE_FOLLOWING_REVERSE.
@@ -138,6 +138,11 @@ class AI {
 		RobotState tickHabitatPickup();
 		RobotState tickLineFollowingReverse();
 		RobotState tickHabitatPlace();
+		// See RobotState::HABITAT_SMACK. Backward leg first, then the arm
+		// sequence — which phase it's in is smack_sequence_started_ below.
+		RobotState tickHabitatSmack();
+		// See RobotState::HABITAT_SMACK_FORWARD.
+		RobotState tickHabitatSmackForward();
 		RobotState tickHabitatSquareUp();
 		RobotState tickHabitatApproachBackup();
 		RobotState tickHabitatFind();
@@ -181,6 +186,14 @@ class AI {
 		// of auto-advancing to the next pose every settle cycle. Reset by
 		// transitionTo() on entering METAL_DETECTING. See onRotationReached().
 		bool metal_probe_pose_applied_ = false;
+		// False while HABITAT_SMACK is still driving its backward leg, true once
+		// tickHabitatSmack() has handed kHabitatSmackXYSequence to
+		// xy_sequence_runner_. This is the state's phase bit: desiredDriveMode()
+		// reads it to pick BACKING_UP vs APPLYING_SEQUENCE, and the arm-sequence
+		// accessors (targetRotationDegrees/onRotationReached/sequencePoseSettleUs)
+		// only route to the XY runner once it's set — before that the runner still
+		// holds HABITAT_PLACE's finished sequence. Reset by transitionTo().
+		bool smack_sequence_started_ = false;
 		// How many rocks have actually been collected — incremented on entering
 		// PICKUP_ROCK, which only happens off a real metal hit, so a rock skipped
 		// for lack of metal doesn't count. nextRockOrDone() routes the run off

@@ -58,6 +58,17 @@ namespace {
 	// habitat before HABITAT_HOLD_AND_MOVE strafes back onto the line.
 	constexpr double kHabitatPostPickupBackupDistanceM = 0.07;
 
+	// Distance (m) driven straight backward on HABITAT_SMACK's first phase,
+	// after HABITAT_PLACE's arm sequence completes — backs the arm out of the
+	// slot it just reached into before kHabitatSmackXYSequence runs.
+	constexpr double kHabitatSmackBackupDistanceM = 0.11;
+
+	// Distance (m) driven straight FORWARD after the smack, before the sweep back
+	// to the line — see RobotState::HABITAT_SMACK_FORWARD. Pulls the robot off
+	// the habitat so the turn that follows has room, and it swings about a point
+	// clear of the slot rather than through it.
+	constexpr double kHabitatSmackForwardDistanceM = 0.10;
+
 	// Sonar range (cm) that counts as "found the rock" — see
 	// AI::tickRotatingTilRock. Placeholder pending hardware tuning.
 	constexpr double kRockSonarMinCm = 5.0;
@@ -234,6 +245,13 @@ void AI::transitionTo(RobotState next){
 		xy_sequence_runner_.start(kHabitatPickupXYSequence, 0.0);
 	} else if (next == RobotState::HABITAT_PLACE){
 		xy_sequence_runner_.start(kHabitatPlaceXYSequence, 0.0);
+	} else if (next == RobotState::HABITAT_SMACK){
+		// Deliberately NOT starting the runner here: HABITAT_SMACK backs up
+		// before it poses, and starting the sequence now would make
+		// desiredDriveMode() pick APPLYING_SEQUENCE from tick one and skip the
+		// backward leg entirely. tickHabitatSmack() starts it once the distance
+		// leg completes — this only clears the phase bit that says so.
+		smack_sequence_started_ = false;
 	} else if (next == RobotState::HABITAT_SQUARE_UP){
 		// Cleared, not stamped: tickHabitatSquareUp() starts the bail-out clock
 		// on its own first tick instead. Stamping here would run the clock
@@ -281,6 +299,7 @@ RobotState AI::tickCurrentState(){
 		case RobotState::HABITAT_PICKUP: return tickHabitatPickup();
 		case RobotState::LINE_FOLLOWING_REVERSE: return tickLineFollowingReverse();
 		case RobotState::HABITAT_PLACE: return tickHabitatPlace();
+		case RobotState::HABITAT_SMACK: return tickHabitatSmack();
 		case RobotState::HABITAT_SQUARE_UP: return tickHabitatSquareUp();
 		case RobotState::HABITAT_APPROACH_BACKUP: return tickHabitatApproachBackup();
 		case RobotState::HABITAT_FIND: return tickHabitatFind();
@@ -707,18 +726,53 @@ RobotState AI::tickHabitatPlace(){
 	if (!xy_sequence_runner_.complete()){
 		return RobotState::HABITAT_PLACE;
 	}
-	// Rock released. Sweep back to the line and line-follow the habitat approach
-	// again — which re-runs the whole find sequence (square-up, approach backup,
-	// the sonar strafe) rather than assuming the next slot is where this one
-	// was. That strafe is also what flips current_habitat_find_direction_ on the
-	// second slot, so the cycle has to pass back through HABITAT_FIND for the
-	// two-slot behaviour to happen at all — see tickHabitatFind.
+	// Rock released, but the arm is still reaching into the slot — HABITAT_SMACK
+	// backs out of it and runs its own sequence before the line search starts.
+	return RobotState::HABITAT_SMACK;
+}
+
+RobotState AI::tickHabitatSmack(){
+	// Phase 1: straight backward leg, DriveMode::BACKING_UP. Nothing to do here
+	// but watch the odometer MrKrabs::driveCurrentMode feeds through
+	// addProgress(); the sequence isn't started until it's done, which is what
+	// keeps desiredDriveMode() on BACKING_UP for the whole leg.
+	if (!smack_sequence_started_){
+		if (current_state_progress_m_ < kHabitatSmackBackupDistanceM){
+			return RobotState::HABITAT_SMACK;
+		}
+		// Order matters: the runner has to be holding this sequence before the
+		// phase bit flips, because flipping it is what makes targetRotationDegrees()
+		// start reading the runner — and until start() lands it still reports
+		// HABITAT_PLACE's -62°, which handleDriveTransition() would then command
+		// as a fresh rotation on the way into APPLYING_SEQUENCE.
+		xy_sequence_runner_.start(kHabitatSmackXYSequence, 0.0);
+		smack_sequence_started_ = true;
+		return RobotState::HABITAT_SMACK;
+	}
+	// Phase 2: the arm sequence, stepped by MrKrabs::driveCurrentMode's
+	// APPLYING_SEQUENCE case via onRotationReached().
+	if (!xy_sequence_runner_.complete()){
+		return RobotState::HABITAT_SMACK;
+	}
+	// Pull forward off the habitat before turning — see HABITAT_SMACK_FORWARD.
+	return RobotState::HABITAT_SMACK_FORWARD;
+}
+
+RobotState AI::tickHabitatSmackForward(){
+	if (current_state_progress_m_ < kHabitatSmackForwardDistanceM){
+		return RobotState::HABITAT_SMACK_FORWARD;
+	}
+	// Sweep back to the line and line-follow the habitat approach again — which
+	// re-runs the whole find sequence (square-up, approach backup, the sonar
+	// strafe) rather than assuming the next slot is where this one was. That
+	// strafe is also what flips current_habitat_find_direction_ on the second
+	// slot, so the cycle has to pass back through HABITAT_FIND for the two-slot
+	// behaviour to happen at all — see tickHabitatFind.
 	post_reacquire_state_ = RobotState::HABITAT_LINE_FOLLOWING;
-	// Keep turning the way the place rotation already went, rather than
-	// reversing it as a search normally would. The place turn
-	// (kHabitatPlaceXYSequence::rotation_degrees) swung the robot off the line
-	// to face the slot; continuing that way carries it the long way round to
-	// meet the line again, which is the approach the next pickup wants.
+	// Keep turning the way the place rotation already went rather than reversing
+	// it. Nothing between here and there has changed the heading — the smack's
+	// backward leg, its arm pose and this forward leg are all translations — so
+	// "same direction as before" still means the sign of that place turn.
 	line_search_continues_last_rotation_ = true;
 	return RobotState::REACQUIRING_LINE;
 }
@@ -748,6 +802,11 @@ AI::DriveMode AI::desiredDriveMode() const{
 	if (current_state_ == RobotState::HABITAT_BACKUP || current_state_ == RobotState::HABITAT_APPROACH_BACKUP ||
 	    current_state_ == RobotState::HABITAT_POST_PICKUP_BACKUP){
 		return DriveMode::BACKING_UP;
+	}
+	if (current_state_ == RobotState::HABITAT_SMACK){
+		// The one state that changes drive mode partway through — backward leg
+		// first, then the arm sequence. See tickHabitatSmack.
+		return smack_sequence_started_ ? DriveMode::APPLYING_SEQUENCE : DriveMode::BACKING_UP;
 	}
 	if (current_state_ == RobotState::HABITAT_HOLD_AND_MOVE){
 		return DriveMode::HOLDING_AND_MOVING;
@@ -796,6 +855,13 @@ double AI::targetRotationDegrees() const{
 	if (current_state_ == RobotState::HABITAT_PICKUP || current_state_ == RobotState::HABITAT_PLACE){
 		return xy_sequence_runner_.targetRotationDegrees();
 	}
+	if (current_state_ == RobotState::HABITAT_SMACK){
+		// 0 during the backward leg, not the runner's value — it still holds
+		// HABITAT_PLACE's sequence until tickHabitatSmack() starts this one, and
+		// handleDriveTransition() latches whatever this returns as
+		// last_commanded_rotation_degrees_ on every mode change.
+		return smack_sequence_started_ ? xy_sequence_runner_.targetRotationDegrees() : 0.0;
+	}
 	return sequence_runner_.targetRotationDegrees();
 }
 
@@ -823,6 +889,11 @@ bool AI::onRotationReached(){
 		case RobotState::HABITAT_PICKUP:
 		case RobotState::HABITAT_PLACE:
 			return xy_sequence_runner_.onRotationReached(*arm_);
+		case RobotState::HABITAT_SMACK:
+			// Guarded: APPLYING_SEQUENCE is only this state's second phase, but a
+			// stray call during the backward leg would advance HABITAT_PLACE's
+			// already-finished runner rather than this state's sequence.
+			return smack_sequence_started_ && xy_sequence_runner_.onRotationReached(*arm_);
 		default:
 			return sequence_runner_.onRotationReached(*arm_);
 	}
@@ -830,7 +901,8 @@ bool AI::onRotationReached(){
 
 uint64_t AI::sequencePoseSettleUs() const{
 	if (current_state_ == RobotState::METAL_DETECTING || current_state_ == RobotState::PICKUP_ROCK ||
-	    current_state_ == RobotState::HABITAT_PICKUP || current_state_ == RobotState::HABITAT_PLACE){
+	    current_state_ == RobotState::HABITAT_PICKUP || current_state_ == RobotState::HABITAT_PLACE ||
+	    current_state_ == RobotState::HABITAT_SMACK){
 		return xy_sequence_runner_.poseSettleUs();
 	}
 	return sequence_runner_.poseSettleUs();

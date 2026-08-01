@@ -93,10 +93,27 @@ const ArmXYSequence kHabitatPlaceXYSequence = {
 		{0.28,  0.04, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
 		{0.18, -0.00, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
 		{0.18, -0.00, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500}, // open claw — release
-		{0.18, -0.00, Arm::WRIST_PLACE, Arm::CLAW_OPEN,  250, 500}, // open claw — release
-		{0.18, -0.00, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500}, // pull back, open
-		{0.21,  0.03, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500}, // retract to home
-		{0.23,  0.06, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500},
+	},
+};
+
+// Runs in HABITAT_SMACK's second phase, once that state's
+// kHabitatSmackBackupDistanceM backward leg has cleared the habitat — see
+// AI::tickHabitatSmack. The runner isn't started on entering the state (the
+// backup runs first at DriveMode::BACKING_UP); tickHabitatSmack starts it when
+// the distance leg completes and the drive mode flips to APPLYING_SEQUENCE.
+//
+// No rotation: the backward leg holds the heading kHabitatPlaceXYSequence's
+// -62° turn already established, which is the one facing the slot. Poses are
+// absolute XY (no x_is_sonar_relative), and the claw stays closed throughout —
+// HABITAT_PLACE already released the item, so there is nothing to drop.
+// Placeholder values — this is the sequence to set.
+const ArmXYSequence kHabitatSmackXYSequence = {
+	0.0,
+	{
+		{0.26, -0.00, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 1000, 1000},
+		{0.36, -0.08, Arm::WRIST_PLACE, Arm::CLAW_CLOSE, 500, 500},
+		{0.36, -0.08, 180,  Arm::CLAW_CLOSE, 500, 500},
+		{0.28,  0.04, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 500, 500}, // reach in, still holding
 	},
 };
 

@@ -46,6 +46,17 @@ enum class RobotState {
 	HABITAT_PICKUP,
 	LINE_FOLLOWING_REVERSE,
 	HABITAT_PLACE,
+	// Entered once HABITAT_PLACE's arm sequence completes. Two phases in one
+	// state: drives straight backward kHabitatSmackBackupDistanceM to clear the
+	// habitat, then writes kHabitatSmackArmPose once and holds it for
+	// kHabitatSmackHoldUs with the wheels stopped before REACQUIRING_LINE takes
+	// over. See AI::tickHabitatSmack.
+	HABITAT_SMACK,
+	// Straight forward leg run after HABITAT_SMACK, before the sweep back to the
+	// line. Drives kHabitatSmackForwardDistanceM with the heading held, then
+	// hands to REACQUIRING_LINE turning the SAME way the place rotation went.
+	// See AI::tickHabitatSmackForward.
+	HABITAT_SMACK_FORWARD,
 	// First rotates a fixed 45° in place, then continues rotating the same
 	// direction (reactive, no fixed target) until the line follower's two
 	// middle sensors both detect the line, then hands off to
@@ -106,7 +117,7 @@ enum class RobotState {
 	DONE,
 };
 
-static constexpr size_t kNumRobotStates = 22;
+static constexpr size_t kNumRobotStates = 24;
 
 // Debug/serial-print helper — not used by any control-flow logic.
 inline const char* robotStateName(RobotState s) {
@@ -123,6 +134,8 @@ inline const char* robotStateName(RobotState s) {
 		case RobotState::HABITAT_PICKUP: return "HABITAT_PICKUP";
 		case RobotState::LINE_FOLLOWING_REVERSE: return "LINE_FOLLOWING_REVERSE";
 		case RobotState::HABITAT_PLACE: return "HABITAT_PLACE";
+		case RobotState::HABITAT_SMACK: return "HABITAT_SMACK";
+		case RobotState::HABITAT_SMACK_FORWARD: return "HABITAT_SMACK_FORWARD";
 		case RobotState::REACQUIRING_LINE: return "REACQUIRING_LINE";
 		case RobotState::ROCK_REACQUIRE_LINE: return "ROCK_REACQUIRE_LINE";
 		case RobotState::REVERSE_180: return "REVERSE_180";
