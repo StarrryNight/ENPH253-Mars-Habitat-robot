@@ -66,15 +66,15 @@ class STSServo
 	// vertical. Raw direction runs opposite the degree axis here — 0 deg is
 	// raw 1000, 70 deg is raw 100 (confirmed on hardware: commanding 70 was
 	// landing at the physical 0 deg position and vice versa).
-	static constexpr double SERVO_1_MIN_DEG = -2.0;   // raw 1000
-	static constexpr double SERVO_1_MAX_DEG = 74.0;  // raw 100
-	static constexpr int SERVO_1_MIN_RAW = 1100;
-	static constexpr int SERVO_1_MAX_RAW = 1850;
+	static constexpr double SERVO_1_MIN_DEG = 0.0;   // raw 1000
+	static constexpr double SERVO_1_MAX_DEG = 65.0;  // raw 100
+	static constexpr int SERVO_1_MIN_RAW = 850;
+	static constexpr int SERVO_1_MAX_RAW = 1600;
 
 	// Calibration (measured on hardware): forearm servo (ID 2), angle down
 	// from horizontal.
-	static constexpr double SERVO_2_MIN_DEG = 25;  // raw 2800, "high"
-	static constexpr double SERVO_2_MAX_DEG = 96;  // raw 3300, "down"
+	static constexpr double SERVO_2_MIN_DEG = 23;  // raw 2800, "high"
+	static constexpr double SERVO_2_MAX_DEG = 90;  // raw 3300, "down"
 	static constexpr int SERVO_2_MIN_RAW = 4095;
-	static constexpr int SERVO_2_MAX_RAW = 3100;
+	static constexpr int SERVO_2_MAX_RAW = 3200;
 };

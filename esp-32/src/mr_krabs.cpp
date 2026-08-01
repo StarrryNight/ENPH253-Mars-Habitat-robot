@@ -15,7 +15,8 @@ namespace {
 	//
 	//
 	//RANGE FOR COORDIANTE S YSTEM
-	//0.25 minimum
+	//0.1365 minimum (was 0.25 before the -113.5 mm x re-base in
+	//Arm::coordinateToDegrees)
 constexpr ArmCoordinate kArmTestPoses[] = {
 	//0 for cloe
 	//50 for oepn
@@ -26,8 +27,8 @@ constexpr ArmCoordinate kArmTestPoses[] = {
 	//{0.30, -0.06, 120, 0, 500, 500},
 	//{0.24, 0.060, 120, 0, 500, 500},
 	//{0.24, 0.060, Arm::WRIST_PLACE, 0, 500, 500},
-	{0.30, 0.03, Arm::WRIST_PLACE, Arm::CLAW_CLOSE, 500, 500},
-	{0.30, 0.03, Arm::WRIST_PLACE, Arm::CLAW_OPEN,  500, 500},
+	{0.1565, 0.05329, Arm::WRIST_PLACE, Arm::CLAW_CLOSE, 500, 500},
+	{0.2065, 0.00329, Arm::WRIST_PLACE, Arm::CLAW_OPEN,  500, 500},
 	//{0.31, -0.05, 100, 100, 250, 500},
 	//{0.31, -0.05, 100, 100, 250, 500},
 //	{0.36, -0.05, 120, 50, 250, 500},
@@ -276,6 +277,13 @@ void MrKrabs::stepControl()
 	debug_print_now_ = (now - last_state_print_us_) >= STATE_PRINT_PERIOD_US;
 	if (debug_print_now_){
 		last_state_print_us_ = now;
+		// Dead-reckoned position relative to where the run started (see
+		// MotorController::getFieldPose). Printed here, above the settle-delay
+		// return below, so it keeps coming out during arm sequences and
+		// rotations too rather than only while the drivetrain is being stepped.
+		MotorController::FieldPose field_pose = motor_controller_->getFieldPose();
+		Serial.printf("[MrKrabs] pos x=%.3f m y=%.3f m heading=%.1f deg\n",
+			field_pose.x_m, field_pose.y_m, field_pose.heading_rad * RAD_TO_DEG);
 	}
 
 	// No sonar ping here: this call discarded its result (it existed to feed a

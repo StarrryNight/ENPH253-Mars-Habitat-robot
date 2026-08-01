@@ -129,8 +129,13 @@ class AI {
 		RobotState tickTeletubbying();
 		RobotState tickPickupRock();
 		// See RobotState::LINE_FOLLOWING — line-follows until
-		// kRampTriggerDistanceM of progress, then hands to the ramp leg.
+		// rampTriggerDistanceM() of progress, then hands to the ramp leg.
 		RobotState tickLineFollowing();
+		// Progress (m) LINE_FOLLOWING must cover before the ramp leg starts:
+		// kRampTriggerDistanceM plus the trigger distances of every rock
+		// checkpoint the run left unvisited, so the ramp is reached at the same
+		// point on the line whichever checkpoint the first rock came from.
+		double rampTriggerDistanceM() const;
 		// See RobotState::RAMP_LINE_FOLLOWING / RobotState::SECOND_ROCK_FIND.
 		RobotState tickRampLineFollowing();
 		RobotState tickSecondRockFind();
@@ -176,6 +181,15 @@ class AI {
 		// isn't. Separate from the rock-search one so the two can't consume each
 		// other's confirmation. See tickRampLineFollowing.
 		uint64_t ramp_sonar_in_range_since_us_ = 0;
+		// Last plausible sonar reading (cm) of the second rock, and the
+		// SECOND_ROCK_FIND progress (m) it was taken at. Seeded by
+		// tickRampLineFollowing() from the reading that confirmed the rock, then
+		// refreshed each approach tick. Both are needed, not just the range:
+		// SECOND_ROCK_FIND now ends on distance rather than on the sonar, so the
+		// last reading is generally older than the stopping point and has to be
+		// corrected by the travel since. See tickSecondRockFind.
+		double second_rock_sonar_cm_ = 0.0;
+		double second_rock_sonar_progress_m_ = 0.0;
 		// esp_timer_get_time() timestamp HABITAT_FIND's sonar first read closer
 		// than HABITAT_SIDE_THRESHOLD, or 0 before that happens — the start of
 		// kHabitatSideStopDelayUs's extra-strafe countdown. Cleared again when

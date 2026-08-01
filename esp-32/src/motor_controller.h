@@ -143,6 +143,19 @@ public:
 	// line-following resumes instead of carrying forward stale distance.
 	void resetTranslationTracking();
 
+	// Displacement from where the robot started, in the frame it started in:
+	// x rightward and y forward *as of power-on*, not the current robot frame.
+	// heading_rad is the accumulated yaw (CCW positive) those two are
+	// integrated against. Distinct from getTotalTranslationM(), which is a
+	// scalar path length that gets reset per leg — this is a whole-run
+	// position and is never reset. See updateTranslationTracking().
+	struct FieldPose {
+		double x_m;
+		double y_m;
+		double heading_rad;
+	};
+	FieldPose getFieldPose() const;
+
 	RobotVelocity getCurrentRobotVelocity();
 private:
 
@@ -188,6 +201,17 @@ private:
 
 	// Monotonic path length (m) accumulated by updateTranslationTracking().
 	double total_translation_m_ = 0.0;
+
+	// Field-frame displacement (m) and heading (rad) since construction — see
+	// getFieldPose(). Never reset, unlike total_translation_m_: the distance
+	// legs need a per-leg odometer, this is a whole-run position. The heading
+	// is integrated here in updateTranslationTracking() rather than reusing
+	// accumulated_angle_, which is only advanced by applyVelocity() — that
+	// returns early while open-loop drive is active, which would freeze the
+	// heading and silently rotate the rest of the run's displacement.
+	double field_x_m_ = 0.0;
+	double field_y_m_ = 0.0;
+	double field_heading_rad_ = 0.0;
 	// Distance from robot center to each wheel contact point (m). Measured
 	// on hardware as 10 cm — was previously 0.3 (3x too large), which made
 	// current_rotation_rad_ (∝ 1/R) systematically underestimate true

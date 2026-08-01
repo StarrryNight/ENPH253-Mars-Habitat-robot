@@ -321,6 +321,26 @@ void MotorController::updateTranslationTracking(){
 	// after tickMotorSpeeds() (see its header comment), which is what keeps
 	// current_robot_velocity_ fresh for this tick.
 	total_translation_m_ += std::hypot(current_robot_velocity_.x, current_robot_velocity_.y) * MOTOR_CONTROL_LOOP_PERIOD;
+
+	// Same measured velocity again, but integrated as a vector rather than a
+	// magnitude: rotate this tick's robot-frame (x, y) into the frame the robot
+	// started in, so what accumulates is displacement relative to the start
+	// instead of distance travelled. A robot that drives out and comes back
+	// reads a large total_translation_m_ and a field pose near zero.
+	//
+	// Heading is advanced first, so the rotation uses this tick's heading rather
+	// than the previous one — the two are within omega*dt of each other, well
+	// inside the encoder resolution either way, but taking the newer one keeps
+	// this consistent with the velocity it's rotating.
+	field_heading_rad_ += current_robot_velocity_.omega * MOTOR_CONTROL_LOOP_PERIOD;
+	double cos_h = std::cos(field_heading_rad_);
+	double sin_h = std::sin(field_heading_rad_);
+	field_x_m_ += (current_robot_velocity_.x * cos_h - current_robot_velocity_.y * sin_h) * MOTOR_CONTROL_LOOP_PERIOD;
+	field_y_m_ += (current_robot_velocity_.x * sin_h + current_robot_velocity_.y * cos_h) * MOTOR_CONTROL_LOOP_PERIOD;
+}
+
+MotorController::FieldPose MotorController::getFieldPose() const{
+	return {field_x_m_, field_y_m_, field_heading_rad_};
 }
 
 double MotorController::getTotalTranslationM() const{

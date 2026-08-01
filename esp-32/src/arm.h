@@ -46,7 +46,7 @@ public:
 	static constexpr double WRIST_PLACE = 70;
 	static constexpr double CLAW_OPEN = 55;
 	static constexpr double CLAW_CLOSE = 5;
-	static constexpr double UPPERARM_LENGTH = 0.2;
+	static constexpr double UPPERARM_LENGTH = 0.25;
 	static constexpr double FOREARM_LENGTH = 0.15;
 	Arm();
 

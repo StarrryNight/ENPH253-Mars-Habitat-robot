@@ -57,13 +57,13 @@ struct ArmXYSequence {
 const ArmXYSequence kPickupRockXYSequence = {
 	0.0,
 	{
-		{-0.01,  0.025, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500, true},   // [2] METAL_DETECTING: reach in, probe for metal
-		{-0.00,  -0.065, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500, true},   // [1] METAL_DETECTING: reach in, probe for metal
-		{-0.00,  -0.065, Arm::WRIST_CENTER, Arm::CLAW_CLOSE,  500, 500, true},   // [3] PICKUP 
-		{0.28,   0.060,Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500, false},  // [4] PICKUP_ROCK: retract, claw closed
-		{0.24,   0.060,Arm::WRIST_PLACE,  Arm::CLAW_CLOSE, 500, 500, false},  // [5] PICKUP_ROCK: rotate to place
-		{0.24,   0.060,Arm::WRIST_PLACE,  Arm::CLAW_OPEN,  500, 500, false},  // [6] PICKUP_ROCK: release
-		{0.24,   0.060,Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500, false},  // [7] PICKUP_ROCK: back to centre, open
+		{-0.17,  0.18, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500, true},   // [2] METAL_DETECTING: reach in, probe for metal
+		{-0.13,  0.07, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  400, 1000, true},   // [1] METAL_DETECTING: reach in, probe for metal
+		{-0.13,  0.07, Arm::WRIST_CENTER, Arm::CLAW_CLOSE,  500, 500, true},   // [3] PICKUP
+		{0.10,   0.165329,Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500, false},  // [4] PICKUP_ROCK: retract, claw closed
+		{0.10,   0.16329,Arm::WRIST_PLACE,  Arm::CLAW_CLOSE, 500, 500, false},  // [5] PICKUP_ROCK: rotate to place
+		{0.10,   0.16329,Arm::WRIST_PLACE,  Arm::CLAW_OPEN,  500, 500, false},  // [6] PICKUP_ROCK: release
+		{0.10,   0.16329,Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500, false},  // [7] PICKUP_ROCK: back to centre, open
 	},
 	1500000,
 };
@@ -73,11 +73,11 @@ const ArmXYSequence kPickupRockXYSequence = {
 const ArmXYSequence kHabitatPickupXYSequence = {
 	0.0,
 	{
-		{0.30,  0.03, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500},
-		{0.31, -0.05, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500},
-		{0.36, -0.05, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500},
-		{0.36, -0.05, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // close claw — grabbed
-		{0.22,  0.06, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // retract, holding item
+		{0.1865,  0.08329, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  500, 500},
+		{0.1965,  0.00329, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500},
+		{0.2465,  0.00329, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500},
+		{0.2465,  0.00329, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // close claw — grabbed
+		{0.1065,  0.11329, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // retract, holding item
 	},
 };
 
@@ -88,11 +88,11 @@ const ArmXYSequence kHabitatPickupXYSequence = {
 // squares it up. Positive is counter-clockwise (see RobotVelocity::omega);
 // negate it to turn the other way.
 const ArmXYSequence kHabitatPlaceXYSequence = {
-	-47.0,
+	-53.0,
 	{
-		{0.28,  0.04, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
-		{0.18, -0.00, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
-		{0.18, -0.00, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500}, // open claw — release
+		{0.1065,  0.09329, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
+		{0.1065,  0.05329, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 250, 500}, // reach in, still holding
+		{0.1065,  0.05329, Arm::WRIST_CENTER, Arm::CLAW_OPEN,  250, 500}, // open claw — release
 	},
 };
 
@@ -110,10 +110,10 @@ const ArmXYSequence kHabitatPlaceXYSequence = {
 const ArmXYSequence kHabitatSmackXYSequence = {
 	0.0,
 	{
-		{0.26, -0.00, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 1000, 1000},
-		{0.346, -0.08, Arm::WRIST_PLACE, Arm::CLAW_CLOSE, 700, 500},
-		{0.346, -0.08, 180,  Arm::CLAW_CLOSE, 700, 500},
-		{0.28,  0.04, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 500, 500}, // reach in, still holding
+		{0.1465, -0.01671, 90, Arm::CLAW_CLOSE, 1000, 1000},
+		{0.2065, -0.01671, 90, Arm::CLAW_CLOSE, 700, 500},
+		{0.2065, -0.01671, Arm::WRIST_CENTER,  Arm::CLAW_CLOSE, 700, 500},
+		{0.1665,  0.09329, Arm::WRIST_CENTER, Arm::CLAW_CLOSE, 500, 500}, // reach in, still holding
 	},
 	1000000
 };
@@ -146,7 +146,7 @@ const ArmPoseSequence kTeletubbySequence = {
 // from vertical (usable range [0,70]) and elbow_pitch degrees down from
 // horizontal ([23,70]), so this pulls the load up and in, close to the turn
 // axis. Tune on hardware.
-const ArmPose kReverse180ArmPose = {-2, 50, Arm::WRIST_CENTER, Arm::CLAW_CLOSE};
+const ArmPose kReverse180ArmPose = {0, 30, Arm::WRIST_CENTER, Arm::CLAW_CLOSE};
 
 // Arm pulled back out of the way, claw open — the same posture Arm::begin()
 // drives to on startup. Written when a state that had the arm extended is
@@ -154,7 +154,7 @@ const ArmPose kReverse180ArmPose = {-2, 50, Arm::WRIST_CENTER, Arm::CLAW_CLOSE};
 // rock leaves the probe pose reaching out over the field, and the
 // REACQUIRING_LINE spin that follows would swing it into whatever is beside the
 // robot. Claw open because nothing is being carried on that path.
-const ArmPose kArmHomePose = {-2, 25, Arm::WRIST_CENTER, Arm::CLAW_OPEN};
+const ArmPose kArmHomePose = {0, 25, Arm::WRIST_CENTER, Arm::CLAW_OPEN};
 
 // Looks up the ArmPoseSequence to run when entering state. Returns nullptr
 // for states with no fixed arm sequence — the line-following states, DONE,

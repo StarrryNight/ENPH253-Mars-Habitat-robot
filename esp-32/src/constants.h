@@ -12,7 +12,7 @@ static constexpr double ENCODER_RESOLUTION_DISTANCE_M = 0.009687; // at 74 mm di
 // Forward speed during line following (m/s). Tune empirically.
 // Forward speed (m/s) for the ordinary line-following legs — the rock phase,
 // the ramp, the plain LINE_FOLLOWING run. See AI::lineFollowingSpeed().
-static constexpr double FORWARD_SPEED = 0.25;
+static constexpr double FORWARD_SPEED = 0.20;
 
 // Forward speed (m/s) for the habitat line-following legs
 // (HABITAT_LINE_FOLLOWING, LINE_FOLLOWING_REVERSE). Slower because those legs
