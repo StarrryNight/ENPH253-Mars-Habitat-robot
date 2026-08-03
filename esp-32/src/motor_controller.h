@@ -124,18 +124,21 @@ public:
 	// ENCODER_RESOLUTION_DISTANCE_M / (3R) = 0.0297 rad (1.7 deg) per tick.
 	double getYawDriftRad() const;
 
-	// Folds this tick's measured (filtered) robot velocity into the running
-	// translation odometer (total_translation_m_) via velocity * dt —
-	// unlike updateRotationTracking()'s exact-encoder-count approach for
-	// heading, this integrates getCurrentRobotVelocity() instead, since the
-	// exact-count approach proved less reliable in practice. Must run after
-	// tickMotorSpeeds() each tick (see MrKrabs::motorStepControl).
+	// Folds this tick's exact encoder-count deltas into the running translation
+	// odometer (total_translation_m_) and the field pose, the same
+	// count-and-convert approach updateRotationTracking() uses for heading —
+	// counts are summed as they come and turned into distance only when read, so
+	// no per-tick smoothing/rounding error compounds. Must run after
+	// tickMotorSpeeds() each tick (see MrKrabs::motorStepControl), which is what
+	// refreshes the per-wheel deltas.
 	void updateTranslationTracking();
 
-	// Monotonic total path length (m) traveled since construction/last reset,
-	// integrated from measured velocity (see updateTranslationTracking()).
-	// Callers diff successive reads to get incremental distance — see
-	// MrKrabs::driveCurrentMode.
+	// Signed forward displacement (m) since construction/last reset: positive
+	// forward, negative backward, and unchanged by an in-place rotation (the
+	// forward mixing cancels it — see updateTranslationTracking()). Not a path
+	// length; a leg driven backward reads negative, so BACKING_UP negates the
+	// delta before feeding it to AI::addProgress. Callers diff successive reads
+	// to get incremental distance — see MrKrabs::driveCurrentMode.
 	double getTotalTranslationM() const;
 
 	// Zeros the translation odometer. Called when leaving LINE_FOLLOWING for
@@ -199,7 +202,7 @@ private:
 	int64_t wheel_right_rotation_count_;
 	int64_t wheel_back_rotation_count_;
 
-	// Monotonic path length (m) accumulated by updateTranslationTracking().
+	// Signed forward displacement (m) accumulated by updateTranslationTracking().
 	double total_translation_m_ = 0.0;
 
 	// Field-frame displacement (m) and heading (rad) since construction — see

@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include "esp_timer.h"
 #include <array>
+#include <cmath>
 
 // Dummy tuning constants — placeholders pending real localization/testing,
 // same status as the arm pose numbers in robot_poses.h.
@@ -16,20 +17,50 @@ namespace {
 	// Only 2 teletubbies exist on the field — see AI::notifyTeletubbyDetected.
 	constexpr int kMaxTeletubbies = 2;
 
-	// Per-rock: distance (m) into FINDING_ROCK's Nth visit at which rock N's
-	// checkpoint is reached, and the search direction (sign only) for
-	// ROTATING_TIL_ROCK — reusing the same sign convention startRotation()
-	// derives last_rotation_sign_ from. Indexed by AI::visits(FINDING_ROCK) -
-	// 1 — see AI::tickFindingRock/rockSearchOmegaRadS.
+	// Which dead-reckoned coordinate a checkpoint's trigger distance is measured
+	// against. The first stretch runs up the field, so those checkpoints are
+	// reached by y climbing; once the course turns, y stops advancing and it's x
+	// that carries the robot on — see kRockCheckpoints.
+	enum class TriggerAxis { Y, X };
+
+	// Per-rock: the dead-reckoned coordinate (m) at which rock N's checkpoint is
+	// reached, the search direction (sign only) for ROTATING_TIL_ROCK — reusing
+	// the same sign convention startRotation() derives last_rotation_sign_ from —
+	// and which axis that coordinate is measured along. Indexed by
+	// AI::visits(FINDING_ROCK) - 1 — see AI::tickFindingRock/rockSearchOmegaRadS.
+	//
+	// The coordinate is absolute: measured from where the run started, in the
+	// frame the robot started in (MotorController::getFieldPose, fed in via
+	// AI::setFieldPosition), NOT distance into the current state. So these are
+	// positions on the field, and each must be further along its own axis than
+	// the one before it. That's what makes them survive the rock detours — a
+	// rotation contributes nothing to either coordinate (the forward mixing
+	// cancels it) and the arm sequences don't move, so a checkpoint stays where
+	// it is however long the robot spends off the line getting to it.
+	//
+	// The y ones were converted from the old per-state trigger distances by
+	// running sums, so their geometry is unchanged on a straight line; on a
+	// curving line it isn't the same thing, since y is a field coordinate rather
+	// than arc length.
+	//
+	// Rock 4 triggers on x instead: by then the course has turned and y has
+	// stopped advancing, so a y threshold there would never be reached. Its 0.35
+	// is therefore x travel, not a position up the field, and it is compared as a
+	// magnitude — it fires 0.35 m along whichever way the turn goes, since field
+	// x is "rightward as of power-on" and a left turn drives it negative.
+	//
+	// Being a separate axis, it does not have to exceed the y thresholds above it
+	// the way those have to exceed each other.
 	struct RockCheckpoint {
-		double trigger_progress_m;
+		double trigger_m;
 		double rotation_degrees;
+		TriggerAxis axis = TriggerAxis::Y;
 	};
 	constexpr std::array<RockCheckpoint, kNumRocks> kRockCheckpoints = {{
-		{0.4, -47.0},
-		{0.55, 48.0},
-		{0.35, -45.0},
-		{0.55, -45.0},
+		{0.42, -47.0},
+		{0.97, 48.0},
+		{1.24, -45.0},
+		{0.20, -45.0, TriggerAxis::X},
 	}};
 
 	// Distance (m) into LINE_FOLLOWING's Nth visit at which the habitat is
@@ -78,7 +109,7 @@ namespace {
 	// Same magnitude as LINE_SEARCH_OMEGA_RAD_S (mr_krabs.h) — kept as a
 	// separate constant since rock-search and line-search are independent
 	// bench-tuning knobs.
-	constexpr double kRockSearchOmegaRadS = 0.5;
+	constexpr double kRockSearchOmegaRadS = 0.6;
 	// Minimum time (us) the sonar must stay continuously in range before
 	// ROTATING_TIL_ROCK commits to "found the rock". Without this, a single
 	// spurious close-range reading (ultrasonic noise/reflections are common
@@ -87,46 +118,34 @@ namespace {
 	// MrKrabs::driveCurrentMode() ever issues a single rotate command, so
 	// the robot appears to sit still in ROTATING_TIL_ROCK.
 	//
-	// This is the window at kRockSonarConfirmRefCm; the actual requirement
-	// scales with the measured range — see rockSonarConfirmDelayUs().
-	constexpr uint64_t kRockSonarConfirmDelayUs = 150000; // 0.15 s
-	// Range (cm) the base window above is quoted at. Readings at this distance
-	// get exactly kRockSonarConfirmDelayUs; nearer ones get proportionally less,
-	// further ones proportionally more.
-	constexpr double kRockSonarConfirmRefCm = 10.0;
-	// Floor and ceiling (us) on the scaled window. The floor keeps a very close
-	// reading from collapsing the window to nothing, which would put back the
-	// single-spurious-reading trip the debounce exists to prevent; the ceiling
-	// keeps a wild long reading from stalling the search behind a window it
-	// can't realistically hold.
-	constexpr uint64_t kRockSonarConfirmMinUs = 80000;  // 0.08 s
-	constexpr uint64_t kRockSonarConfirmMaxUs = 350000; // 0.35 s
+	// Flat, not scaled by the measured range. This is the window
+	// RAMP_LINE_FOLLOWING's look-ahead uses; ROTATING_TIL_ROCK picks one of the
+	// two direction-specific windows below instead.
+	constexpr uint64_t kRockSonarConfirmDelayUs = 110000; // 0.11 s
 
-	// How long a reading at d_cm must hold before it counts as a real target.
-	// Scales linearly with range because a far target is the harder measurement:
-	// the beam is wider out there, so the rock occupies less of what comes back
-	// and more of the echo is the field behind it, and the returns are weaker.
-	// A window tuned tight enough to be quick at 5 cm is short enough to commit
-	// on noise at 20, which is what the scaling fixes. Used by both places that
-	// debounce a rock detection — ROTATING_TIL_ROCK's spin and
-	// RAMP_LINE_FOLLOWING's look-ahead.
-	uint64_t rockSonarConfirmDelayUs(double d_cm){
-		double scaled_us = static_cast<double>(kRockSonarConfirmDelayUs) * (d_cm / kRockSonarConfirmRefCm);
-		if (scaled_us < static_cast<double>(kRockSonarConfirmMinUs)){
-			return kRockSonarConfirmMinUs;
-		}
-		if (scaled_us > static_cast<double>(kRockSonarConfirmMaxUs)){
-			return kRockSonarConfirmMaxUs;
-		}
-		return static_cast<uint64_t>(scaled_us);
-	}
+	// Same window for ROTATING_TIL_ROCK, split by which way the search spins —
+	// see AI::rockSearchConfirmDelayUs(), which selects between them off the same
+	// checkpoint heading sign rockSearchOmegaRadS() derives its direction from
+	// (>= 0 is counter-clockwise, matching RobotVelocity::omega).
+	//
+	// The two are separate knobs because the two sweeps do not see the same
+	// field: spinning one way carries the sonar across whatever is beside the
+	// robot before it reaches the rock, and those returns are what a
+	// confirmation window has to outlast, while the other way sweeps into open
+	// space and can commit sooner. Which is which depends on where the rock sits
+	// relative to the line, so it's a bench measurement, not something derivable.
+	//
+	// CW covers rocks 1, 3 and 4; CCW only rock 2 (see the rotation_degrees signs
+	// in kRockCheckpoints), so the CW knob moves three checkpoints together.
+	constexpr uint64_t kRockSonarConfirmDelayCcwUs = 110000; // 0.11 s
+	constexpr uint64_t kRockSonarConfirmDelayCwUs  = 80000;  // 0.08 s
 
-	// Base progress (m) into LINE_FOLLOWING at which the ramp leg begins — see
-	// RobotState::RAMP_LINE_FOLLOWING and AI::rampTriggerDistanceM(), which adds
-	// the unvisited checkpoint distances on top of this. Measured from where
-	// LINE_FOLLOWING was entered (transitionTo zeroes current_state_progress_m_),
-	// i.e. from wherever ROCK_REACQUIRE_LINE put the robot back on the line.
-	constexpr double kRampTriggerDistanceM = 0.7;
+	// Extra distance (m) added to the ramp trigger once every rock has been
+	// collected, on top of the unvisited checkpoints' combined distance — see
+	// AI::rampTriggerDistanceM(). Only applies on that last leg: while rocks are
+	// still outstanding the leg exists to reach the next one, and any extra
+	// travel would carry the robot past it.
+	constexpr double kPostRocksRampDistanceM = 0.7;
 
 	// Sonar window (cm) that counts as "second rock ahead" during
 	// RAMP_LINE_FOLLOWING. The lower bound is not just a range limit: NewPing
@@ -170,7 +189,7 @@ namespace {
 	// so the arm's travel time doesn't eat the window. Long enough for the
 	// detector to settle over the target, short enough that a non-metal rock
 	// doesn't cost the run much — every rock checkpoint pays this.
-	constexpr uint64_t kMetalProbeTimeoutUs = 1200000; // 2 s
+	constexpr uint64_t kMetalProbeTimeoutUs = 2000000; // 2 s
 
 	// Grace window, in control ticks, granted to the second side sensor after the
 	// first one reads the habitat strip. Only if it hasn't come on by then does
@@ -240,6 +259,11 @@ void AI::setSonar(Sonar* sonar){
 
 void AI::addProgress(double delta_m){
 	current_state_progress_m_ += delta_m;
+}
+
+void AI::setFieldPosition(double x_m, double y_m){
+	field_x_m_ = x_m;
+	field_y_m_ = y_m;
 }
 
 void AI::setLineSearchInitialTurnDone(bool done){
@@ -392,17 +416,9 @@ RobotState AI::nextRockOrDone(){
 	//
 	// LINE_FOLLOWING rather than HABITAT_LINE_FOLLOWING throughout: the habitat
 	// states are deliberately not entered yet.
-	if (rocks_collected_ >= kRocksToCollect){
-		post_reacquire_state_ = RobotState::LINE_FOLLOWING;
-	} else if (rocks_collected_ == 1){
-		post_reacquire_state_ = RobotState::LINE_FOLLOWING;
-	} else if (rocks_collected_ == 2){
-		post_reacquire_state_ = RobotState::FINDING_ROCK;
-	} else {
-		post_reacquire_state_ = visits(RobotState::FINDING_ROCK) >= kNumRocks
-			? RobotState::LINE_FOLLOWING
-			: RobotState::FINDING_ROCK;
-	}
+	post_reacquire_state_ = visits(RobotState::FINDING_ROCK) >= static_cast<int>(kRockCheckpoints.size())
+		? RobotState::LINE_FOLLOWING
+		: RobotState::FINDING_ROCK;
 	// Rock path: retrace the search spin, no blind initial turn.
 	line_search_continues_last_rotation_ = false;
 	return RobotState::ROCK_REACQUIRE_LINE;
@@ -435,7 +451,18 @@ RobotState AI::tickFindingRock(){
 		// habitat states are held back (see nextRockOrDone).
 		return RobotState::LINE_FOLLOWING;
 	}
-	if (current_state_progress_m_ >= kRockCheckpoints[n - 1].trigger_progress_m){
+	// Absolute field coordinate, not per-state progress: the checkpoint is a place
+	// on the field, so it stays put across the rotations and arm sequences of an
+	// earlier rock's detour, which zero current_state_progress_m_ every time
+	// they're entered. See kRockCheckpoints and AI::setFieldPosition.
+	const RockCheckpoint& checkpoint = kRockCheckpoints[n - 1];
+	// x as a magnitude, y as a signed climb — see kRockCheckpoints for why the
+	// two axes are treated differently.
+	bool on_x = checkpoint.axis == TriggerAxis::X;
+	double reached_m = on_x ? std::fabs(field_x_m_) : field_y_m_;
+	if (reached_m >= checkpoint.trigger_m){
+		Serial.printf("[AI] checkpoint %d reached at %s=%.2f m (trigger %.2f m)\n",
+			n, on_x ? "|x|" : "y", reached_m, checkpoint.trigger_m);
 		return RobotState::ROTATING_TIL_ROCK;
 	}
 	return RobotState::FINDING_ROCK;
@@ -459,14 +486,22 @@ RobotState AI::tickRotatingTilRock(){
 		rock_sonar_in_range_since_us_ = now;
 		return RobotState::ROTATING_TIL_ROCK;
 	}
-	// Recomputed from the live reading each tick rather than latched when the
-	// window opened: if the range grows mid-window the requirement grows with
-	// it, which is the conservative direction.
-	if (now - rock_sonar_in_range_since_us_ < rockSonarConfirmDelayUs(d)){
+	// Direction-specific window: the two sweep directions see different things on
+	// the way to the rock — see kRockSonarConfirmDelayCcwUs/CwUs.
+	if (now - rock_sonar_in_range_since_us_ < rockSearchConfirmDelayUs()){
 		return RobotState::ROTATING_TIL_ROCK;
 	}
-	cached_rock_sonar_x_m_ = d / 100.0 + kSonarMountOffsetM;
 	rock_sonar_in_range_since_us_ = 0;
+	// Already carrying a rock: this checkpoint is a look, not a pickup. The spin
+	// found the rock, which is all that was wanted — hand straight to
+	// nextRockOrDone(), whose ROCK_REACQUIRE_LINE retraces the spin back onto the
+	// line and carries on to the next checkpoint. No probe pose, no metal-detect
+	// wait, and no reason to cache the range since nothing will reach for it.
+	if (rocks_collected_ > 0){
+		Serial.printf("[AI] rock seen at %.1f cm, already carrying one — look only\n", d);
+		return nextRockOrDone();
+	}
+	cached_rock_sonar_x_m_ = d / 100.0 + kSonarMountOffsetM;
 	return RobotState::METAL_DETECTING;
 }
 
@@ -535,34 +570,46 @@ RobotState AI::tickPickupRock(){
 	return nextRockOrDone();
 }
 
-double AI::rampTriggerDistanceM() const{
-	// The ramp sits at a fixed place on the field, but LINE_FOLLOWING is entered
-	// from wherever the first rock happened to be — and the checkpoint table is
-	// a chain of incremental distances, so every checkpoint the run never reached
-	// is that much line the robot still has to cover before it's where the table
-	// would have left it. Add those back, then the fixed kRampTriggerDistanceM
-	// from there.
+double AI::rampTriggerYM() const{
+	// Once a rock is collected the run still has to cover the rest of the
+	// checkpoint chain to reach the ramp, but it has no reason to stop at any of
+	// those checkpoints — it isn't looking for another rock there. In absolute
+	// terms that's just "drive to the end of the chain": the remaining rocks are
+	// completed as pure travel, with no rotation, no probe pose and no
+	// metal-detect wait at any of them.
 	//
-	// visits(FINDING_ROCK) is 1-based and counts the visit the rock was found on,
-	// so its checkpoint is already spent; the unvisited ones start at that same
-	// number as a 0-based index. Entries past the initialized four are {0, 0} (see
-	// kRockCheckpoints), so they contribute nothing.
-	double remaining_m = 0.0;
-	for (size_t i = static_cast<size_t>(visits(RobotState::FINDING_ROCK)); i < kRockCheckpoints.size(); ++i){
-		remaining_m += kRockCheckpoints[i].trigger_progress_m;
+	// The end of the chain is the largest trigger_m rather than the last element,
+	// because entries past the initialized four are {0, 0} (see kRockCheckpoints)
+	// and would otherwise read as the chain ending at y=0. Only the y-axis
+	// checkpoints count: this leg is measured in y, so an x threshold is a
+	// distance along a different axis and comparing it here would be meaningless.
+	double chain_end_y_m = 0.0;
+	for (const RockCheckpoint& checkpoint : kRockCheckpoints){
+		if (checkpoint.axis == TriggerAxis::Y && checkpoint.trigger_m > chain_end_y_m){
+			chain_end_y_m = checkpoint.trigger_m;
+		}
 	}
-	return remaining_m + kRampTriggerDistanceM;
+	// With the quota filled there's no next rock this leg has to stop short of,
+	// so it carries on past the end of the chain by kPostRocksRampDistanceM.
+	if (rocks_collected_ >= kRocksToCollect){
+		chain_end_y_m += kPostRocksRampDistanceM;
+	}
+	return chain_end_y_m;
 }
 
 RobotState AI::tickLineFollowing(){
 	// Drives the line at FORWARD_SPEED (desiredDriveMode() falls through to
-	// DriveMode::LINE_FOLLOWING — no sequenceForState entry) until enough
-	// distance has passed to be at the ramp, then hands over to the leg that
+	// DriveMode::LINE_FOLLOWING — no sequenceForState entry) until the robot is
+	// far enough up the field to be at the ramp, then hands over to the leg that
 	// watches the sonar. Nothing else ends this state.
-	double trigger_m = rampTriggerDistanceM();
-	if (current_state_progress_m_ >= trigger_m){
-		Serial.printf("[AI] %.2f m of line-following done (trigger %.2f m), entering ramp leg\n",
-			current_state_progress_m_, trigger_m);
+	//
+	// Same absolute field y the checkpoints trigger on, for the same reason: this
+	// state is entered after a rock detour, and a per-state odometer would start
+	// counting from wherever that detour happened to end.
+	double trigger_y_m = rampTriggerYM();
+	if (field_y_m_ >= trigger_y_m){
+		Serial.printf("[AI] line-following reached y=%.2f m (trigger %.2f m), entering ramp leg\n",
+			field_y_m_, trigger_y_m);
 		return RobotState::RAMP_LINE_FOLLOWING;
 	}
 	return RobotState::LINE_FOLLOWING;
@@ -588,7 +635,7 @@ RobotState AI::tickRampLineFollowing(){
 		ramp_sonar_in_range_since_us_ = now;
 		return RobotState::RAMP_LINE_FOLLOWING;
 	}
-	if (now - ramp_sonar_in_range_since_us_ < rockSonarConfirmDelayUs(d)){
+	if (now - ramp_sonar_in_range_since_us_ < kRockSonarConfirmDelayUs){
 		return RobotState::RAMP_LINE_FOLLOWING;
 	}
 	Serial.printf("[AI] second rock at %.1f cm, approaching %.2f m\n", d, kSecondRockApproachDistanceM);
@@ -929,6 +976,18 @@ double AI::rockSearchOmegaRadS() const{
 		? kRockCheckpoints[n - 1].rotation_degrees
 		: 0.0;
 	return kRockSearchOmegaRadS * (heading >= 0.0 ? 1.0 : -1.0);
+}
+
+uint64_t AI::rockSearchConfirmDelayUs() const{
+	// Same index and sign convention as rockSearchOmegaRadS() above, so the
+	// window always belongs to the direction actually being spun: an
+	// out-of-range visit falls back to heading 0, which reads as
+	// counter-clockwise there and picks the CCW window here.
+	int n = visits(RobotState::FINDING_ROCK); // 1-based, same index tickFindingRock uses
+	double heading = (n >= 1 && n <= static_cast<int>(kRockCheckpoints.size()))
+		? kRockCheckpoints[n - 1].rotation_degrees
+		: 0.0;
+	return heading >= 0.0 ? kRockSonarConfirmDelayCcwUs : kRockSonarConfirmDelayCwUs;
 }
 
 double AI::targetRotationDegrees() const{

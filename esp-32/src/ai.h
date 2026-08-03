@@ -27,6 +27,16 @@ class AI {
 		// MrKrabs, not real encoder feedback — see MrKrabs::driveCurrentMode.
 		void addProgress(double delta_m);
 
+		// Dead-reckoned position (m) from the start of the run, in the frame the
+		// robot started in — MotorController::getFieldPose(), pushed in by
+		// MrKrabs::stepControl every tick. Absolute, so unlike addProgress()'s
+		// per-state odometer it isn't reset by a state change, which is what
+		// lets the rock checkpoints be positions on the field rather than
+		// distances into a leg. Both axes are needed because the checkpoints
+		// before the course turns are reached in y and the one after it in x.
+		// See tickFindingRock/kRockCheckpoints.
+		void setFieldPosition(double x_m, double y_m);
+
 		// Pushed by MrKrabs::driveCurrentMode's SEARCHING_FOR_LINE case: false
 		// while the fixed initial turn is still in progress, true once it's
 		// reached its target and the reactive continuous spin has taken over.
@@ -71,6 +81,11 @@ class AI {
 		// Valid while desiredDriveMode() == ROTATING_TIL_ROCK. Sign (+1/-1) of
 		// the current rock checkpoint's heading — see tickRotatingTilRock.
 		double rockSearchOmegaRadS() const;
+		// How long (us) the sonar must hold in range before ROTATING_TIL_ROCK
+		// commits to a rock, chosen by the direction of this checkpoint's search
+		// spin — see kRockSonarConfirmDelayCcwUs/CwUs in ai.cpp. RAMP_LINE_
+		// FOLLOWING doesn't use this: it has no spin, so no direction to pick by.
+		uint64_t rockSearchConfirmDelayUs() const;
 		// Valid while desiredDriveMode() == STRAFING_TIL_HABITAT. Sign (+1/-1)
 		// of the strafe direction — flipped by tickHabitatFind() once the
 		// second habitat slot has been found.
@@ -128,14 +143,16 @@ class AI {
 		RobotState tickMetalDetecting();
 		RobotState tickTeletubbying();
 		RobotState tickPickupRock();
-		// See RobotState::LINE_FOLLOWING — line-follows until
-		// rampTriggerDistanceM() of progress, then hands to the ramp leg.
+		// See RobotState::LINE_FOLLOWING — line-follows until the field y
+		// reaches rampTriggerYM(), then hands to the ramp leg.
 		RobotState tickLineFollowing();
-		// Progress (m) LINE_FOLLOWING must cover before the ramp leg starts:
-		// kRampTriggerDistanceM plus the trigger distances of every rock
-		// checkpoint the run left unvisited, so the ramp is reached at the same
-		// point on the line whichever checkpoint the first rock came from.
-		double rampTriggerDistanceM() const;
+		// Field y (m) at which the ramp leg starts: the end of the rock
+		// checkpoint chain, driven straight through without stopping to probe
+		// any of the checkpoints left unvisited, plus kPostRocksRampDistanceM
+		// once the rock quota is filled. Being absolute, it reaches the ramp at
+		// the same point on the field whichever checkpoint the first rock came
+		// from.
+		double rampTriggerYM() const;
 		// See RobotState::RAMP_LINE_FOLLOWING / RobotState::SECOND_ROCK_FIND.
 		RobotState tickRampLineFollowing();
 		RobotState tickSecondRockFind();
@@ -224,6 +241,10 @@ class AI {
 		std::array<int, kNumRobotStates> state_visit_count_{};
 		// Distance (m) traveled since the current state was entered.
 		double current_state_progress_m_;
+		// See setFieldPosition(). Never reset — these are field coordinates, not
+		// leg odometers.
+		double field_x_m_ = 0.0;
+		double field_y_m_ = 0.0;
 		// Where tickReacquiringLine() should hand off once the line is
 		// found. Set by whichever tick*() function transitions into
 		// REACQUIRING_LINE (see nextRockOrDone, tickHabitatPickup, etc.).

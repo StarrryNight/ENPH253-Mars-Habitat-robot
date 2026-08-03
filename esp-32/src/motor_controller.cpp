@@ -314,29 +314,53 @@ double MotorController::getElapsedRotation() const{
 }
 
 void MotorController::updateTranslationTracking(){
-	// Integrates the measured (filtered) robot velocity each tick instead of
-	// accumulating exact encoder-count deltas — the exact-count approach
-	// proved less reliable in practice, so this trades back some
-	// long-run compounding error for steadier per-tick readings. Must run
-	// after tickMotorSpeeds() (see its header comment), which is what keeps
-	// current_robot_velocity_ fresh for this tick.
-	total_translation_m_ += std::hypot(current_robot_velocity_.x, current_robot_velocity_.y) * MOTOR_CONTROL_LOOP_PERIOD;
-
-	// Same measured velocity again, but integrated as a vector rather than a
-	// magnitude: rotate this tick's robot-frame (x, y) into the frame the robot
-	// started in, so what accumulates is displacement relative to the start
-	// instead of distance travelled. A robot that drives out and comes back
-	// reads a large total_translation_m_ and a field pose near zero.
+	// Exact encoder counts, not integrated (filtered) velocity: this tick's raw
+	// pulse delta per wheel, signed by the commanded direction, exactly as
+	// updateRotationTracking() does. Must run after tickMotorSpeeds(), which is
+	// what refreshes getCurrentDeltaCount().
 	//
-	// Heading is advanced first, so the rotation uses this tick's heading rather
-	// than the previous one — the two are within omega*dt of each other, well
-	// inside the encoder resolution either way, but taking the newer one keeps
-	// this consistent with the velocity it's rotating.
-	field_heading_rad_ += current_robot_velocity_.omega * MOTOR_CONTROL_LOOP_PERIOD;
+	// Counting works here for the same reason it works for rotation: the progress
+	// legs (LINE_FOLLOWING, DRIVING_FORWARD/BACKING_UP — the only modes that
+	// consume this) drive straight along +/-y, so every wheel with a meaningful
+	// share of the motion has an unambiguous commanded direction to be signed by.
+	WheelVelocities delta_m = {
+		static_cast<double>(wheel_left_motor_->getCurrentDeltaCount())  * wheel_left_motor_->getIntendedDirection()  * ENCODER_RESOLUTION_DISTANCE_M,
+		static_cast<double>(wheel_right_motor_->getCurrentDeltaCount()) * wheel_right_motor_->getIntendedDirection() * ENCODER_RESOLUTION_DISTANCE_M,
+		static_cast<double>(wheel_back_motor_->getCurrentDeltaCount())  * wheel_back_motor_->getIntendedDirection()  * ENCODER_RESOLUTION_DISTANCE_M,
+	};
+	// The forward mixing is a linear map, so feeding per-tick DISTANCES where it
+	// expects speeds returns this tick's displacement in the same units — d.x/d.y
+	// in metres, d.omega in radians.
+	RobotVelocity d = wheelToEuclidean(delta_m);
+
+	// Rotation is rejected structurally, not by a threshold: an in-place spin
+	// adds R*dtheta to all three wheels equally, and both mixing rows sum to zero
+	// over the three wheel angles (-sin: 0.5+0.5-1; cos: -0.866+0.866+0), so that
+	// common term cancels out of d.x and d.y exactly. What survives is translation.
+	//
+	// Accumulating the SIGNED forward component rather than hypot() is what makes
+	// that hold once quantization is in play. A lone stray count during a spin
+	// leaves a ~6 mm residual the cancellation can't reach; taken as a magnitude
+	// every one of those would add, so a long rotation would quietly bank tens of
+	// centimetres of phantom progress. Signed, the left and right wheels' strays
+	// enter with opposite sign (cos150 vs cos30) and accrue at the same rate, so
+	// the residual is a zero-mean walk of a few mm instead of a monotonic drift.
+	//
+	// Only y, not the full vector: no strafe leg consumes progress, so dropping
+	// d.x costs nothing and removes one more way for sideways motion to register
+	// as forward travel. Consumers driving backward negate the delta themselves —
+	// see MrKrabs::driveCurrentMode's BACKING_UP case.
+	total_translation_m_ += d.y;
+
+	// Same per-tick displacement, rotated into the frame the robot started in and
+	// accumulated, so what this holds is position relative to the start rather
+	// than distance travelled. Heading is advanced first so the rotation uses
+	// this tick's heading, consistent with the displacement it's rotating.
+	field_heading_rad_ += d.omega;
 	double cos_h = std::cos(field_heading_rad_);
 	double sin_h = std::sin(field_heading_rad_);
-	field_x_m_ += (current_robot_velocity_.x * cos_h - current_robot_velocity_.y * sin_h) * MOTOR_CONTROL_LOOP_PERIOD;
-	field_y_m_ += (current_robot_velocity_.x * sin_h + current_robot_velocity_.y * cos_h) * MOTOR_CONTROL_LOOP_PERIOD;
+	field_x_m_ += d.x * cos_h - d.y * sin_h;
+	field_y_m_ += d.x * sin_h + d.y * cos_h;
 }
 
 MotorController::FieldPose MotorController::getFieldPose() const{

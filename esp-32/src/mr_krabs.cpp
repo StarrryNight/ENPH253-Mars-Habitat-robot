@@ -274,14 +274,19 @@ static constexpr uint64_t STATE_PRINT_PERIOD_US = 500000; // 500 ms
 void MrKrabs::stepControl()
 {
 	uint64_t now = esp_timer_get_time();
+
+	// Dead-reckoned position relative to where the run started (see
+	// MotorController::getFieldPose). Pushed to AI every tick, above the
+	// settle-delay return below, because the rock checkpoints trigger off the y
+	// coordinate rather than per-state progress — an absolute field position has
+	// to stay current through the arm sequences and rotations that a state's own
+	// odometer is reset by. Cheap: a copy of three doubles.
+	MotorController::FieldPose field_pose = motor_controller_->getFieldPose();
+	ai_->setFieldPosition(field_pose.x_m, field_pose.y_m);
+
 	debug_print_now_ = (now - last_state_print_us_) >= STATE_PRINT_PERIOD_US;
 	if (debug_print_now_){
 		last_state_print_us_ = now;
-		// Dead-reckoned position relative to where the run started (see
-		// MotorController::getFieldPose). Printed here, above the settle-delay
-		// return below, so it keeps coming out during arm sequences and
-		// rotations too rather than only while the drivetrain is being stepped.
-		MotorController::FieldPose field_pose = motor_controller_->getFieldPose();
 		Serial.printf("[MrKrabs] pos x=%.3f m y=%.3f m heading=%.1f deg\n",
 			field_pose.x_m, field_pose.y_m, field_pose.heading_rad * RAD_TO_DEG);
 	}
@@ -415,10 +420,12 @@ void MrKrabs::driveCurrentMode()
 			motor_controller_->setVelocity({0, speed, -correction});
 			// Real odometry: diff of the encoder-count-based translation
 			// odometer (MotorController::updateTranslationTracking(), folded
-			// in each tick by motorStepControl) rather than integrating
-			// (filtered) velocity * dt — avoids compounding smoothing/
-			// rounding error over a long run, same reasoning as
-			// updateRotationTracking().
+			// in each tick by motorStepControl). Counts are summed exactly and
+			// converted on read, so no smoothing/rounding error compounds over a
+			// long run — same reasoning as updateRotationTracking().
+			//
+			// Passed through unnegated: this leg drives +y (see
+			// AI::lineFollowingDirection), which is the odometer's positive sense.
 			double total_translation_m = motor_controller_->getTotalTranslationM();
 			ai_->addProgress(total_translation_m - last_total_translation_m_);
 			last_total_translation_m_ = total_translation_m;
@@ -526,9 +533,9 @@ void MrKrabs::driveCurrentMode()
 			double yaw = orientation_controller_.holdCorrection(motor_controller_->getYawDriftRad());
 			// Open loop, not setVelocity(): at HABITAT_BACKUP_SPEED each wheel
 			// turns ~0.087 m/s, which is ~9 encoder counts/s against a
-			// VELOCITY_BUFFER_SIZE window of 70 ms — most windows contain no
-			// counts at all, so getSpeed() reads a quantized 0 / 0.138 / 0.276
-			// ladder (one count in the window is 0.9687/7 m/s) with the target
+			// VELOCITY_BUFFER_SIZE window of 150 ms (15 ticks) — most windows
+			// contain no counts at all, so getSpeed() reads a quantized ladder
+			// (one count in the window is ENCODER_RESOLUTION_DISTANCE_M/15) with the target
 			// below its first nonzero rung. Feeding that to the wheel PIDs is
 			// feeding them quantization noise, not tracking error. The
 			// feedforward term is what actually drives these legs regardless, so
@@ -543,8 +550,14 @@ void MrKrabs::driveCurrentMode()
 			// Unaffected too: this odometer is encoder-count based, not
 			// integrated filtered velocity, so the distance leg still terminates
 			// correctly at ~9.69 mm resolution.
+			//
+			// Negated by drive_sign because the odometer is signed forward
+			// displacement, not path length: a backward leg accumulates negative,
+			// and AI's distance checks all count up. Multiplying rather than
+			// taking a magnitude keeps the rotation residual zero-mean — abs()
+			// would turn every few-mm jitter into forward progress.
 			double total_translation_m = motor_controller_->getTotalTranslationM();
-			ai_->addProgress(total_translation_m - last_total_translation_m_);
+			ai_->addProgress((total_translation_m - last_total_translation_m_) * drive_sign);
 			last_total_translation_m_ = total_translation_m;
 			break;
 		}
